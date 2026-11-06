@@ -1,0 +1,160 @@
+@import 'tailwindcss' source('../');
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-brand: var(--brand);
+  --color-brand-strong: var(--brand-strong);
+  --color-brand-soft: var(--brand-soft);
+  --color-ok: var(--ok);
+  --color-ok-soft: var(--ok-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --font-display: 'Barlow Condensed', 'Arial Narrow', sans-serif;
+  --font-sans: 'Barlow', system-ui, sans-serif;
+}
+
+:root {
+  --bg: #f4f4f2;
+  --surface: #ffffff;
+  --surface-2: #f8f8f6;
+  --ink: #111111;
+  --ink-2: #2b2b2b;
+  --muted: #6b6b6b;
+  --line: #e4e4e0;
+  --brand: #e10f1f;
+  --brand-strong: #b80a17;
+  --brand-soft: #fdecee;
+  --ok: #157f3b;
+  --ok-soft: #e7f5ec;
+  --warn: #a15c00;
+  --warn-soft: #fff4e0;
+  --info: #1f4fb8;
+  --info-soft: #eaf0fd;
+  color-scheme: light;
+}
+
+[data-theme='dark'] {
+  --bg: #0b0b0b;
+  --surface: #151515;
+  --surface-2: #1c1c1c;
+  --ink: #f4f4f2;
+  --ink-2: #d9d9d6;
+  --muted: #9a9a96;
+  --line: #2a2a2a;
+  --brand: #ff2e3e;
+  --brand-strong: #ff5260;
+  --brand-soft: #2a0f12;
+  --ok: #4ade80;
+  --ok-soft: #0f2418;
+  --warn: #fbbf24;
+  --warn-soft: #2a2008;
+  --info: #7aa2ff;
+  --info-soft: #111c33;
+  color-scheme: dark;
+}
+
+html,
+body {
+  @apply m-0 bg-bg text-ink;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+.font-display {
+  font-family: var(--font-display);
+  letter-spacing: 0.01em;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
+
+/* Diagonal hazard stripe used as a brand accent */
+.stripe {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    var(--brand) 0 8px,
+    transparent 8px 16px
+  );
+}
+
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.anim-slide {
+  animation: slide-in 0.22s ease-out;
+}
+.anim-fade {
+  animation: fade-up 0.25s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .anim-slide,
+  .anim-fade {
+    animation: none;
+  }
+}
+
+/* Print: only the proposal document is printed (Salvar como PDF) */
+@page {
+  size: A4;
+  margin: 14mm 12mm;
+}
+.print-portal {
+  display: none;
+}
+@media print {
+  html,
+  body {
+    background: #fff !important;
+  }
+  body > *:not(.print-portal) {
+    display: none !important;
+  }
+  .print-portal {
+    display: block !important;
+  }
+  .print-area {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    max-width: none !important;
+    box-shadow: none !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
+  }
+  .print-area tr {
+    break-inside: avoid;
+  }
+}
