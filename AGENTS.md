@@ -1,6 +1,6 @@
 # AGENTS.md — Qualimix CRM
 
-CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em pt-BR, com BRL e datas DD/MM/AAAA. **Continue a partir de [PLAN.md](./PLAN.md)**: o Marco 1 (produto navegável + motor de orçamentos) está concluído e o próximo é o Marco 2 (Netlify Database).
+CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em pt-BR, com BRL e datas DD/MM/AAAA. **Continue a partir de [PLAN.md](./PLAN.md)**: o Marco 1 (produto navegável + motor de orçamentos) está concluído e o próximo é o Marco 2 (PostgreSQL + Drizzle sem dependência do host).
 
 ## Arquitetura
 
@@ -37,4 +37,4 @@ CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em 
 - APIs do navegador apenas em efeitos ou handlers (SSR).
 - Impressão: a proposta é renderizada em `.print-portal` (portal no `body`); o CSS de impressão oculta todo o resto.
 - Testes: `npm test` (Vitest, `src/**/*.test.ts`) e `npm run test:browser` (Playwright, `tests/`). O build não faz checagem de tipos.
-- TypeScript fica na versão 6 (o adaptador Netlify depende de APIs ausentes no 7).
+- TypeScript fica na versão 6 (a versão 6 é a versão atualmente validada pelo projeto; reavaliar upgrades com a suíte de testes).

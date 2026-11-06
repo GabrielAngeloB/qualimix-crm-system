@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.output/
+.vinxi/
+.tanstack/
+.vite/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example

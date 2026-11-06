@@ -18,7 +18,7 @@ Nenhum preço, dado institucional ou capacidade operacional da Qualimix foi inve
 - TanStack Start (React 19 + TypeScript), Vite, Tailwind CSS 4
 - Chart.js (gráficos), lucide-react (ícones)
 - Vitest (testes de regras) e Playwright (teste de navegador)
-- Hospedagem na Netlify. Próximas etapas: Netlify Database (Postgres + Drizzle), Netlify Identity e Netlify Blobs
+- Hospedagem: qualquer runtime Node.js compatível com TanStack Start e SSR. Próximas etapas: PostgreSQL + Drizzle, autenticação independente de provedor e armazenamento de objetos compatível com S3
 
 ## Executar localmente
 
@@ -28,9 +28,8 @@ npm run dev          # http://localhost:3000
 npm test             # testes de cálculo, regras e indicadores
 ```
 
-Ou, com emulação da plataforma Netlify: `netlify dev`.
 
-Ainda não há variáveis de ambiente obrigatórias. Banco, autenticação e armazenamento serão provisionados pela Netlify nos próximos marcos.
+Ainda não há variáveis de ambiente obrigatórias. Banco, autenticação e armazenamento ainda não foram implementados; serão escolhidos e configurados de forma independente da hospedagem nos próximos marcos.
 
 ## Roteiro
 
