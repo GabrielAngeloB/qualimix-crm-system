@@ -417,7 +417,7 @@ export const createOpportunity = createServerFn({ method: 'POST' })
          $1,$2,$3,'novo',$4,$5,$6,current_date,
          jsonb_build_array(jsonb_build_object(
            'at', $7::text,
-           'by', $5::text,
+           'by', $5,
            'text', 'Oportunidade criada.'
          )),
          '[]'::jsonb,false,$5
