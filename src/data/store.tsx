@@ -23,6 +23,7 @@ import {
   createOpportunity as createOpportunityOnServer,
   type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
+import { createDefaultSettings, type AppSettings } from './settings'
 
 export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string; body?: string }
 interface Store {
@@ -46,6 +47,11 @@ interface Store {
   updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
   createOpportunity: (input: OpportunityCreateInput) => Promise<void>
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
+  settings: AppSettings
+  settingsReady: boolean
+  workspaceReady: boolean
+  addQuote: (quote: QuoteRecord) => void
+  updateQuote: (quote: QuoteRecord) => void
   refresh: () => Promise<void>
   toasts: Toast[]; toast: (t: Omit<Toast, 'id'>) => void; dismissToast: (id: number) => void
 }
@@ -67,6 +73,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [demoModeState, setDemoModeState] = useState(false)
   const [dbData, setDbData] = useState<StoreData>(emptyData)
   const [opps, setOpps] = useState<Opportunity[]>(seedOpps)
+  const [localQuotes, setLocalQuotes] = useState<QuoteRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [toasts, setToasts] = useState<Toast[]>([])
 
@@ -136,6 +143,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toast({ tone: 'ok', title: 'Orçamento salvo', body: saved.number + ' · versão ' + saved.version })
     return saved
   }, [refresh, toast])
+  const addQuote = useCallback((quote: QuoteRecord) => {
+    setLocalQuotes((quotes) => [...quotes.filter((item) => item.id !== quote.id), quote])
+  }, [])
+  const updateQuote = useCallback((quote: QuoteRecord) => {
+    setLocalQuotes((quotes) => quotes.map((item) => item.id === quote.id ? quote : item))
+  }, [])
 
   const createWorkOrderFromQuote = useCallback(async (quoteId: string, dueDate: string, method: string) => {
     const order = await createWorkOrderFromQuoteOnServer({ data: { quoteId, dueDate, method } })
@@ -179,10 +192,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const value = useMemo<Store>(() => {
-    const ctx = quoteContext(demoMode, dbData.products.length ? dbData.products : undefined)
+    const settings = {
+      ...createDefaultSettings(),
+      catalog: dbData.products.length ? dbData.products : createDefaultSettings().catalog,
+    }
+    const ctx = quoteContext(demoMode, settings)
     const clients = demoMode ? [...dbData.clients, ...seedClients] : dbData.clients
     const sites = demoMode ? [...dbData.sites, ...seedSites] : dbData.sites
-    const quoteRecords = demoMode ? [...dbData.quotes, ...(seedQuotes as QuoteRecord[])] : dbData.quotes
+    const quoteRecords = demoMode
+      ? [...dbData.quotes, ...localQuotes, ...(seedQuotes as QuoteRecord[])]
+      : [...dbData.quotes, ...localQuotes]
     const opportunities = sortNewestFirst(demoMode ? [...dbData.opportunities, ...opps.filter((item) => item.demo)] : dbData.opportunities)
     return {
       demoMode, setDemoMode, ctx, clients, sites,
@@ -190,6 +209,8 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
       currentUserId: dbData.currentUserId, currentRole: dbData.currentRole, views: dbData.views,
       products: dbData.products,
+      settings, settingsReady: !loading, workspaceReady: !loading,
+      addQuote, updateQuote,
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
       workOrders: dbData.workOrders, scheduleEvents: dbData.scheduleEvents,
       professionals: dbData.professionals, expenses: dbData.expenses,
@@ -203,7 +224,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       loading, addClient, updateOpportunity, createOpportunity, saveQuote, refresh,
       toasts, toast, dismissToast,
     }
-  }, [demoMode, setDemoMode, dbData, opps, loading, addClient, updateOpportunity, createOpportunity, saveQuote,
+  }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
     createWorkOrderFromQuote, updateWorkOrderAmount, addExpense, registerPayment, cancelFinancialEntry,
     saveProfessional, addScheduleEvent, saveTask, refresh, toasts, toast, dismissToast])
 

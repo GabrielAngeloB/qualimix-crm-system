@@ -59,7 +59,7 @@ function mapSchedule(r: any): ScheduleEvent {
     clientId: String(r.cliente_id), siteId: String(r.obra_id), date: isoDate(r.data),
     time: String(r.hora).slice(0, 5), service: String(r.servico), volumeM3: Number(r.volume_m3 ?? 0),
     fck: r.fck == null ? null : Number(r.fck), pump: Boolean(r.bomba),
-    status: r.status, notes: r.observacoes ?? '', demo: false,
+    truck: r.caminhao ?? '', status: r.status, notes: r.observacoes ?? '', demo: false,
   }
 }
 function mapProfessional(r: any): Professional {

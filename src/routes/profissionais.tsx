@@ -51,7 +51,7 @@ function Profissionais() {
       document: professional.document,
       phone: professional.phone,
       serviceType: professional.serviceType,
-      rate: (professional.rateCents / 100).toFixed(2).replace('.', ','),
+      rate: professional.rateCents != null ? (professional.rateCents / 100).toFixed(2).replace('.', ',') : '',
       rateUnit: professional.rateUnit,
       paymentMethod: professional.paymentMethod,
       notes: professional.notes,

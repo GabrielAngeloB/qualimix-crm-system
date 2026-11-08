@@ -18,6 +18,7 @@ export function createOpportunityFromClient(
     estimatedValue: null,
     ownerId: client.ownerId,
     source: client.source.trim() || 'Não informado',
+    createdAt,
     enteredAt,
     lastContact: null,
     nextContact: null,

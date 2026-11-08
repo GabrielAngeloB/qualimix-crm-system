@@ -55,6 +55,7 @@ function Agenda() {
       volumeM3: quote.result.concreteVolume,
       fck: quote.fck,
       pump: quote.extras.pumping.mode !== 'nao',
+      truck: '',
       status: 'Planejada',
       notes: [client?.name, site?.name, notes.trim()].filter(Boolean).join(' · '),
       demo: false,

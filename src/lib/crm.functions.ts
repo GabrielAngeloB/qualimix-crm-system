@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import type { Client, Opportunity, QuoteRecord, Site, TeamUser, QuoteType } from '../data/fixtures'
 import { quoteContext } from '../data/derived'
-import { leadSources, lossReasons } from '../data/settings'
+import { createDefaultSettings, leadSources, lossReasons } from '../data/settings'
 import {
   computeQuote,
   defaultExtras,
@@ -59,8 +59,6 @@ const mapQuote = (r: any): QuoteRecord => {
     extras: d.extras ?? defaultExtras(), paymentMethodIds: d.paymentMethodIds ?? [],
     paymentTerms: d.paymentTerms ?? '', executionDeadline: d.executionDeadline ?? '',
     notes: d.notes ?? '', demo: Boolean(r.is_demo),
-    savedResult: r.resultado_calculo ?? null,
-    savedFck: r.fck == null ? null : Number(r.fck),
   }
 }
 const mapCatalog = (r: any): CatalogItem => ({
@@ -642,7 +640,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
 
     const volume = summarizeMeasures(data.volumeElements, data.volumeMargin, 'volume')
     const area = summarizeMeasures(data.areaElements, data.areaMargin, 'area')
-    const ctx = quoteContext(false, dbCatalog)
+    const ctx = quoteContext(false, { ...createDefaultSettings(), catalog: dbCatalog })
     const result = computeQuote({
       clientId: data.clientId, siteId: data.siteId, lines, volume, area,
       extras: data.extras, paymentMethodIds: data.paymentMethodIds,

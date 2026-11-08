@@ -213,7 +213,7 @@ function Financeiro() {
             <Field label="Profissional (opcional)">
               {(id) => <select id={id} className={inputCls()} value={expense.professionalId} onChange={(event) => {
                 const professional = professionals.find((item) => item.id === event.target.value)
-                const unitRate = professional ? (professional.rateCents / 100).toFixed(2).replace('.', ',') : ''
+                const unitRate = professional && professional.rateCents != null ? (professional.rateCents / 100).toFixed(2).replace('.', ',') : ''
                 setExpense((current) => ({
                   ...current,
                   professionalId: event.target.value,

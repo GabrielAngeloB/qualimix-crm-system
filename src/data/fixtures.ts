@@ -217,6 +217,7 @@ export interface Opportunity {
   quoteId: string | null
   history: { at: string; by: string; text: string }[]
   demo: boolean
+  createdAt: string
 }
 
 const op = (
@@ -235,6 +236,7 @@ const op = (
   quoteId: string | null = null,
 ): Opportunity => ({
   id, title, clientId, siteId, stage, estimatedValue, ownerId, source,
+  createdAt: rel(-enteredDaysAgo),
   enteredAt: rel(-enteredDaysAgo),
   lastContact: lastContactDaysAgo === null ? null : rel(-lastContactDaysAgo),
   nextContact: nextInDays === null ? null : rel(nextInDays),
