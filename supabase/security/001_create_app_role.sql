@@ -9,7 +9,7 @@ begin;
 do $$
 begin
   if not exists (select 1 from pg_roles where rolname = 'qualimix_app') then
-    create role qualimix_app;
+    execute 'create role qualimix_app';
   end if;
 end $$;
 
