@@ -195,7 +195,7 @@ export const createWorkOrderFromQuoteOnServer = createServerFn({ method: 'POST' 
     return withTransaction(async (tx) => {
       const q = await tx.query<any>(
         `select id,numero,status,tipo,cliente_id,obra_id,oportunidade_id,total_centavos,is_demo
-         from public.orcamentos where id=$1 for update`, [data.quoteId])
+         from public.orcamentos where id=$1`, [data.quoteId])
       const quote = q.rows[0]
       if (!quote || quote.is_demo) throw new Error('Orçamento real não encontrado.')
       if (quote.status !== 'Aceito') throw new Error('Somente orçamentos aceitos podem gerar pedidos.')
@@ -223,6 +223,14 @@ export const createWorkOrderFromQuoteOnServer = createServerFn({ method: 'POST' 
          amount,data.dueDate,data.method,profile.id])
       return mapWorkOrder(orderResult.rows[0])
     })
+    } catch (error) {
+      // pedidos.orcamento_id possui UNIQUE: sob corrida, apenas uma transação vence.
+      if ((error as { code?: string; constraint?: string })?.code === '23505' &&
+          (error as { constraint?: string })?.constraint === 'pedidos_orcamento_id_key') {
+        throw new Error('Este orçamento já foi convertido em pedido.')
+      }
+      throw error
+    }
   })
 
 export const updateWorkOrderAmountOnServer = createServerFn({ method: 'POST' })
