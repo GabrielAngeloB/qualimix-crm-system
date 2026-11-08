@@ -14,7 +14,7 @@
 begin;
 
 -- --------------------------------------------------------------------------
--- 1. TABELAS — 9 NO TOTAL
+-- 1. TABELAS — 6 NO TOTAL
 -- IDs de negócio são TEXT para aceitar os IDs string já usados pelo frontend.
 -- O Supabase gera UUIDs em texto quando o cliente não envia um ID.
 -- --------------------------------------------------------------------------
@@ -279,86 +279,6 @@ create index orcamentos_oportunidade_idx on public.orcamentos (oportunidade_id);
 create index orcamentos_status_data_idx on public.orcamentos (status, created_at desc);
 create index orcamentos_responsavel_idx on public.orcamentos (responsavel_id);
 
--- 7/9 — Veículos.
-create table public.veiculos (
-  id text primary key default gen_random_uuid()::text,
-  placa text not null,
-  tipo text not null default 'Outro'
-    check (tipo in ('Betoneira', 'Bomba-lança', 'Bomba estacionária', 'Basculante', 'Caminhão de apoio', 'Outro')),
-  modelo text not null default '',
-  ano smallint,
-  capacidade_m3 numeric(10,2) check (capacidade_m3 is null or capacidade_m3 > 0),
-  hodometro_km numeric(12,1) not null default 0 check (hodometro_km >= 0),
-  proxima_manutencao_km numeric(12,1) check (proxima_manutencao_km is null or proxima_manutencao_km >= 0),
-  status text not null default 'Disponível'
-    check (status in ('Disponível', 'Em operação', 'Manutenção', 'Atenção', 'Inativo')),
-  crlv_vence_em date,
-  seguro_vence_em date,
-  observacoes text not null default '',
-  ativo boolean not null default true,
-  is_demo boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create unique index veiculos_placa_unica on public.veiculos (upper(trim(placa)));
-
--- 8/9 — Motoristas.
-create table public.motoristas (
-  id text primary key default gen_random_uuid()::text,
-  nome text not null,
-  telefone text not null default '',
-  categoria_cnh text not null default '',
-  cnh_vence_em date,
-  ativo boolean not null default true,
-  observacoes text not null default '',
-  is_demo boolean not null default false,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
-);
-
-create index motoristas_ativo_idx on public.motoristas (ativo);
-
--- 9/9 — Registros da frota: viagem, manutenção, abastecimento e checklist.
--- Campos comuns e relacionamentos ficam em colunas; os campos específicos
--- de cada tipo ficam em dados JSONB para evitar quatro tabelas quase iguais.
-create table public.frota_registros (
-  id text primary key default gen_random_uuid()::text,
-  tipo text not null
-    check (tipo in ('viagem', 'manutencao', 'abastecimento', 'checklist')),
-  veiculo_id text not null references public.veiculos(id) on delete restrict,
-  motorista_id text references public.motoristas(id) on delete set null,
-  cliente_id text references public.clientes(id) on delete restrict,
-  obra_id text,
-  orcamento_id text references public.orcamentos(id) on delete set null,
-  data_referencia date not null,
-  hora time,
-  status text,
-  dados jsonb not null default '{}'::jsonb
-    check (jsonb_typeof(dados) = 'object'),
-  is_demo boolean not null default false,
-  created_by uuid references public.perfis(id) on delete set null default auth.uid(),
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint frota_viagem_com_cliente_obra check (
-    tipo <> 'viagem' or (cliente_id is not null and obra_id is not null and hora is not null)
-  ),
-  constraint frota_checklist_com_motorista check (
-    tipo <> 'checklist' or motorista_id is not null
-  ),
-  constraint frota_obra_do_cliente_fk
-    foreign key (obra_id, cliente_id) references public.obras(id, cliente_id) on delete restrict,
-  constraint frota_obra_exige_cliente check (obra_id is null or cliente_id is not null)
-);
-
-create index frota_registros_veiculo_data_idx
-  on public.frota_registros (veiculo_id, data_referencia desc);
-create index frota_registros_tipo_data_idx
-  on public.frota_registros (tipo, data_referencia desc);
-create index frota_registros_motorista_idx on public.frota_registros (motorista_id);
-create index frota_registros_cliente_idx on public.frota_registros (cliente_id);
-
--- --------------------------------------------------------------------------
 -- 3. DADOS INICIAIS DO CATÁLOGO
 -- Preços oficiais não confirmados continuam NULL.
 -- Valores de demonstração permanecem explicitamente separados.
@@ -399,13 +319,6 @@ create trigger produtos_updated_at before update on public.produtos
   for each row execute function public.set_updated_at();
 create trigger orcamentos_updated_at before update on public.orcamentos
   for each row execute function public.set_updated_at();
-create trigger veiculos_updated_at before update on public.veiculos
-  for each row execute function public.set_updated_at();
-create trigger motoristas_updated_at before update on public.motoristas
-  for each row execute function public.set_updated_at();
-create trigger frota_registros_updated_at before update on public.frota_registros
-  for each row execute function public.set_updated_at();
-
 -- --------------------------------------------------------------------------
 -- 5. RLS — ACESSO NEGADO POR PADRÃO
 -- Nenhuma política para DELETE: registros são desativados/cancelados, não
@@ -418,9 +331,8 @@ alter table public.obras enable row level security;
 alter table public.oportunidades enable row level security;
 alter table public.produtos enable row level security;
 alter table public.orcamentos enable row level security;
-alter table public.veiculos enable row level security;
-alter table public.motoristas enable row level security;
-alter table public.frota_registros enable row level security;
+
+
 
 -- Perfis: cada pessoa vê o próprio perfil; pessoas ativas podem consultar
 -- nomes e funções da equipe. A API não pode promover ninguém a administrador.
@@ -481,40 +393,6 @@ create policy orcamentos_select on public.orcamentos
   for select to authenticated
   using (public.is_active_user());
 
--- Frota: leitura pela equipe ativa; operação/admin podem inserir e atualizar.
-create policy veiculos_select on public.veiculos
-  for select to authenticated
-  using (public.is_active_user());
-create policy veiculos_insert on public.veiculos
-  for insert to authenticated
-  with check (public.has_role(array['administrador', 'operacao']));
-create policy veiculos_update on public.veiculos
-  for update to authenticated
-  using (public.has_role(array['administrador', 'operacao']))
-  with check (public.has_role(array['administrador', 'operacao']));
-
-create policy motoristas_select on public.motoristas
-  for select to authenticated
-  using (public.is_active_user());
-create policy motoristas_insert on public.motoristas
-  for insert to authenticated
-  with check (public.has_role(array['administrador', 'operacao']));
-create policy motoristas_update on public.motoristas
-  for update to authenticated
-  using (public.has_role(array['administrador', 'operacao']))
-  with check (public.has_role(array['administrador', 'operacao']));
-
-create policy frota_registros_select on public.frota_registros
-  for select to authenticated
-  using (public.is_active_user());
-create policy frota_registros_insert on public.frota_registros
-  for insert to authenticated
-  with check (public.has_role(array['administrador', 'operacao']));
-create policy frota_registros_update on public.frota_registros
-  for update to authenticated
-  using (public.has_role(array['administrador', 'operacao']))
-  with check (public.has_role(array['administrador', 'operacao']));
-
 -- --------------------------------------------------------------------------
 -- 6. PRIVILÉGIOS DA DATA API
 -- Removemos permissões de anon e liberamos somente o necessário ao JWT.
@@ -522,10 +400,7 @@ create policy frota_registros_update on public.frota_registros
 
 grant usage on schema public to authenticated;
 
-revoke all on table public.perfis, public.clientes, public.obras,
-  public.oportunidades, public.produtos,
-  public.orcamentos, public.veiculos, public.motoristas,
-  public.frota_registros from anon, authenticated;
+revoke all on table public.perfis, public.clientes, public.obras, public.oportunidades, public.produtos, public.orcamentos from anon, authenticated;
 
 -- Leitura do próprio perfil/equipe.
 grant select on public.perfis to authenticated;
@@ -540,19 +415,13 @@ grant select, insert, update on public.produtos to authenticated;
 -- Orçamentos são somente leitura no browser.
 grant select on public.orcamentos to authenticated;
 
--- Frota.
-grant select, insert, update on public.veiculos, public.motoristas,
-  public.frota_registros to authenticated;
 
 -- O servidor usa a chave secreta/service_role. Nunca a exponha em VITE_*.
-grant all privileges on table public.perfis, public.clientes, public.obras,
-  public.oportunidades, public.produtos,
-  public.orcamentos, public.veiculos, public.motoristas,
-  public.frota_registros to service_role;
+grant all privileges on table public.perfis, public.clientes, public.obras, public.oportunidades, public.produtos, public.orcamentos to service_role;
 grant usage, select on sequence public.orcamento_numero_seq to service_role;
 
 -- --------------------------------------------------------------------------
--- 7. VIEWS ÚTEIS PARA TELAS E INDICADORES (4 views)
+-- 7. VIEWS ÚTEIS PARA TELAS E INDICADORES (3 views)
 -- Todas usam security_invoker para respeitar as políticas RLS do usuário.
 -- Configurações comerciais continuam em src/data/settings.ts, como no site atual;
 -- persistência editável de configurações fica para quando a tela permitir edição.
@@ -663,33 +532,10 @@ join public.clientes c on c.id = q.cliente_id
 join public.obras o on o.id = q.obra_id
 left join public.perfis p on p.id = q.responsavel_id;
 
-create or replace view public.vw_frota_resumo
-with (security_invoker = true)
-as
-select
-  v.id,
-  v.placa,
-  v.tipo,
-  v.modelo,
-  v.capacidade_m3,
-  v.hodometro_km,
-  v.proxima_manutencao_km,
-  v.status,
-  v.crlv_vence_em,
-  v.seguro_vence_em,
-  v.ativo,
-  count(r.id) filter (where r.tipo = 'viagem')::integer as total_viagens,
-  max(r.data_referencia) filter (where r.tipo = 'abastecimento') as ultimo_abastecimento,
-  max(r.data_referencia) filter (where r.tipo = 'manutencao') as ultima_manutencao
-from public.veiculos v
-left join public.frota_registros r on r.veiculo_id = v.id
-group by v.id;
-
 -- Views só recebem permissões depois de terem sido criadas.
 grant select on public.vw_clientes_resumo,
   public.vw_funil_resumo,
-  public.vw_orcamentos_resumo,
-  public.vw_frota_resumo to authenticated;
+  public.vw_orcamentos_resumo to authenticated;
 
 commit;
 
