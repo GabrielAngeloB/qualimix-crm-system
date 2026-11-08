@@ -61,5 +61,6 @@ export function getPool(): Queryable {
 }
 
 export async function withTransaction<T>(work: (client: Queryable) => Promise<T>): Promise<T> {
-  return getSql().begin(async (transaction) => work(wrap(transaction)))
+  const result = await getSql().begin(async (transaction) => work(wrap(transaction)))
+  return result as unknown as T
 }
