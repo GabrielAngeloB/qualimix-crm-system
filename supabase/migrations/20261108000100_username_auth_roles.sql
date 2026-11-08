@@ -3,7 +3,11 @@
 begin;
 
 alter table public.perfis
-  add column if not exists username text;
+  add column if not exists username text,
+  add column if not exists bootstrap_claim boolean not null default false;
+
+create unique index if not exists perfis_bootstrap_claim_unico
+  on public.perfis (bootstrap_claim) where bootstrap_claim = true;
 
 -- Migra os perfis antigos para os dois papéis solicitados.
 update public.perfis
