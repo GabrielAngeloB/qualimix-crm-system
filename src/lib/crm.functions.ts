@@ -39,7 +39,7 @@ const mapSite = (r: any): Site => ({
 const mapOpportunity = (r: any): Opportunity => ({
   id: String(r.id), title: r.titulo, clientId: String(r.cliente_id), siteId: r.obra_id ?? null,
   stage: r.etapa, estimatedValue: r.valor_estimado == null ? null : Number(r.valor_estimado),
-  ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em),
+  ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em), createdAt: isoDateTime(r.created_at),
   lastContact: nullableDate(r.ultimo_contato), nextContact: nullableDate(r.proximo_contato),
   nextAction: r.proxima_acao ?? '', lossReason: r.motivo_perda ?? null,
   quoteId: null, history: Array.isArray(r.historico) ? r.historico : [], demo: Boolean(r.is_demo),
@@ -101,10 +101,10 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
   const currentProfile = await requireCurrentProfile()
   const db = getPool()
   const [clients, sites, opportunities, quotes, products, profiles, clientView, funnelView, quoteView, fleetView] = await Promise.all([
-    db.query('SELECT * FROM public.clientes WHERE is_demo = false ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.obras WHERE is_demo = false AND ativa = true ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.oportunidades WHERE is_demo = false ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.orcamentos WHERE is_demo = false ORDER BY created_at DESC'),
+    db.query('SELECT * FROM public.clientes WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
+    db.query('SELECT * FROM public.obras WHERE is_demo = false AND ativa = true ORDER BY created_at DESC, id DESC'),
+    db.query('SELECT * FROM public.oportunidades WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
+    db.query('SELECT * FROM public.orcamentos WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
     db.query('SELECT * FROM public.produtos WHERE ativo = true ORDER BY categoria, nome'),
     db.query('SELECT p.id::text, p.nome, p.perfil FROM public.perfis p JOIN public.usuarios u ON u.id = p.id WHERE p.ativo = true ORDER BY p.nome'),
     db.query('SELECT * FROM public.vw_clientes_resumo ORDER BY created_at DESC'),
