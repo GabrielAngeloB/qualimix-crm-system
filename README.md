@@ -10,7 +10,7 @@ CRM e sistema de gestão da Qualimix (concreto usinado, concretagens e pisos de 
 - **Funil comercial**: colunas e tabela, cadastro de oportunidades reais associadas a clientes/obras, mudança de etapa, motivo de perda obrigatório, follow-ups, histórico e vínculo com orçamento.
 - **Tarefas e retornos**: tarefas vinculadas a oportunidades, prazo e horário, prioridade, conclusão/cancelamento e alertas visuais de atrasos e tarefas do dia no painel. Agendamento externo, e-mail e notificações push ainda não estão configurados.
 - **Pedidos**: conversão de orçamento real aceito em pedido, com vínculo à oportunidade, cliente e obra e geração da primeira conta a receber.
-- **Agenda operacional**: criação, reagendamento e mudança de status de serviços, com vínculos operacionais e verificação de conflito do mesmo caminhão no mesmo horário.
+- **Agenda operacional**: criação, reagendamento e mudança de status de serviços, com vínculos operacionais com vínculos a pedido, orçamento, cliente e obra.
 - **Profissionais**: cadastro, custo de referência por serviço/unidade, forma de pagamento preferida e histórico de baixas associadas.
 - **Financeiro**: despesas por obra gerando contas a pagar, contas a receber originadas pelos pedidos, vencimentos, baixas parciais, cancelamentos e histórico.
 - **Resultado por obra**: valor contratado menos despesas efetivamente lançadas.
@@ -41,4 +41,4 @@ Ainda não há conexão Supabase implementada no código desta branch. Não há 
 
 ## Roteiro
 
-Veja [PLAN.md](./PLAN.md). Próximos marcos: integrar o armazenamento atual ao Supabase existente, validar políticas de acesso, adicionar autenticação e auditoria no servidor, implementar versões/aprovações de orçamento, gestão de caminhões/viagens e notificações agendadas.
+Veja [PLAN.md](./PLAN.md). Próximos marcos: integrar o armazenamento atual ao Supabase existente, validar políticas de acesso, adicionar autenticação e auditoria no servidor, implementar versões/aprovações de orçamento e notificações agendadas.
