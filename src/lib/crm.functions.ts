@@ -1,6 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import type { Client, Opportunity, QuoteRecord, Site, TeamUser, QuoteType } from '../data/fixtures'
 import { quoteContext } from '../data/derived'
+import { leadSources, lossReasons } from '../data/settings'
 import {
   computeQuote,
   defaultExtras,
@@ -12,6 +13,8 @@ import {
 } from './quote'
 import { assertSameOrigin, requireCurrentProfile, type AuthProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
+import { onlyDigits } from './documents'
+import { isValidIsoDate, normalizeBrazilPhone, parseOptionalAmount, validateClientFields, validateLeadFields, validateOptionalDecimal } from './crm-validation'
 
 const isoDate = (value: unknown): string => {
   if (value instanceof Date) return value.toISOString().slice(0, 10)
@@ -156,43 +159,106 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
 export const persistClient = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('Dados do cliente inválidos.')
-    const data = input as { client: Client; site?: Site }
-    if (!data.client || typeof data.client.name !== 'string' || data.client.name.trim().length < 3) {
-      throw new Error('Nome do cliente inválido.')
+    const data = input as { client?: unknown; site?: unknown }
+    if (!data.client || typeof data.client !== 'object' || Array.isArray(data.client)) {
+      throw new Error('Dados do cliente inválidos.')
     }
-    if (data.site && (typeof data.site.name !== 'string' || data.site.name.trim().length < 3)) {
-      throw new Error('Nome da obra inválido.')
+    const rawClient = data.client as Record<string, unknown>
+    const rawSite = data.site && typeof data.site === 'object' && !Array.isArray(data.site)
+      ? data.site as Record<string, unknown>
+      : undefined
+    if (data.site && !rawSite) throw new Error('Dados da obra inválidos.')
+
+    const errors = validateClientFields({
+      ...rawClient,
+      siteName: rawSite?.name,
+      siteAddress: rawSite?.address,
+      siteContact: rawSite?.contactName,
+      sitePhone: rawSite?.contactPhone,
+      siteRestrictions: rawSite?.restrictions,
+    })
+    if (Object.keys(errors).length) {
+      throw new Error(Object.values(errors).join(' '))
     }
-    return data
+
+    const readText = (value: unknown, label: string, max: number): string => {
+      if (value == null) return ''
+      if (typeof value !== 'string') throw new Error(`Campo inválido: ${label}.`)
+      const result = value.trim()
+      if (result.length > max) throw new Error(`Campo muito longo: ${label}.`)
+      return result
+    }
+    const id = readText(rawClient.id, 'id do cliente', 80)
+    if (!id) throw new Error('Identificador do cliente inválido.')
+    const client = {
+      id,
+      name: readText(rawClient.name, 'nome do cliente', 160),
+      tradeName: readText(rawClient.tradeName, 'nome fantasia', 120),
+      document: onlyDigits(readText(rawClient.document, 'documento', 20)),
+      phone: normalizeBrazilPhone(readText(rawClient.phone, 'telefone', 20)),
+      whatsapp: normalizeBrazilPhone(readText(rawClient.whatsapp, 'WhatsApp', 20)),
+      email: readText(rawClient.email, 'e-mail', 254),
+      address: readText(rawClient.address, 'endereço', 200),
+      city: readText(rawClient.city, 'cidade', 100),
+      region: readText(rawClient.region, 'região', 80),
+      type: readText(rawClient.type, 'tipo de cliente', 40),
+      source: readText(rawClient.source, 'origem', 40),
+      notes: readText(rawClient.notes, 'observações', 2000),
+    }
+    const site = rawSite ? {
+      id: readText(rawSite.id, 'id da obra', 80),
+      clientId: client.id,
+      name: readText(rawSite.name, 'nome da obra', 160),
+      address: readText(rawSite.address, 'endereço da obra', 200),
+      city: readText(rawSite.city, 'cidade da obra', 100),
+      region: readText(rawSite.region, 'região da obra', 80),
+      contactName: readText(rawSite.contactName, 'contato da obra', 120),
+      contactPhone: normalizeBrazilPhone(readText(rawSite.contactPhone, 'telefone do contato', 20)),
+      serviceType: readText(rawSite.serviceType, 'tipo de serviço da obra', 120),
+      accessNotes: readText(rawSite.accessNotes, 'observações de acesso', 500),
+      restrictions: readText(rawSite.restrictions, 'restrições da obra', 500),
+    } : undefined
+    if (site && !site.id) throw new Error('Identificador da obra inválido.')
+    if (rawSite && typeof rawSite.clientId === 'string' && rawSite.clientId !== client.id) {
+      throw new Error('A obra precisa estar vinculada ao cliente informado.')
+    }
+    return { client, site }
   })
   .handler(async ({ data }) => {
     assertSameOrigin()
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const c = data.client
-    await withTransaction(async (tx) => {
-      await tx.query(
-        `INSERT INTO public.clientes
-          (id,nome,nome_fantasia,documento,telefone,whatsapp,email,endereco,cidade,regiao,tipo,origem,
-           responsavel_id,observacoes,ativo,is_demo,created_by)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,false,$13)`,
-        [c.id,c.name.trim(),c.tradeName ?? '',c.document || null,c.phone ?? '',c.whatsapp ?? '',
-         c.email ?? '',c.address ?? '',c.city ?? '',c.region ?? '',c.type ?? 'Outro',c.source ?? 'Outros',
-         profile.id,c.notes ?? ''],
-      )
-      if (data.site) {
-        const s = data.site
+    try {
+      await withTransaction(async (tx) => {
         await tx.query(
-          `INSERT INTO public.obras
-            (id,cliente_id,nome,endereco,cidade,regiao,contato_nome,contato_telefone,tipo_servico,
-             observacoes_acesso,restricoes,ativa,is_demo)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,false)`,
-          [s.id,c.id,s.name.trim(),s.address ?? '',s.city ?? '',s.region ?? '',
-           s.contactName ?? '',s.contactPhone ?? '',s.serviceType ?? '',
-           s.accessNotes ?? '',s.restrictions ?? ''],
+          `INSERT INTO public.clientes
+            (id,nome,nome_fantasia,documento,telefone,whatsapp,email,endereco,cidade,regiao,tipo,origem,
+             responsavel_id,observacoes,ativo,is_demo,created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,false,$13)`,
+          [c.id,c.name,c.tradeName,c.document || null,c.phone,c.whatsapp,
+           c.email,c.address,c.city,c.region,c.type,c.source,profile.id,c.notes],
         )
+        if (data.site) {
+          const s = data.site
+          await tx.query(
+            `INSERT INTO public.obras
+              (id,cliente_id,nome,endereco,cidade,regiao,contato_nome,contato_telefone,tipo_servico,
+               observacoes_acesso,restricoes,ativa,is_demo)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,true,false)`,
+            [s.id,c.id,s.name,s.address,s.city,s.region,
+             s.contactName,s.contactPhone,s.serviceType,s.accessNotes,s.restrictions],
+          )
+        }
+      })
+    } catch (error) {
+      if ((error as { code?: string; constraint?: string })?.code === '23505') {
+        const constraint = (error as { constraint?: string }).constraint
+        if (constraint === 'clientes_documento_unico') throw new Error('Esse CPF/CNPJ já está cadastrado.')
+        throw new Error('Já existe um registro com esse identificador. Atualize a tela e tente novamente.')
       }
-    })
+      throw error
+    }
     return { success: true }
   })
 
