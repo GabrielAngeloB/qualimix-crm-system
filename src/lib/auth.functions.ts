@@ -195,7 +195,7 @@ export const createUser = createServerFn({ method: 'POST' })
       await withTransaction(async (client) => {
         await client.query(
           'INSERT INTO public.perfis (id, nome, perfil, ativo) VALUES ($1, $2, $3, true)',
-          [id, data.name, 'user'],
+          [id, data.name, 'comercial'],
         )
         await client.query(
           'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
@@ -325,7 +325,7 @@ export const bootstrapAdmin = createServerFn({ method: 'POST' })
 
         await client.query(
           'INSERT INTO public.perfis (id, nome, perfil, ativo) VALUES ($1, $2, $3, true)',
-          [id, data.name, 'admin'],
+          [id, data.name, 'administrador'],
         )
         await client.query(
           'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
