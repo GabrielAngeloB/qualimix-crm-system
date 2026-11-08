@@ -38,7 +38,7 @@ const blankForm = {
 
 function Tarefas() {
   const search = Route.useSearch()
-  const { tasks, opportunities, clients, saveTask, toast, currentRole } = useStore()
+  const { tasks, opportunities, clients, saveTask, toast, currentRole, views } = useStore()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade)
   const [form, setForm] = useState(() => ({
@@ -55,12 +55,19 @@ function Tarefas() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('pendentes')
 
-  const counts = useMemo(() => ({
-    pending: tasks.filter((task) => task.status === 'Pendente').length,
-    overdue: tasks.filter((task) => task.status === 'Pendente' && task.dueDate < today).length,
-    today: tasks.filter((task) => task.status === 'Pendente' && task.dueDate === today).length,
-    completed: tasks.filter((task) => task.status === 'Concluída').length,
-  }), [tasks])
+  const counts = useMemo(() => views.tasks.length > 0
+    ? {
+        pending: views.tasks.filter((row) => row.status === 'Pendente').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0),
+        overdue: views.tasks.reduce((sum, row) => sum + Number(row.atrasadas ?? 0), 0),
+        today: views.tasks.reduce((sum, row) => sum + Number(row.para_hoje ?? 0), 0),
+        completed: views.tasks.filter((row) => row.status === 'Concluída').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0),
+      }
+    : {
+        pending: tasks.filter((task) => task.status === 'Pendente').length,
+        overdue: tasks.filter((task) => task.status === 'Pendente' && task.dueDate < today).length,
+        today: tasks.filter((task) => task.status === 'Pendente' && task.dueDate === today).length,
+        completed: tasks.filter((task) => task.status === 'Concluída').length,
+      }, [tasks, views.tasks])
 
   const visibleTasks = useMemo(() => tasks
     .filter((task) => {
