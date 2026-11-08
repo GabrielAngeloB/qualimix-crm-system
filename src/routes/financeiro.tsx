@@ -86,7 +86,7 @@ function Financeiro() {
   const payableOpenCents = activePayables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
   const overdueCents = [...activeReceivables, ...activePayables].filter((entry) => entry.dueDate < today && openAmountCents(entry) > 0).reduce((sum, entry) => sum + openAmountCents(entry), 0)
 
-  const submitExpense = () => {
+  const submitExpense = async () => {
     const parsed = parseDecimal(expense.amount)
     const rate = parseDecimal(expense.unitRate)
     const quantity = parseDecimal(expense.quantity)
@@ -123,7 +123,7 @@ function Financeiro() {
       demo: false as const,
     }
     try {
-      addExpense(record, expense.dueDate, expense.method)
+      await addExpense(record, expense.dueDate, expense.method)
       toast({ tone: 'ok', title: 'Despesa registrada', body: 'A despesa foi vinculada à obra e gerou uma conta a pagar.' })
       setExpense(blankExpense)
       setShowExpense(false)
@@ -137,7 +137,7 @@ function Financeiro() {
     setPayment({ amount: '', paidAt: today, method: entry.method, note: '' })
   }
 
-  const submitPayment = (entry: FinancialEntry) => {
+  const submitPayment = async (entry: FinancialEntry) => {
     const parsed = parseDecimal(payment.amount)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
       toast({ tone: 'erro', title: 'Valor de baixa inválido', body: 'Informe um pagamento maior que zero.' })
@@ -151,7 +151,7 @@ function Financeiro() {
       note: payment.note.trim(),
     }
     try {
-      registerPayment(entry.id, item)
+      await registerPayment(entry.id, item)
       toast({ tone: 'ok', title: 'Baixa financeira registrada', body: `${entry.description} · ${brlCents(item.amountCents)}` })
       setPaymentFor(null)
     } catch (error) {
@@ -338,14 +338,14 @@ function Financeiro() {
                       <Field label="Observação">{(id) => <input id={id} className={inputCls()} value={payment.note} onChange={(event) => setPayment((current) => ({ ...current, note: event.target.value }))} />}</Field>
                       <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4">
                         <Button size="sm" onClick={() => setPaymentFor(null)}>Cancelar</Button>
-                        <Button size="sm" variant="primary" disabled={!payment.amount || !payment.paidAt || !payment.method.trim()} onClick={() => submitPayment(entry)}>Confirmar baixa</Button>
+                        <Button size="sm" variant="primary" disabled={!payment.amount || !payment.paidAt || !payment.method.trim()} onClick={() => void submitPayment(entry)}>Confirmar baixa</Button>
                       </div>
                     </div>
                   )}
 
                   <div className="ml-12 mt-3 flex flex-wrap gap-2">
                     {openCents > 0 && entry.status !== 'Cancelado' && <Button size="sm" onClick={() => isPaymentOpen ? setPaymentFor(null) : openPayment(entry)}>{isPaymentOpen ? 'Fechar baixa' : 'Registrar baixa'}</Button>}
-                    {entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { cancelFinancialEntry(entry.id); toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description }) } }}>Cancelar lançamento</Button>}
+                    {entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { void cancelFinancialEntry(entry.id).then(() => toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description })).catch((error) => toast({ tone: 'erro', title: 'Não foi possível cancelar', body: error instanceof Error ? error.message : 'Revise o lançamento.' })) } }}>Cancelar lançamento</Button>}
                   </div>
                 </article>
               )
