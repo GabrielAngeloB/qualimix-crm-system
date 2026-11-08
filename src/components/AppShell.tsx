@@ -6,6 +6,7 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  LogOut,
   Menu,
   Moon,
   Search,
@@ -18,7 +19,7 @@ import {
   X,
 } from 'lucide-react'
 import { useStore } from '../data/store'
-import { currentUser } from '../data/fixtures'
+import { getAuthSession, logout } from '../lib/auth.functions'
 import { formatDocument, onlyDigits } from '../lib/documents'
 import { LogoSlot, Toaster, cx } from './ui'
 
@@ -42,7 +43,7 @@ const nav: { group: string; items: NavItem[] }[] = [
     ],
   },
   { group: 'Financeiro', items: [{ label: 'Contas a receber', icon: Wallet, soon: 'Em breve' }] },
-  { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }] },
+  { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }, { label: 'Usuários', icon: Users, to: '/usuarios' }] },
 ]
 
 function useTheme() {
@@ -64,6 +65,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname })
   const { demoMode, setDemoMode } = useStore()
   const { theme, toggle } = useTheme()
+  const navigate = useNavigate()
+  const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
+  useEffect(() => { void getAuthSession().then((session) => setProfile(session.profile)) }, [])
+  const signOut = async () => { await logout(); await navigate({ to: '/login' }) }
 
   useEffect(() => setMenuOpen(false), [path])
 
@@ -154,12 +159,13 @@ export function AppShell({ children }: { children: ReactNode }) {
             {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           </button>
           <div className="hidden items-center gap-2 sm:flex">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">AD</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">{profile?.nome?.slice(0, 1).toUpperCase() ?? 'U'}</div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold">{currentUser.name}</div>
-              <div className="text-xs text-muted">{currentUser.role}</div>
+              <div className="text-sm font-semibold">{profile?.nome ?? 'Usuário'}</div>
+              <div className="text-xs text-muted">{profile?.perfil === 'admin' ? 'Administrador' : 'Usuário'}</div>
             </div>
           </div>
+          <button onClick={() => void signOut()} aria-label="Sair da conta" title="Sair" className="grid h-10 w-10 place-items-center rounded-md border border-line hover:bg-surface-2"><LogOut className="h-4 w-4" /></button>
         </header>
         <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{children}</main>
       </div>
