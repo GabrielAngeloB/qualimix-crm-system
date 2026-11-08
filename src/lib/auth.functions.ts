@@ -98,7 +98,7 @@ async function recordLoginFailure(username: string, ipHash: string) {
 
 async function clearLoginFailures(username: string, ipHash: string) {
   await getPool().query(
-    'DELETE FROM public.login_tentativas WHERE username = $1 AND ip_hash = $2',
+    'UPDATE public.login_tentativas SET falhas = 0, bloqueado_ate = NULL, updated_at = now() WHERE username = $1 AND ip_hash = $2',
     [username, ipHash],
   )
 }
