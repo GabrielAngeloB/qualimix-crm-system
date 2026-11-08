@@ -41,8 +41,6 @@ grant select, insert, update on public.clientes, public.obras, public.oportunida
 grant select on public.produtos to qualimix_app;
 grant select, insert on public.orcamentos to qualimix_app;
 
--- Frota existente (consultada no painel, sem CRUD exposto nesta branch).
-grant select on public.veiculos, public.motoristas, public.frota_registros to qualimix_app;
 
 -- Operação: os endpoints server-side validam o papel antes de gravar.
 grant select, insert, update on public.pedidos to qualimix_app;
@@ -57,7 +55,6 @@ grant select, insert, update on public.tarefas_comerciais to qualimix_app;
 grant select on public.vw_clientes_resumo,
   public.vw_funil_resumo,
   public.vw_orcamentos_resumo,
-  public.vw_frota_resumo,
   public.vw_financeiro_resumo,
   public.vw_pedidos_resumo,
   public.vw_profissionais_resumo,
@@ -82,7 +79,6 @@ begin
   foreach tab in array array[
     'perfis','usuarios','login_tentativas',
     'clientes','obras','oportunidades','produtos','orcamentos',
-    'veiculos','motoristas','frota_registros',
     'pedidos','profissionais','despesas','lancamentos_financeiros',
     'pagamentos_financeiros','agenda_eventos','tarefas_comerciais'
   ] loop
