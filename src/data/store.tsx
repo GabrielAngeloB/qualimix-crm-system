@@ -105,7 +105,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refresh, toast])
 
   const value = useMemo<Store>(() => {
-    const ctx = quoteContext(demoMode, dbData.products)
+    const ctx = quoteContext(demoMode, dbData.products.length ? dbData.products : undefined)
     const clients = demoMode ? [...dbData.clients, ...seedClients] : dbData.clients
     const sites = demoMode ? [...dbData.sites, ...seedSites] : dbData.sites
     const quoteRecords = demoMode ? [...dbData.quotes, ...(seedQuotes as QuoteRecord[])] : dbData.quotes
