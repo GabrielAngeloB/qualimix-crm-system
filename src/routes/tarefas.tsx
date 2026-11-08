@@ -8,7 +8,7 @@ import {
   type CommercialTaskPriority,
   type CommercialTaskStatus,
 } from '../data/operations'
-import { today } from '../lib/clock'
+import { todayInSaoPaulo } from '../lib/clock'
 import { dateBR } from '../lib/format'
 import { Badge, Button, Card, CardHeader, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
 
@@ -27,22 +27,23 @@ export const Route = createFileRoute('/tarefas')({
 
 type Filter = 'pendentes' | 'todas' | 'concluidas' | 'canceladas'
 
-const blankForm = {
+const blankForm = () => ({
   title: '',
   opportunityId: '',
-  dueDate: today,
+  dueDate: todayInSaoPaulo(),
   dueTime: '',
   priority: 'Normal' as CommercialTaskPriority,
   notes: '',
-}
+})
 
 function Tarefas() {
   const search = Route.useSearch()
   const { tasks, opportunities, clients, saveTask, toast, currentRole, views } = useStore()
+  const today = todayInSaoPaulo()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade)
   const [form, setForm] = useState(() => ({
-    ...blankForm,
+    ...blankForm(),
     title: initialOpportunity
       ? (initialOpportunity.nextAction && initialOpportunity.nextAction !== '—'
           ? initialOpportunity.nextAction
@@ -67,7 +68,7 @@ function Tarefas() {
         overdue: tasks.filter((task) => task.status === 'Pendente' && task.dueDate < today).length,
         today: tasks.filter((task) => task.status === 'Pendente' && task.dueDate === today).length,
         completed: tasks.filter((task) => task.status === 'Concluída').length,
-      }, [tasks, views.tasks])
+      }, [tasks, views.tasks, today])
 
   const visibleTasks = useMemo(() => tasks
     .filter((task) => {
@@ -79,7 +80,7 @@ function Tarefas() {
     .sort((a, b) => (a.dueDate + (a.dueTime ?? '23:59')).localeCompare(b.dueDate + (b.dueTime ?? '23:59'))), [tasks, filter])
 
   const resetForm = () => {
-    setForm(blankForm)
+    setForm(blankForm())
     setEditingId(null)
     setShowForm(false)
   }

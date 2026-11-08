@@ -1,4 +1,6 @@
-/** Formatação no padrão brasileiro (pt-BR, BRL, DD/MM/AAAA). */
+import { BUSINESS_TIME_ZONE, isoDateInTimeZone, timeInTimeZone } from './clock'
+
+/** Formatação no padrão brasileiro (pt-BR, BRL, DD/MM/AAAA) e fuso de Brasília. */
 
 const brlFmt = new Intl.NumberFormat('pt-BR', {
   style: 'currency',
@@ -45,31 +47,55 @@ export function dateBR(iso: string | null | undefined): string {
   return `${d}/${m}/${y}`
 }
 
+const dateTimeFmt = new Intl.DateTimeFormat('pt-BR', {
+  timeZone: BUSINESS_TIME_ZONE,
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+})
+
 export function dateTimeBR(iso: string | null | undefined): string {
   if (!iso) return '—'
   const dt = new Date(iso)
   if (Number.isNaN(dt.getTime())) return '—'
-  return `${dateBR(iso)} ${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`
+  const parts = Object.fromEntries(
+    dateTimeFmt.formatToParts(dt)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  )
+  return parts.day + '/' + parts.month + '/' + parts.year + ' ' + parts.hour + ':' + parts.minute
 }
 
+/** Horário HH:mm em Brasília para exibir instantes (incluindo salvamentos recentes). */
+export function timeBR(value: Date = new Date()): string {
+  return timeInTimeZone(value)
+}
+
+/** Converte um instante para a data do calendário de Brasília. */
 export function isoDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+  return isoDateInTimeZone(d)
 }
 
+/** Soma dias de calendário, sem depender do fuso horário do navegador/servidor. */
 export function addDays(iso: string, days: number): string {
+  if (!Number.isInteger(days)) throw new Error('A quantidade de dias precisa ser um número inteiro.')
   const [y, m, d] = iso.slice(0, 10).split('-').map(Number)
-  const dt = new Date(y, m - 1, d)
-  dt.setDate(dt.getDate() + days)
-  return isoDate(dt)
+  const dt = new Date(Date.UTC(y, m - 1, d + days))
+  return dt.getUTCFullYear() + '-' +
+    String(dt.getUTCMonth() + 1).padStart(2, '0') + '-' +
+    String(dt.getUTCDate()).padStart(2, '0')
 }
 
+/** Diferença em dias de calendário, sem efeito de horário de verão ou fuso local. */
 export function daysBetween(fromIso: string, toIso: string): number {
-  const a = new Date(fromIso.slice(0, 10) + 'T00:00:00')
-  const b = new Date(toIso.slice(0, 10) + 'T00:00:00')
-  return Math.round((b.getTime() - a.getTime()) / 86_400_000)
+  const [fy, fm, fd] = fromIso.slice(0, 10).split('-').map(Number)
+  const [ty, tm, td] = toIso.slice(0, 10).split('-').map(Number)
+  const a = Date.UTC(fy, fm - 1, fd)
+  const b = Date.UTC(ty, tm - 1, td)
+  return Math.round((b - a) / 86_400_000)
 }
 
 export type ParsedNumber =

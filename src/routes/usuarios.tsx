@@ -1,11 +1,17 @@
 import { useEffect, useState, type FormEvent } from 'react'
-import { createFileRoute } from '@tanstack/react-router'
-import { createUser, listUsers, setUserActive } from '../lib/auth.functions'
+import { createFileRoute, redirect } from '@tanstack/react-router'
+import { createUser, getAuthSession, listUsers, setUserActive } from '../lib/auth.functions'
 
 type UserRole = 'comercial' | 'operacao' | 'financeiro' | 'consulta'
 type UserRow = { id: string; nome: string; username: string; perfil: 'admin' | 'user'; role: UserRole | 'administrador'; ativo: boolean; created_at: string }
 
 export const Route = createFileRoute('/usuarios')({
+  beforeLoad: async () => {
+    const session = await getAuthSession()
+    if (session.profile?.perfil !== 'admin') {
+      throw redirect({ to: '/' })
+    }
+  },
   head: () => ({ meta: [{ title: 'Usuários — Qualimix CRM' }] }),
   component: UsersPage,
 })

@@ -3,7 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarDays, CircleAlert, FileText, Plus, Settings, Truck, Wallet } from 'lucide-react'
 import { useStore } from '../data/store'
 import { computeDashboard, computeOperationalDashboard } from '../data/metrics'
-import { today } from '../lib/clock'
+import { todayInSaoPaulo } from '../lib/clock'
 import { pendingSettings } from '../data/settings'
 import { brl, brlCents, dateBR, daysBetween, num, pct } from '../lib/format'
 import { Badge, Card, CardHeader, EmptyState, PageHeader, cx, inputCls } from '../components/ui'
@@ -23,9 +23,10 @@ export const Route = createFileRoute('/')({
 
 function Painel() {
   const { quotes, opportunities, receivables, clients, sites, scheduleEvents, workOrders, expenses, financialEntries, tasks, settings } = useStore()
+  const today = todayInSaoPaulo()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
-  const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId])
+  const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId, today])
   const pend = pendingSettings(settings)
   const clientOf = (quoteId: string) => {
     const q = quotes.find((x) => x.id === quoteId)
@@ -57,7 +58,7 @@ function Painel() {
     .slice(0, 6)
   const operational = useMemo(
     () => computeOperationalDashboard(workOrders, expenses, financialEntries, scheduleEvents, today),
-    [workOrders, expenses, financialEntries, scheduleEvents],
+    [workOrders, expenses, financialEntries, scheduleEvents, today],
   )
   const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0 || financialEntries.length > 0 || tasks.length > 0
 

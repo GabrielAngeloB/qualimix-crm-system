@@ -64,6 +64,8 @@ CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em 
 
 ## Convenções
 
+- Fuso horário operacional fixo: `America/Sao_Paulo` (Brasília, UTC−03:00). Datas de hoje, vencimentos, validade, histórico e horários exibidos devem usar essa zona, nunca o fuso local do navegador/servidor. A sessão PostgreSQL também inicia com `TimeZone=America/Sao_Paulo`.
+
 - Tokens de cor em `src/styles.css` (`bg-surface`, `text-ink`, `text-muted`, `border-line`, `bg-brand`, `ok/warn/info`), com tema claro e escuro (`data-theme`). Títulos com `font-display` em caixa alta.
 - APIs do navegador apenas em efeitos ou handlers (SSR).
 - Impressão: a proposta é renderizada em `.print-portal` (portal no `body`); o CSS de impressão oculta todo o resto.

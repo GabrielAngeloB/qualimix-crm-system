@@ -25,7 +25,7 @@ function Clientes() {
   const { id, novo } = Route.useSearch()
   const navigate = useNavigate()
   const { clients, sites, quotes, currentRole, views } = useStore()
-  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
+  const canCreate = currentRole === 'admin' || currentRole === 'administrador'
   const clientSummaryById = useMemo(() => new Map(views.clients.map((row) => [String(row.id), row])), [views.clients])
   const totalSitesForClient = (clientId: string) => {
     const summary = clientSummaryById.get(clientId)
@@ -42,8 +42,8 @@ function Clientes() {
   const [status, setStatus] = useState('ativos')
   const [creating, setCreating] = useState(false)
   useEffect(() => {
-    if (novo && canEdit) setCreating(true)
-  }, [novo, canEdit])
+    if (novo && canCreate) setCreating(true)
+  }, [novo, canCreate])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -68,8 +68,8 @@ function Clientes() {
         eyebrow="Comercial"
         title="Clientes e obras"
         description="Localize clientes pelo nome, CPF/CNPJ ou telefone. Cada cliente pode ter várias obras."
-        actions={canEdit ? (
-          <Button variant="primary" onClick={() => setCreating(true)}>
+        actions={canCreate ? (
+          <Button variant="primary" onClick={() => navigate({ to: '/clientes/novo' })}>
             <Plus className="h-4 w-4" /> Novo cliente
           </Button>
         ) : undefined}
@@ -95,7 +95,7 @@ function Clientes() {
           </select>
         </div>
         {t.total === 0 ? (
-          <EmptyState icon={<Users className="h-6 w-6" />} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} action={canEdit ? <Button variant="primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Cadastrar cliente</Button> : undefined}>
+          <EmptyState icon={<Users className="h-6 w-6" />} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} action={canCreate ? <Button variant="primary" onClick={() => navigate({ to: '/clientes/novo' })}><Plus className="h-4 w-4" /> Cadastrar cliente</Button> : undefined}>
             {clients.length ? 'Ajuste a pesquisa ou os filtros.' : 'Cadastre o primeiro cliente para começar a orçar.'}
           </EmptyState>
         ) : (
@@ -143,7 +143,7 @@ function Clientes() {
         <Pagination {...t} />
       </Card>
 
-      {canEdit && <ClientForm
+      {canCreate && <ClientForm
         open={creating}
         onClose={() => {
           setCreating(false)

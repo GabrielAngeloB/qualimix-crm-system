@@ -162,3 +162,61 @@ Esses itens não são falhas de conexão do banco; são funcionalidades/telas qu
 - O advisor de performance reportou 24 FKs sem índice de cobertura e 31 índices sem uso observado. Nenhum índice foi removido. A criação de índices adicionais exige análise de workload e janela de escrita.
 
 O CI do último commit foi concluído com sucesso: instalação, build de produção (`pnpm typecheck`, que executa Vite build + `tsc --noEmit`) e `pnpm test`. `pnpm lint` continua falhando pela dívida global de formatação descrita acima. A integração ainda precisa de homologação ponta a ponta em ambiente isolado antes de ser considerada pronta para produção.
+
+
+## 9. Revisão de autenticação, permissões e correspondência com o banco (08/11/2026)
+
+### Autenticação e sessão
+
+- As contas `admin`, `comercial` e `operacao` já existem em `public.usuarios`, estão ativas e possuem `senha_hash` Scrypt. As credenciais iniciais fornecidas foram conferidas contra os hashes existentes; nenhuma senha em texto puro foi adicionada ao repositório nem foi necessário sobrescrever os hashes.
+- O login é próprio da aplicação, não Supabase Auth: `login` consulta `usuarios` + `perfis`, verifica Scrypt e emite o cookie `qmx_session` HttpOnly assinado. `session_version` permite revogar sessões.
+- O shell anterior mostrava literalmente "Sessão local / Sem autenticação", apesar do login de servidor já existir. Isso era texto fixo da interface, não a fonte real da sessão.
+- O roteador valida a sessão antes de renderizar as rotas protegidas; apenas `/login` e `/bootstrap` são públicas. As páginas de login/bootstrap não montam o shell protegido. Respostas autenticadas usam `Cache-Control: private, no-store`.
+- O menu mostra nome, usuário e papel reais e inclui logout. A rota de usuários é protegida no nível de rota e nas Server Functions.
+- O cadastro de cliente exige administrador na interface, na rota de entrada `/clientes/novo` e novamente na Server Function `persistClient`. A listagem de clientes continua disponível conforme as permissões já existentes; Comercial não recebe o formulário de criação.
+
+### Conferência do banco ativo
+
+A comparação foi feita com o trecho de dump SQL anexado e com introspecção somente de leitura no projeto Supabase conectado.
+
+- Existem as tabelas utilizadas pelo código: `perfis`, `usuarios`, `login_tentativas`, `clientes`, `obras`, `oportunidades`, `orcamentos`, `produtos`, `pedidos`, `profissionais`, `despesas`, `lancamentos_financeiros`, `pagamentos_financeiros`, `agenda_eventos`, `tarefas_comerciais`, além de `veiculos`, `motoristas` e `frota_registros`.
+- As nove views usadas em resumos existem e estão com `security_invoker=true`: clientes, funil, orçamentos, pedidos, financeiro, profissionais, agenda, tarefas e frota.
+- Nas nove views, `anon` não tem SELECT e `qualimix_app` tem SELECT. O papel `qualimix_app` está configurado para login e senha, e não é superusuário, não cria bancos/roles e não possui `BYPASSRLS`.
+- A conexão de negócio do site é a role técnica `qualimix_app`; as pessoas são autenticadas por `public.usuarios` + `public.perfis` e autorizadas pelas Server Functions. As policies para `authenticated` no dump não substituem a verificação do usuário feita pelo login próprio.
+- As consultas e mapeamentos inspecionados usam as colunas existentes no banco. Valores monetários operacionais são armazenados em centavos inteiros e convertidos no limite da aplicação.
+
+### Por que algumas telas podem parecer vazias
+
+Snapshot de contagens no Supabase em 08/11/2026 (registros de demonstração são intencionalmente excluídos dos módulos reais):
+
+| Tabela | Registros reais | Observação |
+| --- | ---: | --- |
+| clientes | 3 | Disponíveis na listagem |
+| obras | 0 | O único registro existente está marcado como demonstração |
+| oportunidades | 1 | Há também 1 oportunidade de demonstração |
+| orcamentos | 0 | O único orçamento existente está marcado como demonstração |
+| produtos | 10 | Produtos ativos no catálogo |
+| tarefas_comerciais | 1 | Registro real |
+| pedidos, despesas, lançamentos, pagamentos | 0 | Ainda sem dados operacionais/financeiros |
+| agenda_eventos, profissionais | 0 | Ainda sem registros |
+| veiculos, motoristas, frota_registros | 0 | Ainda sem registros |
+
+Portanto, a ausência de itens em Pedidos, Agenda e Financeiro não indica, por si só, falha de conexão: as tabelas correspondentes estão vazias. O orçamento e a obra existentes são dados de demonstração e são filtrados corretamente para não aparecerem como produção.
+
+### Mapa das telas e limites
+
+| Tela | Fonte persistida principal | Estado |
+| --- | --- | --- |
+| Painel | clientes, obras, oportunidades, orçamentos e views operacionais | Carrega pelo Store via Server Functions |
+| Clientes e obras | clientes, obras, vw_clientes_resumo | Integrada; criação somente administrador |
+| Funil | oportunidades, vw_funil_resumo | Integrada |
+| Orçamentos | orcamentos, produtos e vw_orcamentos_resumo | Integrada; sem edição de proposta existente |
+| Pedidos | pedidos, vw_pedidos_resumo | Integrada; sem linhas reais cadastradas atualmente |
+| Agenda | agenda_eventos, vw_agenda_resumo | Integrada; sem eventos reais cadastrados |
+| Profissionais | profissionais, vw_profissionais_resumo | Integrada; sem profissionais reais cadastrados |
+| Financeiro | despesas, lancamentos_financeiros, pagamentos_financeiros, vw_financeiro_resumo | Integrada; sem lançamentos reais cadastrados |
+| Tarefas | tarefas_comerciais, vw_tarefas_resumo | Integrada |
+| Configurações | produtos | Catálogo lido do banco; demais regras comerciais seguem valores pendentes em arquivo |
+| Frota | veiculos, motoristas, frota_registros, vw_frota_resumo | Banco existe, mas não há página/rota de Frota na interface |
+
+A revisão confirmou a integração das telas existentes, mas não criou módulos que ainda não existem. Também não inseriu dados de teste no banco de produção. A validação final de interface e sessão no domínio Vercel ainda depende de testar no ambiente publicado com as variáveis server-only `DATABASE_URL` e `SUPABASE_CA_CERT_BASE64` configuradas.

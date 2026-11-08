@@ -4,6 +4,8 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
+  redirect,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
@@ -14,6 +16,8 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { StoreProvider } from "../data/store";
 import { AppShell } from "../components/AppShell";
+import { getAuthSession } from "../lib/auth.functions";
+import type { AuthProfile } from "../lib/auth.server";
 
 const siteName = "Qualimix CRM — Gestão comercial e operacional";
 const siteDescription =
@@ -77,7 +81,23 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+export const Route = createRootRouteWithContext<{
+  queryClient: QueryClient;
+  authProfile?: AuthProfile | null;
+}>()({
+  headers: () => ({ "Cache-Control": "private, no-store" }),
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === "/login" || location.pathname === "/bootstrap") {
+      return { authProfile: null };
+    }
+
+    const session = await getAuthSession();
+    if (!session.authenticated || !session.profile) {
+      throw redirect({ to: "/login" });
+    }
+
+    return { authProfile: session.profile };
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -123,15 +143,25 @@ function RootShell({ children }: { children: ReactNode }) {
 }
 
 function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
+  const { queryClient, authProfile } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const isPublicAuthRoute = pathname === "/login" || pathname === "/bootstrap";
 
   return (
     <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <AppShell>
-          <Outlet />
-        </AppShell>
-      </StoreProvider>
+      {isPublicAuthRoute ? (
+        <Outlet />
+      ) : authProfile ? (
+        <StoreProvider>
+          <AppShell profile={authProfile}>
+            <Outlet />
+          </AppShell>
+        </StoreProvider>
+      ) : (
+        <main className="grid min-h-screen place-items-center bg-surface-2 text-sm text-muted">
+          Validando sessão…
+        </main>
+      )}
     </QueryClientProvider>
   );
 }

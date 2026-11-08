@@ -9,6 +9,7 @@ import {
 } from '../data/operations'
 import { assertSameOrigin, requireCurrentProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
+import { todayInSaoPaulo } from './clock'
 
 const isoDate = (value: unknown): string => value instanceof Date ? value.toISOString().slice(0, 10) : String(value ?? '').slice(0, 10)
 const isoDateTime = (value: unknown): string => value instanceof Date ? value.toISOString() : String(value ?? '')
@@ -278,7 +279,7 @@ export const updateWorkOrderAmountOnServer = createServerFn({ method: 'POST' })
         'update public.pedidos set valor_contratado_centavos=$2,historico_valor=$3::jsonb where id=$1',
         [data.id,data.amountCents,JSON.stringify(history)])
       const status = paidCents >= data.amountCents ? 'Pago' : paidCents > 0 ? 'Parcial' :
-        String(entry.vencimento).slice(0,10) < new Date().toISOString().slice(0,10) ? 'Vencido' : 'Em aberto'
+        String(entry.vencimento).slice(0,10) < todayInSaoPaulo() ? 'Vencido' : 'Em aberto'
       await tx.query('update public.lancamentos_financeiros set valor_centavos=$2,status=$3 where id=$1',
         [entry.id,data.amountCents,status])
     })
