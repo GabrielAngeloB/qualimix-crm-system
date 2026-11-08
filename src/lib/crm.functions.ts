@@ -417,13 +417,22 @@ export const createOpportunity = createServerFn({ method: 'POST' })
          $1,$2,$3,'novo',$4,$5,$6,current_date,
          jsonb_build_array(jsonb_build_object(
            'at', $7::text,
-           'by', $5,
+           'by', $8::text,
            'text', 'Oportunidade criada.'
          )),
          '[]'::jsonb,false,$5
        )
        RETURNING id`,
-      [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,historyAt],
+      [
+        data.title,
+        data.clientId,
+        data.siteId,
+        data.estimatedValue,
+        profile.id,
+        data.source,
+        historyAt,
+        String(profile.id),
+      ],
     )
     const row = saved.rows[0]
     if (!row) throw new Error('O banco não retornou a nova oportunidade.')
