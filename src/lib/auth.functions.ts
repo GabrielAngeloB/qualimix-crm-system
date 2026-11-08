@@ -226,6 +226,7 @@ export const setUserActive = createServerFn({ method: 'POST' })
     if (profile.id === data.id && !data.active) throw new Error('Você não pode desativar sua própria conta.')
 
     await withTransaction(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
       const targetResult = await client.query(
         'SELECT p.perfil, p.ativo FROM public.perfis p WHERE p.id = $1 FOR UPDATE',
         [data.id],
@@ -266,6 +267,7 @@ export const deleteUser = createServerFn({ method: 'POST' })
     if (profile.id === data.id) throw new Error('Você não pode excluir sua própria conta.')
 
     await withTransaction(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
       const targetResult = await client.query(
         'SELECT p.perfil, p.ativo FROM public.perfis p WHERE p.id = $1 FOR UPDATE',
         [data.id],
