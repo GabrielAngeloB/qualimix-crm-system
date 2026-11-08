@@ -239,7 +239,9 @@ export const persistClient = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     assertSameOrigin()
     const profile = await requireCurrentProfile()
-    assertCommercial(profile)
+    if (profile.perfil !== 'admin') {
+      throw new Error('Somente administradores podem cadastrar novos clientes.')
+    }
     const c = data.client
     try {
       await withTransaction(async (tx) => {
