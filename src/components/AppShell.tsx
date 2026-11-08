@@ -65,6 +65,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname })
   const { demoMode, setDemoMode, loading } = useStore()
   const showDemoToggle = import.meta.env.DEV
+  const showDemoToggle = import.meta.env.DEV
   const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
