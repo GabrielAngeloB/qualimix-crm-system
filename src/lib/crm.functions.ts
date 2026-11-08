@@ -168,6 +168,16 @@ export const persistClient = createServerFn({ method: 'POST' })
       ? data.site as Record<string, unknown>
       : undefined
     if (data.site && !rawSite) throw new Error('Dados da obra inválidos.')
+    if (rawSite) {
+      const siteName = typeof rawSite.name === 'string' ? rawSite.name.trim() : ''
+      const siteAddress = typeof rawSite.address === 'string' ? rawSite.address.trim() : ''
+      if (siteName.length < 3 || siteName.length > 160) {
+        throw new Error('Informe a identificação da obra com 3 a 160 caracteres.')
+      }
+      if (!siteAddress || siteAddress.length > 200) {
+        throw new Error('Informe um endereço válido para a obra.')
+      }
+    }
 
     const errors = validateClientFields({
       ...rawClient,
@@ -558,7 +568,16 @@ export const persistQuote = createServerFn({ method: 'POST' })
     assertCommercial(profile)
     const db = getPool()
     const [siteResult, productResult] = await Promise.all([
-      db.query('SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true AND is_demo = false LIMIT 1', [data.siteId,data.clientId]),
+      db.query(
+        `SELECT o.id
+         FROM public.obras o
+         JOIN public.clientes c ON c.id = o.cliente_id
+         WHERE o.id = $1 AND o.cliente_id = $2
+           AND o.ativa = true AND o.is_demo = false
+           AND c.ativo = true AND c.is_demo = false
+         LIMIT 1`,
+        [data.siteId,data.clientId],
+      ),
       db.query('SELECT * FROM public.produtos WHERE ativo = true'),
     ])
     if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado ou está inativa.')
