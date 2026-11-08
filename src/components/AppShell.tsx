@@ -63,7 +63,7 @@ function useTheme() {
 export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const path = useRouterState({ select: (s) => s.location.pathname })
-  const { demoMode, setDemoMode } = useStore()
+  const { demoMode, setDemoMode, loading } = useStore()
   const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
@@ -167,7 +167,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
           <button onClick={() => void signOut()} aria-label="Sair da conta" title="Sair" className="grid h-10 w-10 place-items-center rounded-md border border-line hover:bg-surface-2"><LogOut className="h-4 w-4" /></button>
         </header>
-        <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{children}</main>
+        <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{loading && <p role="status" className="mb-4 text-xs text-muted">Sincronizando dados com o banco…</p>}{children}</main>
       </div>
       <Toaster />
     </div>
