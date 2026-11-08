@@ -8,24 +8,18 @@ import {
   summarizeMeasures,
   type QuoteContext,
   type QuoteResult,
-  type CatalogItem,
 } from '../lib/quote'
 import { daysBetween } from '../lib/format'
-import {
-  catalog,
-  demoRules,
-  officialRules,
-  paymentMethods,
-} from './settings'
+import { createDefaultSettings, type AppSettings } from './settings'
 import { receivableSeeds, type QuoteRecord } from './fixtures'
 import { today } from '../lib/clock'
 
-export function quoteContext(demoMode: boolean, catalogOverride?: CatalogItem[]): QuoteContext {
+export function quoteContext(demoMode: boolean, settings: AppSettings = createDefaultSettings()): QuoteContext {
   return {
-    catalog: catalogOverride ?? (demoMode ? catalog : []),
-    rules: demoMode ? demoRules : officialRules,
+    catalog: settings.catalog,
+    rules: demoMode ? settings.demoRules : settings.officialRules,
     demoPrices: demoMode,
-    enabledPaymentMethodIds: paymentMethods
+    enabledPaymentMethodIds: settings.paymentMethods
       .filter((m) => (demoMode ? m.enabledDemo : m.enabledOfficial === true))
       .map((m) => m.id),
   }
@@ -56,11 +50,8 @@ export interface EvaluatedQuote extends QuoteRecord {
 export function evaluateAll(records: QuoteRecord[], ctx: QuoteContext): EvaluatedQuote[] {
   return records.map((r) => {
     const concrete = r.lines.find((l) => l.category === 'concreto')
-    const fck = r.savedFck !== undefined
-      ? r.savedFck
-      : concrete ? (ctx.catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
-    const result = r.savedResult ?? evaluateRecord(r, ctx)
-    return { ...r, result, fck }
+    const fck = concrete ? (ctx.catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
+    return { ...r, result: evaluateRecord(r, ctx), fck }
   })
 }
 

@@ -3,6 +3,7 @@ import { quotes } from './fixtures'
 import { computeOperationalDashboard } from './metrics'
 import {
   calculateUnitCostCents,
+  canDeleteDraftQuote,
   financialStatus,
   jobBalanceCents,
   jobCostCents,
@@ -11,6 +12,7 @@ import {
   reviseWorkOrderAmount,
   validateDate,
   validateMoneyCents,
+  validateProfessionalProfile,
   validateTime,
   validateCommercialTask,
   commercialTaskTiming,
@@ -87,7 +89,7 @@ const scheduleEvent: ScheduleEvent = {
   volumeM3: 12,
   fck: 25,
   pump: true,
-
+  truck: 'Betoneira 01',
   status: 'Planejada',
   notes: '',
   demo: false,
@@ -137,6 +139,21 @@ describe('regras operacionais', () => {
     expect(validateMoneyCents(1)).toBe(true)
     expect(validateMoneyCents(0)).toBe(false)
     expect(validateMoneyCents(1.5)).toBe(false)
+  })
+
+  it('só permite excluir rascunho sem vínculos operacionais ou financeiros', () => {
+    expect(canDeleteDraftQuote('Rascunho', false, false, false)).toBe(true)
+    expect(canDeleteDraftQuote('Aceito', false, false, false)).toBe(false)
+    expect(canDeleteDraftQuote('Rascunho', true, false, false)).toBe(false)
+    expect(canDeleteDraftQuote('Rascunho', false, true, false)).toBe(false)
+    expect(canDeleteDraftQuote('Rascunho', false, false, true)).toBe(false)
+  })
+
+  it('aceita profissional sem custo de referência, mas não custo zero ou nome incompleto', () => {
+    expect(validateProfessionalProfile('Equipe Alfa', null)).toBe(true)
+    expect(validateProfessionalProfile('Equipe Alfa', 12500)).toBe(true)
+    expect(validateProfessionalProfile('Equipe Alfa', 0)).toBe(false)
+    expect(validateProfessionalProfile('  ', null)).toBe(false)
   })
 
   it('revisa o valor contratado, preserva baixas e atualiza a conta a receber', () => {
@@ -191,6 +208,7 @@ describe('tarefas comerciais', () => {
     expect(validateCommercialTask(task)).toBe(true)
     expect(validateCommercialTask({ ...task, title: '  ' })).toBe(false)
     expect(validateCommercialTask({ ...task, dueDate: '2026-02-30' })).toBe(false)
+    expect(validateCommercialTask({ ...task, dueDate: '' })).toBe(true)
     expect(validateCommercialTask({ ...task, dueTime: '25:90' })).toBe(false)
     expect(validateCommercialTask({ ...task, notes: 'x'.repeat(2001) })).toBe(false)
   })
@@ -199,6 +217,7 @@ describe('tarefas comerciais', () => {
     expect(commercialTaskTiming({ ...task, dueDate: '2026-11-07' }, '2026-11-08')).toBe('Atrasada')
     expect(commercialTaskTiming({ ...task, dueDate: '2026-11-08' }, '2026-11-08')).toBe('Hoje')
     expect(commercialTaskTiming(task, '2026-11-08')).toBe('Futura')
+    expect(commercialTaskTiming({ ...task, dueDate: '' }, '2026-11-08')).toBe('Sem prazo')
     expect(commercialTaskTiming({ ...task, status: 'Concluída', completedAt: '2026-11-08T13:00:00.000Z' }, '2026-11-08')).toBe('Concluída')
     expect(commercialTaskTiming({ ...task, status: 'Cancelada' }, '2026-11-08')).toBe('Cancelada')
   })

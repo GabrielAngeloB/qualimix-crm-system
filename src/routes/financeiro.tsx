@@ -33,7 +33,7 @@ const blankExpense = {
   category: 'Mão de obra' as ExpenseCategory,
   description: '',
   unitRate: '',
-  quantity: '1',
+  quantity: '',
   amount: '',
   incurredAt: today,
   dueDate: today,
@@ -53,9 +53,7 @@ function Financeiro() {
     cancelFinancialEntry,
     jobBalance,
     toast,
-    currentRole,
   } = useStore()
-  const canEditFinance = currentRole === 'administrador' || currentRole === 'financeiro'
   const [kind, setKind] = useState<'todos' | FinancialKind>('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [expense, setExpense] = useState(blankExpense)
@@ -88,25 +86,26 @@ function Financeiro() {
   const payableOpenCents = activePayables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
   const overdueCents = [...activeReceivables, ...activePayables].filter((entry) => entry.dueDate < today && openAmountCents(entry) > 0).reduce((sum, entry) => sum + openAmountCents(entry), 0)
 
-  const submitExpense = async () => {
+  const submitExpense = () => {
     const parsed = parseDecimal(expense.amount)
     const rate = parseDecimal(expense.unitRate)
     const quantity = parseDecimal(expense.quantity)
     const selectedProfessional = professionals.find((item) => item.id === expense.professionalId)
+    const hasRateBreakdown = Boolean(expense.unitRate.trim() || expense.quantity.trim())
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
       toast({ tone: 'erro', title: 'Valor inválido', body: 'Informe uma despesa maior que zero.' })
       return
     }
-    if (selectedProfessional && (!rate.ok || rate.value === null || rate.value <= 0 || !quantity.ok || quantity.value === null || quantity.value <= 0)) {
+    if (selectedProfessional && hasRateBreakdown && (!rate.ok || rate.value === null || rate.value <= 0 || !quantity.ok || quantity.value === null || quantity.value <= 0)) {
       toast({ tone: 'erro', title: 'Custo de mão de obra inválido', body: 'Informe a tarifa unitária e a quantidade para calcular o custo do serviço.' })
       return
     }
-    const unitRateCents = selectedProfessional && rate.ok && rate.value !== null ? Math.round(rate.value * 100) : null
-    const quantityValue = selectedProfessional && quantity.ok && quantity.value !== null ? quantity.value : null
+    const unitRateCents = selectedProfessional && hasRateBreakdown && rate.ok && rate.value !== null ? Math.round(rate.value * 100) : null
+    const quantityValue = selectedProfessional && hasRateBreakdown && quantity.ok && quantity.value !== null ? quantity.value : null
     const calculatedLaborCents = selectedProfessional && unitRateCents !== null && quantityValue !== null
       ? calculateUnitCostCents(unitRateCents, quantityValue)
       : null
-    if (selectedProfessional && calculatedLaborCents !== Math.round(parsed.value * 100)) {
+    if (selectedProfessional && hasRateBreakdown && calculatedLaborCents !== Math.round(parsed.value * 100)) {
       toast({ tone: 'erro', title: 'Total divergente', body: 'O total da mão de obra deve ser igual à tarifa unitária multiplicada pela quantidade.' })
       return
     }
@@ -115,7 +114,7 @@ function Financeiro() {
       workOrderId: expense.workOrderId,
       professionalId: expense.professionalId || null,
       category: expense.category,
-      description: expense.description.trim(),
+      description: expense.description.trim() || 'Despesa sem descrição',
       amountCents: Math.round(parsed.value * 100),
       unitRateCents,
       quantity: quantityValue,
@@ -125,7 +124,7 @@ function Financeiro() {
       demo: false as const,
     }
     try {
-      await addExpense(record, expense.dueDate, expense.method)
+      addExpense(record, expense.dueDate, expense.method)
       toast({ tone: 'ok', title: 'Despesa registrada', body: 'A despesa foi vinculada à obra e gerou uma conta a pagar.' })
       setExpense(blankExpense)
       setShowExpense(false)
@@ -139,7 +138,7 @@ function Financeiro() {
     setPayment({ amount: '', paidAt: today, method: entry.method, note: '' })
   }
 
-  const submitPayment = async (entry: FinancialEntry) => {
+  const submitPayment = (entry: FinancialEntry) => {
     const parsed = parseDecimal(payment.amount)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
       toast({ tone: 'erro', title: 'Valor de baixa inválido', body: 'Informe um pagamento maior que zero.' })
@@ -153,7 +152,7 @@ function Financeiro() {
       note: payment.note.trim(),
     }
     try {
-      await registerPayment(entry.id, item)
+      registerPayment(entry.id, item)
       toast({ tone: 'ok', title: 'Baixa financeira registrada', body: `${entry.description} · ${brlCents(item.amountCents)}` })
       setPaymentFor(null)
     } catch (error) {
@@ -170,7 +169,7 @@ function Financeiro() {
         eyebrow="Financeiro"
         title="Contas a pagar e receber"
         description="Vencimentos, baixas totais ou parciais, vínculo com obras e profissionais. Pix/boleto informado não representa pagamento sem uma baixa registrada."
-        actions={canEditFinance ? <Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button> : undefined}
+        actions={<Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button>}
       />
 
       <dl className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -181,7 +180,7 @@ function Financeiro() {
         <Kpi label="Vencido" value={brlCents(overdueCents)} sub="Pagar + receber" danger={overdueCents > 0} />
       </dl>
 
-      {canEditFinance && showExpense && (
+      {showExpense && (
         <Card className="mb-6">
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-xl font-bold uppercase">Nova despesa da obra</h2>
@@ -200,28 +199,28 @@ function Financeiro() {
             <Field label="Profissional (opcional)">
               {(id) => <select id={id} className={inputCls()} value={expense.professionalId} onChange={(event) => {
                 const professional = professionals.find((item) => item.id === event.target.value)
-                const unitRate = professional ? (professional.rateCents / 100).toFixed(2).replace('.', ',') : ''
+                const unitRate = professional?.rateCents != null ? (professional.rateCents / 100).toFixed(2).replace('.', ',') : ''
                 setExpense((current) => ({
                   ...current,
                   professionalId: event.target.value,
                   category: professional ? 'Mão de obra' : current.category,
                   description: professional ? (current.description || professional.serviceType) : current.description,
                   unitRate,
-                  quantity: professional ? '1' : '',
-                  amount: professional ? unitRate : current.amount,
+                  quantity: professional?.rateCents != null ? '1' : '',
+                  amount: professional?.rateCents != null ? unitRate : '',
                   method: professional ? professional.paymentMethod : current.method,
                 }))
               }}>
                 <option value="">Não vincular</option>
-                {professionals.filter((professional) => professional.active).map((professional) => <option key={professional.id} value={professional.id}>{professional.name} · {professional.serviceType} · {brlCents(professional.rateCents)}/{professional.rateUnit}</option>)}
+                {professionals.filter((professional) => professional.active).map((professional) => <option key={professional.id} value={professional.id}>{professional.name} · {professional.serviceType || 'Especialidade não informada'} · {professional.rateCents === null ? 'custo pendente' : `${brlCents(professional.rateCents)}/${professional.rateUnit}`}</option>)}
               </select>}
             </Field>
-            <Field label="Descrição" required>
-              {(id) => <input id={id} className={inputCls()} value={expense.description} onChange={(event) => setExpense((current) => ({ ...current, description: event.target.value }))} />}
+            <Field label="Descrição (opcional)">
+              {(id) => <input id={id} className={inputCls()} placeholder="Ex.: material, combustível, serviço…" value={expense.description} onChange={(event) => setExpense((current) => ({ ...current, description: event.target.value }))} />}
             </Field>
             {expense.professionalId && (
               <>
-                <Field label="Tarifa por unidade (R$)" required>
+                <Field label="Tarifa por unidade (R$) (opcional)">
                   {(id) => <input id={id} inputMode="decimal" className={inputCls()} value={expense.unitRate} onChange={(event) => {
                     const nextRate = event.target.value
                     setExpense((current) => {
@@ -238,7 +237,7 @@ function Financeiro() {
                     })
                   }} />}
                 </Field>
-                <Field label={`Quantidade (${professionals.find((item) => item.id === expense.professionalId)?.rateUnit ?? 'unidade'})`} required>
+                <Field label={`Quantidade (${professionals.find((item) => item.id === expense.professionalId)?.rateUnit ?? 'unidade'}) (opcional)`}>
                   {(id) => <input id={id} type="number" min="0.01" step="0.01" className={inputCls()} value={expense.quantity} onChange={(event) => {
                     const nextQuantity = event.target.value
                     setExpense((current) => {
@@ -266,13 +265,13 @@ function Financeiro() {
             <Field label="Vencimento" required>
               {(id) => <input id={id} type="date" className={inputCls()} value={expense.dueDate} onChange={(event) => setExpense((current) => ({ ...current, dueDate: event.target.value }))} />}
             </Field>
-            <Field label="Forma de pagamento" required>
+            <Field label="Forma de pagamento (opcional)" hint="Se ainda não foi definida, ficará como Não informado.">
               {(id) => <input id={id} className={inputCls()} placeholder="Pix, boleto, transferência…" value={expense.method} onChange={(event) => setExpense((current) => ({ ...current, method: event.target.value }))} />}
             </Field>
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
             <Button onClick={() => setShowExpense(false)}>Cancelar</Button>
-            <Button variant="primary" disabled={!expense.workOrderId || !expense.description.trim() || !expense.amount || !expense.dueDate || !expense.incurredAt || !expense.method.trim()} onClick={submitExpense}>Salvar despesa e conta a pagar</Button>
+            <Button variant="primary" disabled={!expense.workOrderId || !expense.amount || !expense.dueDate || !expense.incurredAt} onClick={submitExpense}>Salvar despesa e conta a pagar</Button>
           </div>
         </Card>
       )}
@@ -340,14 +339,14 @@ function Financeiro() {
                       <Field label="Observação">{(id) => <input id={id} className={inputCls()} value={payment.note} onChange={(event) => setPayment((current) => ({ ...current, note: event.target.value }))} />}</Field>
                       <div className="flex justify-end gap-2 sm:col-span-2 lg:col-span-4">
                         <Button size="sm" onClick={() => setPaymentFor(null)}>Cancelar</Button>
-                        <Button size="sm" variant="primary" disabled={!payment.amount || !payment.paidAt || !payment.method.trim()} onClick={() => void submitPayment(entry)}>Confirmar baixa</Button>
+                        <Button size="sm" variant="primary" disabled={!payment.amount || !payment.paidAt || !payment.method.trim()} onClick={() => submitPayment(entry)}>Confirmar baixa</Button>
                       </div>
                     </div>
                   )}
 
                   <div className="ml-12 mt-3 flex flex-wrap gap-2">
-                    {canEditFinance && openCents > 0 && entry.status !== 'Cancelado' && <Button size="sm" onClick={() => isPaymentOpen ? setPaymentFor(null) : openPayment(entry)}>{isPaymentOpen ? 'Fechar baixa' : 'Registrar baixa'}</Button>}
-                    {canEditFinance && entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { void cancelFinancialEntry(entry.id).then(() => toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description })).catch((error) => toast({ tone: 'erro', title: 'Não foi possível cancelar', body: error instanceof Error ? error.message : 'Revise o lançamento.' })) } }}>Cancelar lançamento</Button>}
+                    {openCents > 0 && entry.status !== 'Cancelado' && <Button size="sm" onClick={() => isPaymentOpen ? setPaymentFor(null) : openPayment(entry)}>{isPaymentOpen ? 'Fechar baixa' : 'Registrar baixa'}</Button>}
+                    {entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { cancelFinancialEntry(entry.id); toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description }) } }}>Cancelar lançamento</Button>}
                   </div>
                 </article>
               )

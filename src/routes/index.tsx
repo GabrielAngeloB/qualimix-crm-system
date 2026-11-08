@@ -1,48 +1,72 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { CalendarDays, CircleAlert, FileText, Plus, Settings, Wallet } from 'lucide-react'
+import { CalendarDays, CircleAlert, FileText, Plus, Settings, Truck, Wallet } from 'lucide-react'
 import { useStore } from '../data/store'
-import { computeDashboard } from '../data/metrics'
-import { activities, schedule, today } from '../data/fixtures'
+import { computeDashboard, computeOperationalDashboard } from '../data/metrics'
+import { today } from '../lib/clock'
 import { pendingSettings } from '../data/settings'
 import { brl, brlCents, dateBR, daysBetween, num, pct } from '../lib/format'
 import { Badge, Card, CardHeader, EmptyState, PageHeader, cx, inputCls } from '../components/ui'
 import { BarChart, ChartCard } from '../components/Charts'
 
-export const Route = createFileRoute('/')({ component: Painel })
+export const Route = createFileRoute('/')({
+  head: () => ({
+    meta: [
+      { title: 'Painel gerencial — Qualimix CRM' },
+      { name: 'description', content: 'Leads, orçamentos, conversão, m³ e m² vendidos, próximas concretagens e contas a receber da Qualimix.' },
+      { property: 'og:title', content: 'Painel gerencial — Qualimix CRM' },
+      { property: 'og:description', content: 'Indicadores comerciais e operacionais da Qualimix em um só painel.' },
+    ],
+  }),
+  component: Painel,
+})
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, workOrders, currentRole } = useStore()
-  const canCreateQuote = currentRole === 'administrador' || currentRole === 'comercial'
+  const { quotes, opportunities, receivables, clients, sites, scheduleEvents, workOrders, expenses, financialEntries, tasks, settings } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
-  const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId])
-  const pend = pendingSettings(ctx.catalog)
+  const pend = pendingSettings(settings)
   const clientOf = (quoteId: string) => {
     const q = quotes.find((x) => x.id === quoteId)
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
   }
-  const upcoming = (demoMode
-    ? schedule.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volume, fck: e.fck, pump: e.pump, status: e.status }))
-    : scheduleEvents.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volumeM3, fck: e.fck, pump: e.pump, status: e.status }))
-  ).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada')
-    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  const financeRows = views.finance ?? []
-  const financeSummary = {
-    billed: financeRows.filter((x) => x.tipo === 'receber').reduce((sum, x) => sum + Number(x.valor_centavos ?? 0), 0),
-    received: financeRows.filter((x) => x.tipo === 'receber').reduce((sum, x) => sum + Number(x.total_pago_centavos ?? 0), 0),
-    open: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado !== 'Cancelado').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
-    overdue: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado === 'Vencido').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
-  }
-  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0 || scheduleEvents.length > 0
+  const realSchedule = scheduleEvents
+    .filter((event) => daysBetween(today, event.date) >= 0 && !['Cancelada', 'Concluída'].includes(event.status))
+    .map((event) => ({
+      id: event.id, date: event.date, time: event.time, volume: event.volumeM3, fck: event.fck, pump: event.pump, truck: event.truck, status: event.status,
+      clientName: clients.find((client) => client.id === event.clientId)?.name ?? '—',
+      siteName: sites.find((site) => site.id === event.siteId)?.name ?? event.service,
+    }))
+  const upcoming = [...realSchedule].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+  const pendingTasks = tasks
+    .filter((task) => task.status === 'Pendente')
+    .sort((a, b) => ((a.dueDate || '9999-12-31') + (a.dueTime ?? '23:59')).localeCompare((b.dueDate || '9999-12-31') + (b.dueTime ?? '23:59')))
+  const overdueTasks = pendingTasks.filter((task) => task.dueDate && task.dueDate < today)
+  const todayTasks = pendingTasks.filter((task) => task.dueDate === today)
+  const ownerOptions = [...new Set(opportunities.map((opportunity) => opportunity.ownerId))].sort()
+  const recentActivities = opportunities
+    .flatMap((opportunity) => opportunity.history.map((event) => ({
+      id: `${opportunity.id}-${event.at}-${event.text}`,
+      text: event.text,
+      ref: opportunity.title,
+      by: event.by,
+      at: event.at.slice(0, 10),
+    })))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 6)
+  const operational = useMemo(
+    () => computeOperationalDashboard(workOrders, expenses, financialEntries, scheduleEvents, today),
+    [workOrders, expenses, financialEntries, scheduleEvents],
+  )
+  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0 || financialEntries.length > 0 || tasks.length > 0
 
   return (
     <>
       <PageHeader
         eyebrow={`Hoje, ${dateBR(today)}`}
         title="Painel gerencial"
-        description="Indicadores calculados a partir dos registros comerciais, operacionais e financeiros persistidos no banco."
+        description="Indicadores comerciais e operacionais calculados a partir dos orçamentos, pedidos, agenda, despesas e lançamentos financeiros."
         actions={
           <>
             <select aria-label="Período" className={cx(inputCls(), 'w-auto')} value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -53,77 +77,16 @@ function Painel() {
             </select>
             <select aria-label="Responsável" className={cx(inputCls(), 'w-auto')} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
               <option value="">Todos os responsáveis</option>
-              {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {ownerOptions.map((ownerId) => <option key={ownerId} value={ownerId}>{ownerId === 'u-local' ? 'Sessão local' : ownerId}</option>)}
             </select>
-            {canCreateQuote && <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
+            <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
               <Plus className="h-4 w-4" /> Novo orçamento
-            </Link>}
+            </Link>
           </>
         }
       />
 
-      <section className="mb-6 space-y-3">
-        <div>
-          <h2 className="font-display text-xl font-bold uppercase">Consultas do banco de dados</h2>
-          <p className="text-xs text-muted">Dados carregados das views SQL comerciais, operacionais e financeiras do Supabase.</p>
-        </div>
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <Card><CardHeader title="Clientes" subtitle="vw_clientes_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.clients.length}</p></Card>
-          <Card><CardHeader title="Orçamentos" subtitle="vw_orcamentos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.quotes.length}</p></Card>
-          <Card><CardHeader title="Oportunidades" subtitle="vw_funil_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.funnel.reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
-          <Card><CardHeader title="Pedidos" subtitle="vw_pedidos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.orders.length}</p></Card>
-          <Card><CardHeader title="Contas financeiras" subtitle="vw_financeiro_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.finance.length}</p></Card>
-          <Card><CardHeader title="Profissionais" subtitle="vw_profissionais_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.professionals.length}</p></Card>
-          <Card><CardHeader title="Programações" subtitle="vw_agenda_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.schedule.length}</p></Card>
-          <Card><CardHeader title="Tarefas pendentes" subtitle="vw_tarefas_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.tasks.filter((row) => row.status === 'Pendente').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
-        </div>
-        <Card>
-          <CardHeader title="Funil resumido no PostgreSQL" subtitle="Contagem e valor estimado por etapa, calculados pela view vw_funil_resumo." />
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[480px] text-left text-sm">
-              <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted">
-                <tr><th className="px-4 py-2">Etapa</th><th className="px-4 py-2 text-right">Oportunidades</th><th className="px-4 py-2 text-right">Valor estimado</th><th className="px-4 py-2 text-right">Retornos atrasados</th></tr>
-              </thead>
-              <tbody>
-                {views.funnel.map((row) => (
-                  <tr key={row.etapa} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2">{row.nome}</td>
-                    <td className="px-4 py-2 text-right tabular">{row.quantidade}</td>
-                    <td className="px-4 py-2 text-right tabular">{brl(Number(row.valor_estimado ?? 0))}</td>
-                    <td className="px-4 py-2 text-right tabular">{row.retornos_atrasados}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-        <div className="grid gap-3 xl:grid-cols-2">
-          <Card>
-            <CardHeader title="Clientes — visão resumida" subtitle="vw_clientes_resumo · registros recentes" />
-            {views.clients.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum cliente na view.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[420px] text-left text-sm">
-                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Cliente</th><th className="px-4 py-2 text-right">Obras</th><th className="px-4 py-2 text-right">Leads</th><th className="px-4 py-2 text-right">Orçamentos</th></tr></thead>
-                  <tbody>{views.clients.slice(0, 6).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2"><span className="block max-w-[220px] truncate font-medium">{row.nome}</span><span className="text-xs text-muted">{row.cidade || row.regiao || '—'}</span></td><td className="px-4 py-2 text-right tabular">{row.total_obras}</td><td className="px-4 py-2 text-right tabular">{row.total_oportunidades}</td><td className="px-4 py-2 text-right tabular">{row.total_orcamentos}</td></tr>)}</tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-          <Card>
-            <CardHeader title="Orçamentos — visão resumida" subtitle="vw_orcamentos_resumo · registros recentes" />
-            {views.quotes.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum orçamento na view.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[440px] text-left text-sm">
-                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Número / cliente</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Total</th></tr></thead>
-                  <tbody>{views.quotes.slice(0, 6).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2"><span className="block font-semibold tabular">{row.numero}</span><span className="block max-w-[220px] truncate text-xs text-muted">{row.cliente_nome}</span></td><td className="px-4 py-2">{row.status}</td><td className="px-4 py-2 text-right tabular">{row.total_centavos == null ? '—' : brl(Number(row.total_centavos) / 100)}</td></tr>)}</tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-        </div>
-      </section>
-
-      {pend.length > 0 &&
+      {pend.length > 0 && (
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-warn/30 bg-warn-soft p-4 text-sm">
           <Settings className="h-5 w-5 shrink-0 text-warn" />
           <p className="min-w-0 flex-1">
@@ -131,7 +94,7 @@ function Painel() {
           </p>
           <Link to="/configuracoes" className="font-semibold text-warn underline">Ver pendências</Link>
         </div>
-      }
+      )}
 
       {!hasData ? (
         <Card>
@@ -147,10 +110,41 @@ function Painel() {
             <Kpi label="Aceitos" value={String(d.acceptedCount)} def={`Conversão ${pct(d.conversion)} (aceitos ÷ enviados)`} />
             <Kpi label="Valor orçado" value={brlCents(d.quotedCents)} def="Total das propostas criadas no período" />
             <Kpi accent label="Valor contratado" value={brlCents(d.contractedCents)} def="Orçamentos aceitos — pedidos fechados" />
+            <Kpi label="Pipeline em aberto" value={brlCents(d.pipelineCents)} def={d.opportunitiesWithoutQuote + ' sem orçamento · ' + d.opportunitiesWithQuote + ' com orçamento vinculado'} />
             <Kpi label="Concreto vendido" value={`${num(d.volumeM3, 1)} m³`} def="Volume dos orçamentos aceitos" />
             <Kpi label="Pisos vendidos" value={`${num(d.areaM2, 0)} m²`} def="Área dos orçamentos aceitos" />
-            <Kpi label="Contas a receber" value={brlCents(demoMode ? d.openCents : financeSummary.open)} def={demoMode ? `${d.overdue.length} parcela(s) em atraso (demo)` : `${brlCents(financeSummary.overdue)} vencido`} />
+            <Kpi label="Contas vencidas" value={brlCents(d.overdueCents)} def={`${d.overdue.length} parcela(s) em atraso`} tone={d.overdueCents > 0 ? 'red' : undefined} />
           </dl>
+
+          <Card className="mt-6">
+            <CardHeader
+              title="Tarefas e retornos comerciais"
+              subtitle={overdueTasks.length + ' atrasada(s) · ' + todayTasks.length + ' para hoje'}
+              action={<Link to="/tarefas" search={{ oportunidade: undefined }} className="text-sm font-semibold text-brand hover:underline">Abrir tarefas</Link>}
+            />
+            {pendingTasks.length === 0 ? (
+              <p className="p-5 text-sm text-muted">Nenhuma tarefa pendente. Registre o próximo passo de uma oportunidade para acompanhar os retornos.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {pendingTasks.slice(0, 5).map((task) => {
+                  const opportunity = opportunities.find((item) => item.id === task.opportunityId)
+                  const client = clients.find((item) => item.id === opportunity?.clientId)
+                  return (
+                    <li key={task.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{task.title}</p>
+                        <p className="truncate text-xs text-muted">{opportunity?.title ?? 'Tarefa geral'}{client ? ' · ' + client.name : ''}</p>
+                      </div>
+                      <span className="text-xs text-muted">{task.dueDate ? dateBR(task.dueDate) : 'Sem prazo'}{task.dueTime ? ' · ' + task.dueTime : ''}</span>
+                      <Badge tone={task.dueDate && task.dueDate < today ? 'red' : task.dueDate === today ? 'warn' : 'neutral'}>
+                        {task.dueDate ? (task.dueDate < today ? 'Atrasada' : task.dueDate === today ? 'Hoje' : 'Agendada') : 'Sem prazo'}
+                      </Badge>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
             <ChartCard className="xl:col-span-2" title="Histórico de vendas" definition="Valor orçado × valor contratado por mês de criação do orçamento (últimos 6 meses)." columns={['Mês', 'Orçado', 'Contratado']} rows={d.months.map((m) => [m.label, brl(m.quoted), brl(m.contracted)])}>
@@ -196,13 +190,12 @@ function Painel() {
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             <Card>
-              <CardHeader title="Próximas concretagens" action={<CalendarDays className="h-5 w-5 text-brand" />} />
+              <CardHeader title="Próximas concretagens" subtitle={`${operational.scheduledCount} serviço(s) futuro(s)`} action={<Link to="/agenda" className="text-sm font-semibold text-brand hover:underline">Abrir agenda</Link>} />
               {upcoming.length === 0 ? (
-                <p className="p-5 text-sm text-muted">'Nenhuma concretagem programada.</p>
+                <p className="p-5 text-sm text-muted">Nenhuma concretagem programada.</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {upcoming.map((e) => {
-                    const { client, site } = clientOf(e.quoteId)
                     return (
                       <li key={e.id} className="flex gap-3 px-5 py-3 text-sm">
                         <div className="w-14 shrink-0 rounded bg-ink py-1 text-center text-bg">
@@ -210,11 +203,12 @@ function Painel() {
                           <div className="text-[11px]">{e.time}</div>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold">{site?.name}</p>
-                          <p className="truncate text-xs text-muted">{client?.name}</p>
+                          <p className="truncate font-semibold">{e.siteName}</p>
+                          <p className="truncate text-xs text-muted">{e.clientName}</p>
                           <p className="mt-1 flex flex-wrap gap-1">
                             <Badge>{num(e.volume, 1)} m³{e.fck && ` · FCK ${e.fck}`}</Badge>
                             {e.pump && <Badge tone="info">Bomba</Badge>}
+                            {e.truck ? <Badge><Truck className="h-3 w-3" /> {e.truck}</Badge> : <Badge tone="warn">Sem caminhão</Badge>}
                             <Badge tone={e.status === 'Confirmada' ? 'ok' : 'neutral'}>{e.status}</Badge>
                           </p>
                         </div>
@@ -228,11 +222,11 @@ function Painel() {
             <Card>
               <CardHeader title="Contas a receber" subtitle="Contratado, cobrado e efetivamente recebido são indicadores distintos." action={<Wallet className="h-5 w-5 text-brand" />} />
               <div className="space-y-3 p-5">
-                <Flow label="Cobrado (parcelas emitidas)" value={demoMode ? d.billedCents : financeSummary.billed} max={demoMode ? d.billedCents : financeSummary.billed} />
-                <Flow label="Recebido (pagamentos confirmados)" value={demoMode ? d.receivedCents : financeSummary.received} max={demoMode ? d.billedCents : financeSummary.billed} tone="ok" />
-                <Flow label="Em aberto" value={demoMode ? d.openCents : financeSummary.open} max={demoMode ? d.billedCents : financeSummary.billed} tone="grey" />
-                <Flow label="Vencido" value={demoMode ? d.overdueCents : financeSummary.overdue} max={demoMode ? d.billedCents : financeSummary.billed} tone="red" />
-                {demoMode && d.overdue.length > 0 && (
+                <Flow label="Cobrado (parcelas emitidas)" value={d.billedCents} max={d.billedCents} />
+                <Flow label="Recebido (pagamentos confirmados)" value={d.receivedCents} max={d.billedCents} tone="ok" />
+                <Flow label="Em aberto" value={d.openCents} max={d.billedCents} tone="grey" />
+                <Flow label="Vencido" value={d.overdueCents} max={d.billedCents} tone="red" />
+                {d.overdue.length > 0 && (
                   <div className="rounded-md border border-brand/30 bg-brand-soft p-3 text-sm">
                     <p className="mb-1 flex items-center gap-1 font-bold text-brand"><CircleAlert className="h-4 w-4" /> Parcelas vencidas</p>
                     <ul className="space-y-1">
@@ -249,17 +243,31 @@ function Painel() {
             </Card>
 
             <Card>
+              <CardHeader title="Contas a pagar" action={<Link to="/financeiro" className="text-sm font-semibold text-brand hover:underline">Abrir financeiro</Link>} />
+              <div className="space-y-3 p-5">
+                <Flow label="Em aberto" value={operational.payableOpenCents} max={operational.payableOpenCents + operational.payablePaidCents} tone="grey" />
+                <Flow label="Pago" value={operational.payablePaidCents} max={operational.payableOpenCents + operational.payablePaidCents} tone="ok" />
+                <Flow label="Custos lançados nas obras" value={operational.costsCents} max={operational.contractedCents} tone="red" />
+                <div className="border-t border-line pt-3">
+                  <p className="text-xs text-muted">Contratado nas obras</p>
+                  <p className="font-display text-xl font-bold tabular">{brlCents(operational.contractedCents)}</p>
+                  <p className="mt-1 text-xs text-muted">Saldo após despesas: <strong className="tabular">{brlCents(operational.balanceCents)}</strong></p>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
               <CardHeader title="Atividades recentes" />
-              {!demoMode || activities.length === 0 ? (
-                <p className="p-5 text-sm text-muted">{demoMode ? 'Nenhuma atividade registrada.' : 'A linha do tempo geral ainda não está integrada ao banco.'}</p>
+              {recentActivities.length === 0 ? (
+                <p className="p-5 text-sm text-muted">Nenhuma atividade registrada.</p>
               ) : (
                 <ol className="space-y-3 p-5 text-sm">
-                  {activities.map((a, i) => (
-                    <li key={i} className="flex gap-3">
+                  {recentActivities.map((activity) => (
+                    <li key={activity.id} className="flex gap-3">
                       <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />
                       <div className="min-w-0">
-                        <p className="font-medium">{a.text}</p>
-                        <p className="text-xs text-muted">{a.ref} · {userName(a.by)} · {dateBR(a.at)}</p>
+                        <p className="font-medium">{activity.text}</p>
+                        <p className="text-xs text-muted">{activity.ref} · {activity.by === 'u-local' ? 'Sessão local' : activity.by} · {dateBR(activity.at)}</p>
                       </div>
                     </li>
                   ))}
