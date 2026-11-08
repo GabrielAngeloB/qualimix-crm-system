@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div key={g.group} className="mb-5">
             <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{g.group}</p>
             <ul className="space-y-0.5">
-              {g.items.filter((it) => profile?.perfil === 'admin' || (it.roles ? it.roles.includes(profile?.role ?? '') : it.to === '/usuarios' && profile?.perfil === 'admin')).map((it) => {
+              {g.items.filter((it) => profile?.role === 'administrador' || (it.roles ? it.roles.includes(profile?.role ?? '') : false)).map((it) => {
                 const active = it.to && (it.to === '/' ? path === '/' : path.startsWith(it.to))
                 const inner = (
                   <>
