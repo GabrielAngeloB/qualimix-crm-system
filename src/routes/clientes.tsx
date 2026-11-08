@@ -4,7 +4,8 @@ import { Building2, FileText, MapPin, MessageCircle, Phone, Plus, Search, Users 
 import { useStore } from '../data/store'
 import { clientTypes, leadSources, regions } from '../data/settings'
 import { team, today, userName, type Client, type Site } from '../data/fixtures'
-import { formatDocument, formatPhone, onlyDigits, validateDocument, whatsappUrl } from '../lib/documents'
+import { formatDocument, formatPhone, onlyDigits, whatsappUrl } from '../lib/documents'
+import { normalizeBrazilPhone, validateClientFields } from '../lib/crm-validation'
 import { brlCents, dateBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
@@ -168,26 +169,14 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
   const up = (k: keyof typeof emptyForm, v: string | boolean) => setF((x) => ({ ...x, [k]: v }))
 
   const docDigits = onlyDigits(f.document)
-  const phoneDigits = onlyDigits(f.phone)
+  const phoneDigits = normalizeBrazilPhone(f.phone)
   const dupDoc = docDigits ? clients.find((c) => c.document === docDigits) : undefined
   const dupPhone = phoneDigits.length >= 10 ? clients.find((c) => c.phone === phoneDigits || c.whatsapp === phoneDigits) : undefined
 
-  const validate = () => {
-    const e: Record<string, string> = {}
-    if (f.name.trim().length < 3) e.name = 'Informe o nome ou razão social'
-    if (!f.type) e.type = 'Selecione o tipo de cliente'
-    const de = validateDocument(f.document)
-    if (de) e.document = de
-    if (dupDoc) e.document = `Documento já cadastrado para ${dupDoc.name}`
-    if (phoneDigits.length < 10 || phoneDigits.length > 11) e.phone = 'Telefone com DDD (10 ou 11 dígitos)'
-    if (!f.sameWa && f.whatsapp && ![10, 11].includes(onlyDigits(f.whatsapp).length)) e.whatsapp = 'WhatsApp com DDD'
-    if (f.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(f.email)) e.email = 'E-mail inválido'
-    if (!f.region) e.region = 'Selecione a região de atendimento'
-    if (!f.source) e.source = 'Selecione a origem do lead'
-    if (f.siteName && f.siteName.trim().length < 3) e.siteName = 'Nome da obra muito curto'
-    if (f.siteName && !f.siteAddress.trim()) e.siteAddress = 'Informe o endereço da obra'
-    return e
-  }
+  const validate = () => validateClientFields({
+    ...f,
+    whatsapp: f.sameWa ? f.phone : f.whatsapp,
+  }, clients)
   const liveErrors = tried ? validate() : errors
 
   const close = () => {
@@ -208,10 +197,10 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
     }
     const id = newId()
     const client: Client = {
-      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : onlyDigits(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: f.ownerId, notes: f.notes.trim(), createdAt: today, active: true, demo: false,
+      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : normalizeBrazilPhone(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: f.ownerId, notes: f.notes.trim(), createdAt: today, active: true, demo: false,
     }
     const site: Site | undefined = f.siteName.trim()
-      ? { id: newId(), clientId: id, name: f.siteName.trim(), address: f.siteAddress.trim(), city: f.city.trim(), region: f.region, contactName: f.siteContact.trim(), contactPhone: onlyDigits(f.sitePhone), serviceType: '', accessNotes: '', restrictions: f.siteRestrictions.trim(), demo: false }
+      ? { id: newId(), clientId: id, name: f.siteName.trim(), address: f.siteAddress.trim(), city: f.city.trim(), region: f.region, contactName: f.siteContact.trim(), contactPhone: normalizeBrazilPhone(f.sitePhone), serviceType: '', accessNotes: '', restrictions: f.siteRestrictions.trim(), demo: false }
       : undefined
     try {
       await addClient(client, site)
@@ -230,8 +219,8 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
       <div className="space-y-6">
         <p className="text-sm text-muted">Campos com <span className="text-brand">*</span> são obrigatórios. O restante pode ser completado depois.</p>
         <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Nome ou razão social" required error={liveErrors.name} className="sm:col-span-2">{(id) => <input id={id} className={inputCls(!!liveErrors.name)} value={f.name} onChange={(e) => up('name', e.target.value)} autoFocus />}</Field>
-          <Field label="Nome fantasia">{(id) => <input id={id} className={inputCls()} value={f.tradeName} onChange={(e) => up('tradeName', e.target.value)} />}</Field>
+          <Field label="Nome ou razão social" required error={liveErrors.name} hint="Nome oficial da pessoa ou empresa. Ex.: Construtora Almeida Ltda." className="sm:col-span-2">{(id) => <input id={id} required maxLength={160} autoComplete="organization" className={inputCls(!!liveErrors.name)} value={f.name} placeholder="Ex.: Construtora Almeida Ltda." onChange={(e) => up('name', e.target.value)} autoFocus />}</Field>
+          <Field label="Nome fantasia" error={liveErrors.tradeName} hint="Nome pelo qual a empresa é conhecida. Ex.: Camaleão.">{(id) => <input id={id} maxLength={120} className={inputCls(!!liveErrors.tradeName)} value={f.tradeName} placeholder="Ex.: Camaleão" onChange={(e) => up('tradeName', e.target.value)} />}</Field>
           <Field label="Tipo de cliente" required error={liveErrors.type}>
             {(id) => (
               <select id={id} className={inputCls(!!liveErrors.type)} value={f.type} onChange={(e) => up('type', e.target.value)}>
@@ -240,11 +229,11 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               </select>
             )}
           </Field>
-          <Field label="CPF ou CNPJ" error={liveErrors.document ?? (dupDoc ? `Já cadastrado: ${dupDoc.name}` : null)} hint="Opcional. Validamos os dígitos verificadores.">
-            {(id) => <input id={id} inputMode="numeric" className={inputCls(!!liveErrors.document || !!dupDoc)} value={f.document} onChange={(e) => up('document', e.target.value)} onBlur={() => up('document', formatDocument(f.document))} />}
+          <Field label="CPF ou CNPJ" error={liveErrors.document ?? (dupDoc ? `Já cadastrado: ${dupDoc.name}` : null)} hint="Opcional. Digite somente números ou use a máscara. Ex.: 00.000.000/0000-00.">
+            {(id) => <input id={id} inputMode="numeric" maxLength={18} autoComplete="off" className={inputCls(!!liveErrors.document || !!dupDoc)} value={f.document} placeholder="00.000.000/0000-00" onChange={(e) => up('document', e.target.value)} onBlur={() => up('document', formatDocument(f.document))} />}
           </Field>
           <Field label="Telefone" required error={liveErrors.phone} hint={dupPhone ? `Atenção: telefone já usado por ${dupPhone.name}` : undefined}>
-            {(id) => <input id={id} inputMode="tel" className={inputCls(!!liveErrors.phone)} value={f.phone} placeholder="(00) 00000-0000" onChange={(e) => up('phone', e.target.value)} onBlur={() => up('phone', formatPhone(f.phone))} />}
+            {(id) => <input id={id} required inputMode="tel" maxLength={20} autoComplete="tel" className={inputCls(!!liveErrors.phone)} value={f.phone} placeholder="(61) 99999-9999" onChange={(e) => up('phone', e.target.value)} onBlur={() => up('phone', formatPhone(f.phone))} />}
           </Field>
           <div className="sm:col-span-2">
             <label className="flex items-center gap-2 text-sm">
@@ -252,10 +241,10 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               O WhatsApp é o mesmo número do telefone
             </label>
             {!f.sameWa && (
-              <Field label="WhatsApp" error={liveErrors.whatsapp} className="mt-3 sm:w-1/2">{(id) => <input id={id} inputMode="tel" className={inputCls(!!liveErrors.whatsapp)} value={f.whatsapp} onChange={(e) => up('whatsapp', e.target.value)} />}</Field>
+              <Field label="WhatsApp" error={liveErrors.whatsapp} hint="Quando for diferente do telefone. Ex.: (61) 98888-7777." className="mt-3 sm:w-1/2">{(id) => <input id={id} inputMode="tel" maxLength={20} className={inputCls(!!liveErrors.whatsapp)} value={f.whatsapp} placeholder="(61) 98888-7777" onChange={(e) => up('whatsapp', e.target.value)} onBlur={() => up('whatsapp', formatPhone(f.whatsapp))} />}</Field>
             )}
           </div>
-          <Field label="E-mail" error={liveErrors.email}>{(id) => <input id={id} type="email" className={inputCls(!!liveErrors.email)} value={f.email} onChange={(e) => up('email', e.target.value)} />}</Field>
+          <Field label="E-mail" error={liveErrors.email} hint="Ex.: compras@empresa.com.br. Campo opcional.">{(id) => <input id={id} type="email" maxLength={254} autoComplete="email" className={inputCls(!!liveErrors.email)} value={f.email} placeholder="compras@empresa.com.br" onChange={(e) => up('email', e.target.value)} />}</Field>
           <Field label="Origem do lead" required error={liveErrors.source}>
             {(id) => (
               <select id={id} className={inputCls(!!liveErrors.source)} value={f.source} onChange={(e) => up('source', e.target.value)}>
@@ -264,8 +253,8 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               </select>
             )}
           </Field>
-          <Field label="Endereço" className="sm:col-span-2">{(id) => <input id={id} className={inputCls()} value={f.address} onChange={(e) => up('address', e.target.value)} />}</Field>
-          <Field label="Cidade">{(id) => <input id={id} className={inputCls()} value={f.city} onChange={(e) => up('city', e.target.value)} />}</Field>
+          <Field label="Endereço" error={liveErrors.address} hint="Ex.: Quadra 00, Conjunto 00, Lote 00, Setor Norte." className="sm:col-span-2">{(id) => <input id={id} maxLength={200} className={inputCls(!!liveErrors.address)} value={f.address} placeholder="Ex.: Quadra 00, Conjunto 00, Lote 00" onChange={(e) => up('address', e.target.value)} />}</Field>
+          <Field label="Cidade" error={liveErrors.city} hint="Inclua a UF para evitar cidades com o mesmo nome. Ex.: Sobradinho - DF.">{(id) => <input id={id} maxLength={100} className={inputCls(!!liveErrors.city)} value={f.city} placeholder="Ex.: Sobradinho - DF" onChange={(e) => up('city', e.target.value)} />}</Field>
           <Field label="Região de atendimento" required error={liveErrors.region}>
             {(id) => (
               <select id={id} className={inputCls(!!liveErrors.region)} value={f.region} onChange={(e) => up('region', e.target.value)}>
@@ -281,18 +270,18 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               </select>
             )}
           </Field>
-          <Field label="Observações" className="sm:col-span-2">{(id) => <textarea id={id} rows={2} className={cx(inputCls(), 'h-auto py-2')} value={f.notes} onChange={(e) => up('notes', e.target.value)} />}</Field>
+          <Field label="Observações" error={liveErrors.notes} hint="Ex.: prefere contato pela manhã; falar com o setor de compras." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={2000} className={cx(inputCls(!!liveErrors.notes), 'h-auto py-2')} value={f.notes} placeholder="Ex.: Prefere contato pela manhã; falar com compras." onChange={(e) => up('notes', e.target.value)} /></Field>
         </div>
 
         <div className="rounded-lg border border-dashed border-line p-4">
           <h3 className="mb-1 flex items-center gap-2 text-lg font-bold uppercase"><Building2 className="h-5 w-5 text-brand" /> Primeira obra (opcional)</h3>
           <p className="mb-4 text-sm text-muted">Já cadastre a obra para orçar em seguida.</p>
           <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Nome ou identificação da obra" error={liveErrors.siteName} className="sm:col-span-2">{(id) => <input id={id} className={inputCls(!!liveErrors.siteName)} value={f.siteName} onChange={(e) => up('siteName', e.target.value)} />}</Field>
-            <Field label="Endereço da obra" error={liveErrors.siteAddress} className="sm:col-span-2">{(id) => <input id={id} className={inputCls(!!liveErrors.siteAddress)} value={f.siteAddress} onChange={(e) => up('siteAddress', e.target.value)} />}</Field>
-            <Field label="Contato na obra">{(id) => <input id={id} className={inputCls()} value={f.siteContact} onChange={(e) => up('siteContact', e.target.value)} />}</Field>
-            <Field label="Telefone do contato">{(id) => <input id={id} inputMode="tel" className={inputCls()} value={f.sitePhone} onChange={(e) => up('sitePhone', e.target.value)} />}</Field>
-            <Field label="Restrições de acesso e descarga" className="sm:col-span-2">{(id) => <input id={id} className={inputCls()} value={f.siteRestrictions} placeholder="Ex.: descarga até 16h, rua estreita" onChange={(e) => up('siteRestrictions', e.target.value)} />}</Field>
+            <Field label="Nome ou identificação da obra" error={liveErrors.siteName} hint="Use o nome do empreendimento ou uma identificação fácil de localizar. Ex.: Residencial Jardim das Flores — Bloco A." className="sm:col-span-2">{(id) => <input id={id} maxLength={160} className={inputCls(!!liveErrors.siteName)} value={f.siteName} placeholder="Ex.: Residencial Jardim das Flores — Bloco A" onChange={(e) => up('siteName', e.target.value)} />}</Field>
+            <Field label="Endereço da obra" error={liveErrors.siteAddress} hint="Informe o endereço de entrega/execução, não o endereço da sede do cliente. Ex.: Rua das Acácias, 500, portão 2." className="sm:col-span-2">{(id) => <input id={id} maxLength={200} className={inputCls(!!liveErrors.siteAddress)} value={f.siteAddress} placeholder="Ex.: Rua das Acácias, 500, portão 2" onChange={(e) => up('siteAddress', e.target.value)} />}</Field>
+            <Field label="Contato na obra" error={liveErrors.siteContact} hint="Ex.: João Silva — mestre de obras.">{(id) => <input id={id} maxLength={120} className={inputCls(!!liveErrors.siteContact)} value={f.siteContact} placeholder="Ex.: João Silva — mestre de obras" onChange={(e) => up('siteContact', e.target.value)} />}</Field>
+            <Field label="Telefone do contato" error={liveErrors.sitePhone} hint="Opcional. Ex.: (61) 98888-7777.">{(id) => <input id={id} inputMode="tel" maxLength={20} className={inputCls(!!liveErrors.sitePhone)} value={f.sitePhone} placeholder="(61) 98888-7777" onChange={(e) => up('sitePhone', e.target.value)} onBlur={() => up('sitePhone', formatPhone(f.sitePhone))} />}</Field>
+            <Field label="Restrições de acesso e descarga" error={liveErrors.siteRestrictions} hint="Anote regras que afetam a entrada do caminhão ou o horário de serviço." className="sm:col-span-2">{(id) => <input id={id} maxLength={500} className={inputCls(!!liveErrors.siteRestrictions)} value={f.siteRestrictions} placeholder="Ex.: descarga até 16h; entrada pela Rua B; altura máxima 3,5 m." onChange={(e) => up('siteRestrictions', e.target.value)} />}</Field>
           </div>
         </div>
       </div>
