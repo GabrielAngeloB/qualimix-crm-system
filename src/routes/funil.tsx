@@ -107,7 +107,7 @@ function Funil() {
         eyebrow="Comercial"
         title="Funil comercial"
         description="Acompanhe cada oportunidade do primeiro contato ao fechamento. O fechamento é sempre uma ação explícita."
-        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadClientId(clients[0]?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
+        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadClientId(clients.find((client) => client.active)?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
