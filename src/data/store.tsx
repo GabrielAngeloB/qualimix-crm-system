@@ -12,7 +12,7 @@ interface Store {
   demoMode:boolean; setDemoMode:(v:boolean)=>void; ctx:QuoteContext
   clients:Client[]; sites:Site[]; quotes:EvaluatedQuote[]; opportunities:Opportunity[]
   receivables:ReceivableRow[]; loading:boolean
-  addClient:(c:Client,site?:Site)=>void
+  addClient:(c:Client,site?:Site)=>Promise<void>
   updateOpportunity:(id:string,patch:Partial<Opportunity>,historyText?:string)=>void
   saveQuote:(input:QuoteSaveInput)=>Promise<{id:string;number:string;version:number}>
   refresh:()=>Promise<void>
@@ -52,13 +52,10 @@ export function StoreProvider({children}:{children:ReactNode}) {
   },[])
   const dismissToast=useCallback((id:number)=>setToasts((xs)=>xs.filter((x)=>x.id!==id)),[])
 
-  const addClient=useCallback((client:Client,site?:Site)=>{
-    void persistClient({data:{client,site}}).then(async()=>{
-      await refresh()
-      toast({tone:'ok',title:'Cliente cadastrado',body:'Dados salvos no banco de dados.'})
-    }).catch((error)=>{
-      toast({tone:'erro',title:'Não foi possível cadastrar o cliente',body:error instanceof Error?error.message:'Erro de gravação.'})
-    })
+  const addClient=useCallback(async(client:Client,site?:Site)=>{
+    await persistClient({data:{client,site}})
+    await refresh()
+    toast({tone:'ok',title:'Cliente cadastrado',body:'Dados salvos no banco de dados.'})
   },[refresh,toast])
 
   const updateOpportunity=useCallback((id:string,patch:Partial<Opportunity>,historyText?:string)=>{
