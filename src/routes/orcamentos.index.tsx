@@ -3,7 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Copy, Eye, FileText, MessageCircle, Plus, Search } from 'lucide-react'
 import { useStore } from '../data/store'
 import { paymentMethods, quoteStatuses } from '../data/settings'
-import { today, userName } from '../data/fixtures'
+import { today } from '../data/fixtures'
 import type { EvaluatedQuote } from '../data/derived'
 import { summarizeMeasures } from '../lib/quote'
 import { brlCents, dateBR, daysBetween, num } from '../lib/format'
@@ -21,7 +21,7 @@ export const Route = createFileRoute('/orcamentos/')({
 
 function Orcamentos() {
   const { q: initialQ } = Route.useSearch()
-  const { quotes, clients, sites, demoMode } = useStore()
+  const { quotes, clients, sites, demoMode, team } = useStore()
   const [q, setQ] = useState(initialQ ?? '')
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
@@ -30,6 +30,7 @@ function Orcamentos() {
   useEffect(() => setQ(initialQ ?? ''), [initialQ])
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
+  const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? '—'
 
   const filtered = useMemo(() => {
@@ -51,7 +52,7 @@ function Orcamentos() {
     validUntil: x.validUntil,
     client: clients.find((c) => c.id === x.clientId),
     site: sites.find((s) => s.id === x.siteId),
-    ownerName: userName(x.ownerId),
+    ownerName: ownerName(x.ownerId),
     lines: x.lines,
     result: x.result,
     volume: summarizeMeasures(x.volumeElements, x.volumeMargin, 'volume'),
