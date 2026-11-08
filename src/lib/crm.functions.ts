@@ -66,7 +66,6 @@ const mapCatalog = (r: any): CatalogItem => ({
   ...(r.fck == null ? {} : { fck: Number(r.fck) }),
   ...(r.acabamento == null ? {} : { finish: r.acabamento }),
   active: Boolean(r.ativo), validFrom: nullableDate(r.valido_desde),
-  internalNotes: r.observacoes_internas ?? '',
 })
 const roleName = (role: string): TeamUser['role'] => {
   if (role === 'administrador' || role === 'admin') return 'Administrador'
