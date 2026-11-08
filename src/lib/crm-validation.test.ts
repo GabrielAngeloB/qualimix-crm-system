@@ -84,6 +84,17 @@ describe('CRM field validation', () => {
     })
   })
 
+  it('rejects lead estimates with more than two decimal places', () => {
+    const errors = validateLeadFields({
+      title: 'Concretagem da laje',
+      clientId: 'client-1',
+      siteId: '',
+      source: 'Indicação',
+      estimatedValue: '25.1234',
+    })
+    expect(errors.estimatedValue).toMatch(/duas casas decimais/)
+  })
+
   it('validates decimal measurement bounds and real ISO dates', () => {
     expect(validateOptionalDecimal('12,5', 'Comprimento', { positive: true })).toBeNull()
     expect(validateOptionalDecimal('-1', 'Comprimento', { positive: true })).toBeTruthy()
