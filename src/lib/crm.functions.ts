@@ -88,7 +88,6 @@ export type CrmViews = {
   clients: any[]
   funnel: any[]
   quotes: any[]
-  fleet: any[]
 }
 export type CrmData = {
   clients: Client[]
@@ -108,7 +107,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
   // (max=1 é intencional para não multiplicar conexões em ambientes serverless).
   const result = await db.query<{
     clients: any[]; sites: any[]; opportunities: any[]; quotes: any[]; products: any[];
-    profiles: any[]; clientView: any[]; funnelView: any[]; quoteView: any[]; fleetView: any[];
+    profiles: any[]; clientView: any[]; funnelView: any[]; quoteView: any[];
   }>(`
     SELECT
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.clientes WHERE is_demo = false) x), '[]'::json) AS clients,
@@ -125,7 +124,6 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_clientes_resumo) x), '[]'::json) AS "clientView",
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.ordem) FROM (SELECT * FROM public.vw_funil_resumo) x), '[]'::json) AS "funnelView",
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS "quoteView",
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.placa) FROM (SELECT * FROM public.vw_frota_resumo) x), '[]'::json) AS "fleetView"
   `)
   const data = result.rows[0]
   if (!data) throw new Error('O banco não retornou os dados do CRM.')
@@ -151,7 +149,6 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
       clients: data.clientView,
       funnel: data.funnelView,
       quotes: data.quoteView,
-      fleet: data.fleetView,
     },
     currentUserId: currentProfile.id,
   }
