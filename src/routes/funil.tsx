@@ -98,7 +98,7 @@ function Funil() {
     toast({ tone: 'ok', title: 'Etapa atualizada', body: `${o.title}: ${stageLabel(to)}` })
   }
 
-  const t = useSortPage(filtered, { title: (o) => o.title, stage: (o) => funnelStages.findIndex((s) => s.id === o.stage), value: (o) => o.estimatedValue ?? -1, next: (o) => o.nextContact ?? '9999', entered: (o) => o.enteredAt }, { key: 'next', dir: 'asc' }, 10)
+  const t = useSortPage(filtered, { title: (o) => o.title, stage: (o) => funnelStages.findIndex((s) => s.id === o.stage), value: (o) => o.estimatedValue ?? -1, next: (o) => o.nextContact ?? '9999', created: (o) => o.createdAt }, { key: 'created', dir: 'desc' }, 10)
   const selected = opportunities.find((o) => o.id === detail)
 
   return (
@@ -201,7 +201,7 @@ function Funil() {
                   <SortTh label="Valor estimado" k="value" sort={t.sort} toggle={t.toggle} right />
                   <th className="px-4 py-3 font-bold uppercase tracking-wide">Último contato</th>
                   <SortTh label="Próximo contato" k="next" sort={t.sort} toggle={t.toggle} />
-                  <SortTh label="Entrada" k="entered" sort={t.sort} toggle={t.toggle} />
+                  <SortTh label="Criado em" k="created" sort={t.sort} toggle={t.toggle} />
                 </tr>
               </thead>
               <tbody>
@@ -219,7 +219,7 @@ function Funil() {
                       <td className="px-4 py-3 tabular">
                         {dateBR(o.nextContact)} {f && <Badge tone={f.tone}>{f.text}</Badge>}
                       </td>
-                      <td className="px-4 py-3 tabular">{dateBR(o.enteredAt)}</td>
+                      <td className="px-4 py-3 tabular">{dateBR(o.createdAt.slice(0, 10))}</td>
                     </tr>
                   )
                 })}
