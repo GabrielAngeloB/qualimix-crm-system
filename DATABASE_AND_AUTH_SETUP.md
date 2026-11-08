@@ -18,7 +18,7 @@ Este repositório nasceu sem banco ou autenticação. O projeto usa TanStack Sta
 1. Crie um projeto Supabase.
 2. Execute primeiro o SQL base enxuto de 9 tabelas já fornecido para o Qualimix.
 3. Execute a migration `supabase/migrations/20261108000100_username_auth_roles.sql`.
-4. Instale as dependências:
+4. Instale as dependências já declaradas no package.json e regenere o lockfile:
    ```bash
    pnpm install
    ```
@@ -57,7 +57,7 @@ A UI não é uma fronteira de segurança. As funções do servidor e as polític
 
 ## Limitações que exigem configuração/validação externa
 
-- O projeto Supabase e suas chaves precisam ser fornecidos no ambiente de execução.
+- O projeto Supabase e suas chaves precisam ser fornecidos no ambiente de execução. O bootstrap inicial fica em `/bootstrap`.
 - O SQL base deve corresponder à versão de 9 tabelas usada como referência. Não execute o SQL base em banco que já tenha tabelas ou dados sem revisar a migração.
 - O banco atual não possui tabelas de agenda, pedidos ou contas a receber. Esses módulos estão marcados como “Em breve” no projeto e não devem ser simulados como dados persistidos.
 - A migration de autenticação converte os papéis antigos para ADMIN/USER. Revise usuários já existentes antes de aplicá-la em produção.
