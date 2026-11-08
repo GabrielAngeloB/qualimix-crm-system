@@ -1,113 +1,80 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import {
-  Outlet,
-  Link,
-  createRootRouteWithContext,
-  useRouter,
-  HeadContent,
-  Scripts,
-  type ErrorComponentProps,
-} from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useRouterState } from '@tanstack/react-router'
+import { getAuthSession } from '../lib/auth.functions'
 
-import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
-import { StoreProvider } from "../data/store";
-import { AppShell } from "../components/AppShell";
+import '../styles.css'
+import { StoreProvider } from '../data/store'
+import { AppShell } from '../components/AppShell'
 
-const siteName = "Qualimix CRM — Gestão comercial e operacional";
+const siteName = 'Qualimix CRM — Gestão comercial e operacional'
 const siteDescription =
-  "CRM da Qualimix: clientes, obras, funil comercial, orçamentos de concreto usinado e pisos, agenda de concretagens e contas a receber.";
+  'CRM da Qualimix: clientes, obras, funil comercial, orçamentos de concreto usinado e pisos, agenda de concretagens e contas a receber.'
 
-const themeScript = `try{var t=localStorage.getItem('qmx-theme');if(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.dataset.theme=t||'light'}catch(e){}`;
+const themeScript = `try{var t=localStorage.getItem('qmx-theme');if(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.dataset.theme=t||'light'}catch(e){}`
 
-function NotFoundComponent() {
-  return (
-    <div className="flex min-h-[60vh] items-center justify-center px-4">
-      <div className="max-w-md text-center">
-        <h1 className="font-display text-7xl font-bold text-ink">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-ink">Página não encontrada</h2>
-        <p className="mt-2 text-sm text-muted">A página que você procura não existe ou foi movida.</p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
-          >
-            Voltar ao painel
-          </Link>
-        </div>
-      </div>
-    </div>
-  );
-}
+export const Route = createRootRoute({
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === '/login' || location.pathname === '/bootstrap') return
+    const session = await getAuthSession()
+    if (!session.authenticated) throw redirect({ to: '/login' })
 
-function ErrorComponent({ error, reset }: ErrorComponentProps) {
-  console.error(error);
-  const router = useRouter();
-  useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
-
-  return (
-    <div className="flex min-h-screen items-center justify-center bg-bg px-4">
-      <div className="max-w-md text-center">
-        <h1 className="text-xl font-semibold tracking-tight text-ink">Esta página não carregou</h1>
-        <p className="mt-2 text-sm text-muted">
-          Algo deu errado. Tente novamente ou volte ao painel.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-2">
-          <button
-            onClick={() => {
-              router.invalidate();
-              reset();
-            }}
-            className="inline-flex items-center justify-center rounded-md bg-brand px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
-          >
-            Tentar novamente
-          </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-line bg-surface px-4 py-2 text-sm font-semibold text-ink transition-colors hover:bg-surface-2"
-          >
-            Voltar ao painel
-          </a>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+    const profile = session.profile
+    if (!profile) throw redirect({ to: '/login' })
+    const pathPermissions: Record<string, string[]> = {
+      '/clientes': ['comercial', 'consulta'],
+      '/funil': ['comercial', 'consulta'],
+      '/tarefas': ['comercial', 'consulta'],
+      '/orcamentos/novo': ['comercial'],
+      '/orcamentos': ['comercial', 'consulta'],
+      '/pedidos': ['comercial', 'operacao', 'consulta'],
+      '/agenda': ['operacao', 'consulta'],
+      '/profissionais': ['operacao', 'financeiro', 'consulta'],
+      '/financeiro': ['financeiro', 'consulta'],
+      '/configuracoes': [],
+      '/usuarios': [],
+    }
+    const requiredRoles = Object.entries(pathPermissions)
+      .find(([prefix]) => location.pathname === prefix || location.pathname.startsWith(prefix + '/'))?.[1]
+    const isAdmin = profile.perfil === 'admin'
+    if (!isAdmin && requiredRoles && !requiredRoles.includes(profile.role)) {
+      throw redirect({ to: '/' })
+    }
+  },
   head: () => ({
     meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
       { title: siteName },
-      { name: "description", content: siteDescription },
-      { name: "robots", content: "noindex, nofollow" },
-      { property: "og:title", content: siteName },
-      { property: "og:description", content: siteDescription },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
+      { name: 'description', content: siteDescription },
+      { name: 'robots', content: 'noindex, nofollow' },
+      { property: 'og:title', content: siteName },
+      { property: 'og:description', content: siteDescription },
+      { property: 'og:type', content: 'website' },
     ],
     links: [
-      { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+      { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
+      { rel: 'preconnect', href: 'https://fonts.gstatic.com', crossOrigin: 'anonymous' },
       {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap",
+        rel: 'stylesheet',
+        href: 'https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=Barlow:wght@400;500;600;700&display=swap',
       },
     ],
   }),
-  shellComponent: RootShell,
-  component: RootComponent,
-  notFoundComponent: NotFoundComponent,
-  errorComponent: ErrorComponent,
-});
+  shellComponent: RootDocument,
+  component: RootLayout,
+})
 
-function RootShell({ children }: { children: ReactNode }) {
+function RootLayout() {
+  const path = useRouterState({ select: (s) => s.location.pathname })
+  const publicPage = path === '/login' || path === '/bootstrap'
+  if (publicPage) return <Outlet />
+  return (
+    <StoreProvider>
+      <AppShell><Outlet /></AppShell>
+    </StoreProvider>
+  )
+}
+
+function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <head>
@@ -119,19 +86,5 @@ function RootShell({ children }: { children: ReactNode }) {
         <Scripts />
       </body>
     </html>
-  );
-}
-
-function RootComponent() {
-  const { queryClient } = Route.useRouteContext();
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <StoreProvider>
-        <AppShell>
-          <Outlet />
-        </AppShell>
-      </StoreProvider>
-    </QueryClientProvider>
-  );
+  )
 }

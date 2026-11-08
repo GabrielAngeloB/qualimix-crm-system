@@ -46,6 +46,9 @@ export function MeasureCalculator({
 
   return (
     <div>
+      <p className="mb-3 text-xs text-muted">
+        Comprimento e largura são em metros (ex.: 12,5); espessura é em centímetros (ex.: 12); quantidade é um número inteiro (ex.: 2). Também é possível informar diretamente o volume em m³ ou a área em m².
+      </p>
       <div className="space-y-3">
         {elements.map((e, i) => {
           const r = results[i]
@@ -132,7 +135,7 @@ function NumIn({ label, value, onChange, narrow }: { label: string; value: strin
   return (
     <div className={narrow ? 'w-[calc(50%-4px)] sm:w-20' : 'w-[calc(50%-4px)] sm:w-28'}>
       <label className="mb-1 block text-xs font-semibold text-muted">{label}</label>
-      <input inputMode="decimal" aria-label={label} className={inputCls()} value={value} placeholder="0,00" onChange={(e) => onChange(e.target.value)} />
+      <input inputMode="decimal" aria-label={label} className={inputCls()} value={value} placeholder={label.includes('Qtd.') ? 'Ex.: 2' : label.includes('Espessura') ? 'Ex.: 12' : 'Ex.: 12,5'} onChange={(e) => onChange(e.target.value)} />
     </div>
   )
 }

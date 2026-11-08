@@ -87,7 +87,7 @@ const scheduleEvent: ScheduleEvent = {
   volumeM3: 12,
   fck: 25,
   pump: true,
-  truck: 'Betoneira 01',
+
   status: 'Planejada',
   notes: '',
   demo: false,

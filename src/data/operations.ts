@@ -43,7 +43,6 @@ export interface ScheduleEvent {
   volumeM3: number
   fck: number | null
   pump: boolean
-  truck: string
   status: ScheduleStatus
   notes: string
   demo: false
