@@ -43,7 +43,7 @@ function UsersPage() {
   }
 
   async function remove(user: UserRow) {
-    if (!confirm(`Excluir a conta de ${user.nome}? Esta ação não pode ser desfeita.`)) return
+    if (!confirm(`Desativar a conta de ${user.nome}? Os registros vinculados serão preservados.`)) return
     setError(''); setNotice('')
     try { await deleteUser({ data: { id: user.id } }); await refresh() }
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível excluir o usuário.') }
@@ -51,7 +51,7 @@ function UsersPage() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
-      <header><p className="text-xs font-bold uppercase tracking-widest text-brand">Administração</p><h1 className="font-display text-4xl font-extrabold uppercase">Usuários</h1><p className="mt-1 text-sm text-muted">Somente administradores podem criar, desativar ou excluir contas.</p></header>
+      <header><p className="text-xs font-bold uppercase tracking-widest text-brand">Administração</p><h1 className="font-display text-4xl font-extrabold uppercase">Usuários</h1><p className="mt-1 text-sm text-muted">Somente administradores podem criar e gerenciar contas. A desativação preserva o histórico comercial.</p></header>
       <form onSubmit={submit} className="grid gap-3 rounded-lg border border-line bg-surface p-5 md:grid-cols-4">
         <label className="text-sm font-semibold md:col-span-2">Nome<input required minLength={2} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-line bg-surface px-3" /></label>
         <label className="text-sm font-semibold">Usuário<input required minLength={3} maxLength={30} value={username} onChange={(e) => setUsername(e.target.value)} className="mt-1 h-10 w-full rounded-md border border-line bg-surface px-3" /></label>
@@ -67,7 +67,7 @@ function UsersPage() {
             <td className="px-4 py-3"><strong>{user.nome}</strong><span className="block text-xs text-muted">@{user.username}</span></td>
             <td className="px-4 py-3">{user.perfil === 'admin' ? 'Administrador' : 'Usuário'}</td>
             <td className="px-4 py-3">{user.ativo ? 'Ativo' : 'Desativado'}</td>
-            <td className="px-4 py-3 text-right"><button onClick={() => void toggle(user)} className="mr-3 font-semibold text-brand hover:underline">{user.ativo ? 'Desativar' : 'Ativar'}</button><button onClick={() => void remove(user)} className="font-semibold text-muted hover:text-brand">Excluir</button></td>
+            <td className="px-4 py-3 text-right"><button onClick={() => void toggle(user)} className="mr-3 font-semibold text-brand hover:underline">{user.ativo ? 'Desativar' : 'Ativar'}</button><button onClick={() => void remove(user)} className="font-semibold text-muted hover:text-brand">Desativar e preservar histórico</button></td>
           </tr>)}</tbody>
         </table>
         {!users.length && <p className="p-5 text-sm text-muted">Nenhum usuário encontrado.</p>}
