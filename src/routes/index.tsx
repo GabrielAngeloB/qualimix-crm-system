@@ -12,9 +12,10 @@ import { BarChart, ChartCard } from '../components/Charts'
 export const Route = createFileRoute('/')({ component: Painel })
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
+  const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId])
   const pend = pendingSettings()
   const clientOf = (quoteId: string) => {
@@ -29,7 +30,7 @@ function Painel() {
       <PageHeader
         eyebrow={`Hoje, ${dateBR(today)}`}
         title="Painel gerencial"
-        description="Indicadores calculados a partir dos registros de orçamentos, funil e contas a receber."
+        description="Indicadores calculados a partir dos registros persistidos de clientes, oportunidades e orçamentos."
         actions={
           <>
             <select aria-label="Período" className={cx(inputCls(), 'w-auto')} value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -49,7 +50,40 @@ function Painel() {
         }
       />
 
-      {pend.length > 0 && (
+      <section className="mb-6 space-y-3">
+        <div>
+          <h2 className="font-display text-xl font-bold uppercase">Consultas do banco de dados</h2>
+          <p className="text-xs text-muted">Dados carregados das quatro views SQL configuradas no Supabase.</p>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <Card><CardHeader title="Clientes" subtitle="vw_clientes_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.clients.length}</p></Card>
+          <Card><CardHeader title="Orçamentos" subtitle="vw_orcamentos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.quotes.length}</p></Card>
+          <Card><CardHeader title="Veículos" subtitle="vw_frota_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.fleet.length}</p></Card>
+          <Card><CardHeader title="Oportunidades" subtitle="vw_funil_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.funnel.reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
+        </div>
+        <Card>
+          <CardHeader title="Funil resumido no PostgreSQL" subtitle="Contagem e valor estimado por etapa, calculados pela view vw_funil_resumo." />
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[480px] text-left text-sm">
+              <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted">
+                <tr><th className="px-4 py-2">Etapa</th><th className="px-4 py-2 text-right">Oportunidades</th><th className="px-4 py-2 text-right">Valor estimado</th><th className="px-4 py-2 text-right">Retornos atrasados</th></tr>
+              </thead>
+              <tbody>
+                {views.funnel.map((row) => (
+                  <tr key={row.etapa} className="border-b border-line last:border-0">
+                    <td className="px-4 py-2">{row.nome}</td>
+                    <td className="px-4 py-2 text-right tabular">{row.quantidade}</td>
+                    <td className="px-4 py-2 text-right tabular">{brl(Number(row.valor_estimado ?? 0))}</td>
+                    <td className="px-4 py-2 text-right tabular">{row.retornos_atrasados}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      </section>
+
+      {pend.length > 0 &&
         <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-warn/30 bg-warn-soft p-4 text-sm">
           <Settings className="h-5 w-5 shrink-0 text-warn" />
           <p className="min-w-0 flex-1">
@@ -75,7 +109,7 @@ function Painel() {
             <Kpi accent label="Valor contratado" value={brlCents(d.contractedCents)} def="Orçamentos aceitos — pedidos fechados" />
             <Kpi label="Concreto vendido" value={`${num(d.volumeM3, 1)} m³`} def="Volume dos orçamentos aceitos" />
             <Kpi label="Pisos vendidos" value={`${num(d.areaM2, 0)} m²`} def="Área dos orçamentos aceitos" />
-            <Kpi label="Contas vencidas" value={brlCents(d.overdueCents)} def={`${d.overdue.length} parcela(s) em atraso`} tone={d.overdueCents > 0 ? 'red' : undefined} />
+            <Kpi label="Contas a receber" value={demoMode ? brlCents(d.overdueCents) : '—'} def={demoMode ? `${d.overdue.length} parcela(s) em atraso (demo)` : 'Módulo ainda não integrado ao banco'} />
           </dl>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
@@ -124,7 +158,7 @@ function Painel() {
             <Card>
               <CardHeader title="Próximas concretagens" action={<CalendarDays className="h-5 w-5 text-brand" />} />
               {upcoming.length === 0 ? (
-                <p className="p-5 text-sm text-muted">Nenhuma concretagem programada.</p>
+                <p className="p-5 text-sm text-muted">{demoMode ? 'Nenhuma concretagem programada.' : 'A agenda de concretagens ainda não está integrada ao banco.'}</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {upcoming.map((e) => {
@@ -154,7 +188,7 @@ function Painel() {
 
             <Card>
               <CardHeader title="Contas a receber" subtitle="Contratado, cobrado e efetivamente recebido são indicadores distintos." action={<Wallet className="h-5 w-5 text-brand" />} />
-              <div className="space-y-3 p-5">
+              {demoMode ? <div className="space-y-3 p-5">
                 <Flow label="Cobrado (parcelas emitidas)" value={d.billedCents} max={d.billedCents} />
                 <Flow label="Recebido (pagamentos confirmados)" value={d.receivedCents} max={d.billedCents} tone="ok" />
                 <Flow label="Em aberto" value={d.openCents} max={d.billedCents} tone="grey" />
@@ -172,13 +206,13 @@ function Painel() {
                     </ul>
                   </div>
                 )}
-              </div>
+              </div> : <p className="p-5 text-sm text-muted">Contas a receber ainda não possuem tabela no esquema atual. Nenhum valor fictício é exibido em produção.</p>}
             </Card>
 
             <Card>
               <CardHeader title="Atividades recentes" />
-              {(demoMode ? activities : []).length === 0 ? (
-                <p className="p-5 text-sm text-muted">Nenhuma atividade registrada.</p>
+              {!demoMode || activities.length === 0 ? (
+                <p className="p-5 text-sm text-muted">{demoMode ? 'Nenhuma atividade registrada.' : 'A linha do tempo geral ainda não está integrada ao banco.'}</p>
               ) : (
                 <ol className="space-y-3 p-5 text-sm">
                   {activities.map((a, i) => (
