@@ -39,7 +39,7 @@ const mapSite = (r: any): Site => ({
 const mapOpportunity = (r: any): Opportunity => ({
   id: String(r.id), title: r.titulo, clientId: String(r.cliente_id), siteId: r.obra_id ?? null,
   createdAt: isoDateTime(r.created_at), stage: r.etapa, estimatedValue: r.valor_estimado == null ? null : Number(r.valor_estimado),
-  ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em), createdAt: isoDateTime(r.created_at),
+  ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em),
   lastContact: nullableDate(r.ultimo_contato), nextContact: nullableDate(r.proximo_contato),
   nextAction: r.proxima_acao ?? '', lossReason: r.motivo_perda ?? null,
   quoteId: null, history: Array.isArray(r.historico) ? r.historico : [], demo: Boolean(r.is_demo),
