@@ -60,3 +60,12 @@ O catálogo e as regras comerciais oficiais ainda dependem dos valores confirmad
 ## Verificações pendentes
 
 Após configurar DATABASE_URL e executar a migration, rode pnpm install, pnpm typecheck, pnpm test e pnpm build. Teste login, logout, bloqueio de tentativas, criação/desativação de usuários, cadastro de cliente/obra, funil e gravação/leitura de orçamento em homologação antes de publicar.
+
+
+## Ordenação e desempenho do CRM
+
+- O funil usa `oportunidades.created_at` para ordenar os leads do mais novo para o mais antigo. `entrou_em` continua sendo a data de entrada comercial no funil e não é usada como substituta da data/hora real de criação.
+- A migration `20261108000400_recent_records_indexes.sql` cria índices parciais para registros reais (`is_demo=false`) e atualiza as estatísticas do PostgreSQL.
+- O carregamento inicial foi consolidado em uma única consulta SQL com agregações JSON, evitando dez viagens separadas ao banco remoto. O servidor continua mantendo `DATABASE_URL` fora do navegador.
+- O carregamento ainda traz os registros existentes em lote. Se o CRM crescer muito, a próxima etapa é paginação no servidor e carregamento sob demanda por tela, em vez de carregar toda a base ao entrar.
+- Registros com `is_demo=true` são intencionalmente ocultados das telas de produção. Se um cadastro de teste for na verdade um cliente real, confira sua identidade e altere somente esse registro para `is_demo=false`.
