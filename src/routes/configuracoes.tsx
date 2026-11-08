@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { CircleCheck, Lock, TriangleAlert } from 'lucide-react'
-import { catalog, categoryLabel, company, demoRules, funnelStages, leadSources, officialRules, paymentMethods, pendingSettings, regions } from '../data/settings'
+import { categoryLabel, company, demoRules, funnelStages, leadSources, officialRules, paymentMethods, pendingSettings, regions } from '../data/settings'
+import { useStore } from '../data/store'
 import { brl, num } from '../lib/format'
 import { Badge, Card, CardHeader, PageHeader } from '../components/ui'
 
@@ -27,6 +28,7 @@ const permissions: [string, string[]][] = [
 ]
 
 function Configuracoes() {
+  const { products, loading } = useStore()
   const pend = pendingSettings()
   const ruleRows: [string, number | null, number | null, ((n: number) => string)?][] = [
     ['Frete — valor fixo', officialRules.freight.fixed, demoRules.freight.fixed],
@@ -87,7 +89,9 @@ function Configuracoes() {
               </tr>
             </thead>
             <tbody>
-              {catalog.map((c) => (
+              {products.length === 0 ? (
+                <tr><td colSpan={7} className="px-4 py-6 text-center text-sm text-muted">{loading ? 'Carregando catálogo do banco de dados…' : 'Nenhum produto cadastrado no banco de dados.'}</td></tr>
+              ) : products.map((c) => (
                 <tr key={c.id} className="border-b border-line last:border-0">
                   <td className="px-4 py-3 font-mono text-xs">{c.code}</td>
                   <td className="px-4 py-3 font-semibold">{c.name}</td>
