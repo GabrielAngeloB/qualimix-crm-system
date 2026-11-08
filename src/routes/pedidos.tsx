@@ -17,7 +17,9 @@ export const Route = createFileRoute('/pedidos')({
 })
 
 function Pedidos() {
-  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, jobBalance, toast } = useStore()
+  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, jobBalance, toast, currentRole } = useStore()
+  const canCreateOrder = currentRole === 'administrador' || currentRole === 'comercial'
+  const canEditOrderAmount = currentRole === 'administrador' || currentRole === 'comercial'
   const [dueDates, setDueDates] = useState<Record<string, string>>({})
   const [methods, setMethods] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -76,7 +78,7 @@ function Pedidos() {
         }
       />
 
-      <Card className="mb-6">
+      {canCreateOrder && <Card className="mb-6">
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-xl font-bold uppercase">Orçamentos aceitos aguardando pedido</h2>
           <p className="text-sm text-muted">Confirme o vencimento e a forma de pagamento antes da conversão.</p>
@@ -111,7 +113,7 @@ function Pedidos() {
             ))}
           </div>
         )}
-      </Card>
+      </Card>}
 
       <Card>
         <div className="border-b border-line px-5 py-4">
@@ -172,7 +174,7 @@ function Pedidos() {
                         ) : (
                           <div className="flex items-center justify-end gap-2">
                             <strong>{brlCents(order.contractedCents)}</strong>
-                            {order.status !== 'Cancelada' && (
+                            {canEditOrderAmount && order.status !== 'Cancelada' && (
                               <button type="button" aria-label={`Editar valor de ${order.number}`} title="Editar valor contratado" className="grid h-8 w-8 place-items-center rounded-md text-muted hover:bg-surface-2 hover:text-ink" onClick={() => startEditAmount(order.id, order.contractedCents)}>
                                 <Pencil className="h-4 w-4" />
                               </button>
