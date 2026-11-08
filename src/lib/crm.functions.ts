@@ -322,7 +322,7 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
         throw new Error('Obra inválida.')
       }
       values.push(typeof value === 'string' ? value.trim() : value)
-      sets.push(column + ' = 
+      sets.push(column + ' = ' + String.fromCharCode(36) + values.length)
     }
     if (data.historyText) {
       values.push(JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: data.historyText }]))
