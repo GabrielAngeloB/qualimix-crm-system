@@ -55,9 +55,10 @@ function wrap(executor: UnsafeSql): Queryable {
 }
 
 export function getPool(): Queryable {
-  return wrap(getSql())
+  return wrap(getSql() as unknown as UnsafeSql)
 }
 
 export async function withTransaction<T>(work: (client: Queryable) => Promise<T>): Promise<T> {
-  return getSql().begin(async (transaction) => work(wrap(transaction))) as Promise<T>
+  const result = await getSql().begin(async (transaction) => work(wrap(transaction as unknown as UnsafeSql)))
+  return result as unknown as T
 }
