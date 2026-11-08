@@ -3,7 +3,7 @@ import { Link, createFileRoute } from '@tanstack/react-router'
 import { Bell, Clock, KanbanSquare, List, SquareKanban, TriangleAlert } from 'lucide-react'
 import { useStore } from '../data/store'
 import { funnelStages, leadSources, lossReasons, type StageId } from '../data/settings'
-import { team, today, userName, type Opportunity } from '../data/fixtures'
+import { today, type Opportunity } from '../data/fixtures'
 import { brl, dateBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, Modal, PageHeader, SegTabs, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
@@ -26,7 +26,7 @@ function followUp(o: Opportunity) {
 }
 
 function Funil() {
-  const { opportunities, clients, updateOpportunity, toast } = useStore()
+  const { opportunities, clients, updateOpportunity, toast, team } = useStore()
   const [view, setView] = useState<'kanban' | 'tabela'>('kanban')
   const [owner, setOwner] = useState('')
   const [source, setSource] = useState('')
@@ -37,6 +37,7 @@ function Funil() {
   const [detail, setDetail] = useState<string | null>(null)
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
+  const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
 
   const filtered = useMemo(
     () =>
@@ -133,7 +134,7 @@ function Funil() {
                             {f && <Badge tone={f.tone} className="ml-auto">{f.text}</Badge>}
                           </div>
                           <p className="mt-1 text-xs text-muted">
-                            {o.source} · {userName(o.ownerId).split(' ')[0]}
+                            {o.source} · {ownerName(o.ownerId).split(' ')[0]}
                           </p>
                           {isOpen(o) && <p className="mt-1 text-xs"><span className="font-semibold">Próx.:</span> {o.nextAction} {o.nextContact && `(${dateBR(o.nextContact)})`}</p>}
                           {o.lossReason && <p className="mt-1 text-xs text-brand">Motivo: {o.lossReason}</p>}
@@ -171,7 +172,7 @@ function Funil() {
                     <tr key={o.id} className="border-b border-line last:border-0 hover:bg-surface-2/60">
                       <td className="px-4 py-3">
                         <button onClick={() => setDetail(o.id)} className="text-left font-semibold hover:text-brand">{o.title}</button>
-                        <span className="block text-xs text-muted">{clientName(o.clientId)} · {o.source} · {userName(o.ownerId)}</span>
+                        <span className="block text-xs text-muted">{clientName(o.clientId)} · {o.source} · {ownerName(o.ownerId)}</span>
                       </td>
                       <td className="px-4 py-3"><Badge tone={o.stage === 'fechado' ? 'ok' : o.stage === 'perdido' ? 'red' : 'neutral'}>{stageLabel(o.stage)}</Badge></td>
                       <td className="px-4 py-3 text-right font-semibold tabular">{o.estimatedValue === null ? '—' : brl(o.estimatedValue)}</td>
@@ -252,7 +253,7 @@ function Funil() {
         <p className="text-sm">Confirme que o cliente aceitou a proposta. Gerar ou enviar um orçamento não fecha a oportunidade automaticamente.</p>
       </Modal>
 
-      {selected && <OpportunityDrawer o={selected} onClose={() => setDetail(null)} clientName={clientName(selected.clientId)} onMove={(to) => move(selected, to)} />}
+      {selected && <OpportunityDrawer o={selected} onClose={() => setDetail(null)} clientName={clientName(selected.clientId)} onMove={(to) => move(selected, to)} userName={ownerName} />}
     </>
   )
 }
@@ -281,7 +282,7 @@ function AlertBox({ title, items, tone, icon, onOpen, clientName }: { title: str
   )
 }
 
-function OpportunityDrawer({ o, onClose, clientName, onMove }: { o: Opportunity; onClose: () => void; clientName: string; onMove: (to: StageId) => void }) {
+function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Opportunity; onClose: () => void; clientName: string; onMove: (to: StageId) => void; userName: (id: string) => string }) {
   const { updateOpportunity, toast, quotes } = useStore()
   const quoteNumber = quotes.find((q) => q.id === o.quoteId)?.number
   const [next, setNext] = useState(o.nextContact ?? '')
