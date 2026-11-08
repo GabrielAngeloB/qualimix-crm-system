@@ -1,7 +1,7 @@
 import { createServerFn } from '@tanstack/react-start'
 import type { Client, Opportunity, QuoteRecord, Site } from '../data/fixtures'
 import { quoteContext } from '../data/derived'
-import { computeQuote, summarizeMeasures, type MeasureElement, type QuoteExtras, type QuoteLine } from './quote'
+import { computeQuote, defaultExtras, summarizeMeasures, type MeasureElement, type QuoteExtras, type QuoteLine } from './quote'
 import { createAdminSupabase, createRequestSupabase } from './supabase/server'
 import { catalog } from '../data/settings'
 
@@ -43,7 +43,7 @@ const mapQuote = (r: any): QuoteRecord => {
     clientId:r.cliente_id, siteId:r.obra_id, ownerId:r.responsavel_id,
     volumeElements:d.volumeElements ?? [], volumeMargin:d.volumeMargin ?? '',
     areaElements:d.areaElements ?? [], areaMargin:d.areaMargin ?? '',
-    lines:d.lines ?? [], extras:d.extras ?? { freight:{mode:'nao',km:'',regionId:''}, pumping:{mode:'nao',hours:'',partner:false}, stay:{include:false,hours:''}, applyMinVolume:false, globalDiscount:'' },
+    lines:d.lines ?? [], extras:d.extras ?? defaultExtras(),
     paymentMethodIds:d.paymentMethodIds ?? [], paymentTerms:d.paymentTerms ?? '',
     executionDeadline:d.executionDeadline ?? '', notes:d.notes ?? '', demo:r.is_demo,
   }
@@ -166,9 +166,9 @@ export const persistQuote = createServerFn({ method: 'POST' })
       executionDeadline:data.executionDeadline, notes:data.notes,
     }
     const concreteLine = data.lines.find((line) => line.category === 'concreto')
-    const { data: saved, error } = await supabase.from('orcamentos').insert({
+    const { data: saved, error } = await createAdminSupabase().from('orcamentos').insert({
       tipo:data.type, cliente_id:data.clientId, obra_id:data.siteId,
-      responsavel_id:profile.id, validade:validUntil, status:'Rascunho',
+      responsavel_id:profile.id, created_by:profile.id, validade:validUntil, status:'Rascunho',
       dados_orcamento:input, resultado_calculo:result, total_centavos:result.totalCents,
       volume_concreto:result.concreteVolume, area_piso:result.floorArea,
       fck:concreteLine?.catalogId ? catalog.find((item) => item.id === concreteLine.catalogId)?.fck ?? null : null, pode_emitir:result.canIssue,
