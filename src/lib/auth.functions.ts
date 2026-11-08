@@ -75,6 +75,7 @@ export const login = createServerFn({ method: 'POST' })
     return { username: normalizeUsername(data.username), password: requirePassword(data.password) }
   })
   .handler(async ({ data }) => {
+    assertLoginAllowed(data.username)
     const admin = createAdminSupabase()
     const { data: profile, error: lookupError } = await admin.from('perfis')
       .select('id,ativo')
@@ -87,7 +88,8 @@ export const login = createServerFn({ method: 'POST' })
       email: usernameEmail(data.username),
       password: data.password,
     })
-    if (error) throw new Error('Usuário ou senha inválidos.')
+    if (error) { recordLoginFailure(data.username); throw new Error('Usuário ou senha inválidos.') }
+    loginFailures.delete(data.username)
 
     const { profile: signedIn } = await currentProfile()
     return { profile: signedIn }
