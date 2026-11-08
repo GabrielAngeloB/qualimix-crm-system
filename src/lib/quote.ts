@@ -78,9 +78,18 @@ export interface MeasureElement {
   label: string
   elementType: string
   mode: 'dimensoes' | 'informado'
+  /** Comprimento (m); para pilares, representa a altura. */
   length: string
+  /** Largura (m). */
   width: string
+  /** Campo legado em centímetros. Mantido para orçamentos antigos e lajes sem tipo H selecionado. */
   thicknessCm: string
+  /** Profundidade/espessura (m), usada por vigas, pilares, sapatas, radier e contrapiso. */
+  depth?: string
+  /** Diâmetro (m), usado por estacas e tubulões. */
+  diameter?: string
+  /** Índice comercial de volume por metro linear (m³/m), para escadas. */
+  factor?: string
   count: string
   informed: string
   notes: string
@@ -101,41 +110,137 @@ function positive(raw: string, label: string, required = true) {
   return { value: p.value }
 }
 
-/** Volume (m³) = comprimento × largura × (espessura cm ÷ 100) × quantidade. Área (m²) = comprimento × largura × quantidade. */
+const normalizedType = (value: string) =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+
+const result = (value: number): ElementResult => ({
+  value,
+  error: null,
+  incomplete: false,
+})
+
+const incomplete = (): ElementResult => ({
+  value: null,
+  error: null,
+  incomplete: true,
+})
+
+const invalid = (message: string): ElementResult => ({
+  value: null,
+  error: message,
+  incomplete: false,
+})
+
+/**
+ * Medidas lineares são informadas em metros, exceto thicknessCm (campo legado)
+ * e a altura nominal H8/H10/H12… das lajes (centímetros).
+ *
+ * Volume (m³):
+ * - Laje Hn: comprimento × largura × (n ÷ 100) × quantidade
+ * - Viga/baldrame/sapata/radier/contrapiso: comprimento × largura × profundidade × quantidade
+ * - Pilar: altura × largura × espessura × quantidade
+ * - Estaca/tubulão: π × (diâmetro ÷ 2)² × profundidade × quantidade
+ * - Escada: metro linear × índice comercial configurável (m³ por metro)
+ *
+ * Área (m²) de piso/calçada: comprimento × largura × quantidade.
+ */
 export function computeElement(
   el: MeasureElement,
   kind: MeasureKind,
 ): ElementResult {
   if (el.mode === 'informado') {
     const v = positive(el.informed, kind === 'volume' ? 'Volume' : 'Área')
-    if ('error' in v) return { value: null, error: v.error!, incomplete: false }
-    if ('missing' in v) return { value: null, error: null, incomplete: true }
-    return { value: v.value, error: null, incomplete: false }
+    if ('error' in v) return invalid(v.error!)
+    if ('missing' in v) return incomplete()
+    return result(v.value!)
   }
-  const L = positive(el.length, 'Comprimento')
-  const W = positive(el.width, 'Largura')
-  const T =
-    kind === 'volume' ? positive(el.thicknessCm, 'Espessura') : { value: 1 }
-  const countRaw = el.count.trim() === '' ? '1' : el.count
-  const N = positive(countRaw, 'Quantidade')
-  for (const f of [L, W, T, N])
-    if ('error' in f) return { value: null, error: f.error!, incomplete: false }
-  if ('value' in N && N.value !== null && !Number.isInteger(N.value))
-    return {
-      value: null,
-      error: 'Quantidade de elementos deve ser um número inteiro',
-      incomplete: false,
-    }
-  if ([L, W, T, N].some((f) => 'missing' in f))
-    return { value: null, error: null, incomplete: true }
-  const l = (L as { value: number }).value
-  const w = (W as { value: number }).value
-  const n = (N as { value: number }).value
-  if (kind === 'area') return { value: l * w * n, error: null, incomplete: false }
-  const t = (T as { value: number }).value / 100
-  return { value: l * w * t * n, error: null, incomplete: false }
-}
 
+  const type = normalizedType(el.elementType)
+  const pileType = type === 'estaca' || type === 'estacas' || type === 'tubulao'
+  const stairType = type === 'escada'
+  const volumeOnly =
+    type.startsWith('laje') ||
+    type === 'viga' ||
+    type === 'viga baldrame' ||
+    type === 'viga baltrame' ||
+    type === 'baldrame' ||
+    type === 'pilar' ||
+    type === 'sapata' ||
+    type === 'radier' ||
+    type === 'contrapiso' ||
+    pileType ||
+    stairType
+
+  if (kind === 'area' && volumeOnly)
+    return invalid('O elemento ' + el.elementType + ' é calculado em m³. Use a calculadora de volume.')
+
+  const countRaw = (el.count ?? '').trim() === '' ? '1' : el.count
+  const N = positive(countRaw, 'Quantidade')
+  if ('error' in N) return invalid(N.error!)
+  if ('value' in N && N.value !== null && !Number.isInteger(N.value))
+    return invalid('Quantidade de elementos deve ser um número inteiro')
+  if ('missing' in N) return incomplete()
+  const n = N.value!
+
+  // Escada: índice comercial editável, aplicado por metro linear.
+  if (kind === 'volume' && stairType) {
+    const length = positive(el.length ?? '', 'Metro linear')
+    const factor = positive(el.factor ?? '', 'Índice de cálculo (m³ por metro)')
+    for (const field of [length, factor])
+      if ('error' in field) return invalid(field.error!)
+    if ('missing' in length || 'missing' in factor) return incomplete()
+    return result(length.value! * factor.value! * n)
+  }
+
+  // Estacas/tubulões: seção circular πr²h, multiplicada pela quantidade.
+  if (kind === 'volume' && pileType) {
+    const diameter = positive(el.diameter ?? '', 'Diâmetro')
+    const depth = positive(el.depth ?? '', 'Profundidade')
+    for (const field of [diameter, depth])
+      if ('error' in field) return invalid(field.error!)
+    if ('missing' in diameter || 'missing' in depth) return incomplete()
+    const radius = diameter.value! / 2
+    return result(Math.PI * radius * radius * depth.value! * n)
+  }
+
+  const L = positive(el.length ?? '', type === 'pilar' ? 'Altura' : 'Comprimento')
+  const W = positive(el.width ?? '', 'Largura')
+  for (const field of [L, W])
+    if ('error' in field) return invalid(field.error!)
+  if ('missing' in L || 'missing' in W) return incomplete()
+  const length = L.value!
+  const width = W.value!
+
+  // Pisos/calçadas são apresentados por área no orçamento (m²).
+  if (kind === 'area') return result(length * width * n)
+
+  // Laje com altura nominal selecionada (H8, H10, H12, H15, H20…).
+  const slabHeight = type.match(/^laje\s*h\s*(\d+(?:[.,]\d+)?)$/i)
+  if (slabHeight) {
+    const heightCm = positive(slabHeight[1].replace(',', '.'), 'Altura da laje')
+    if ('error' in heightCm) return invalid(heightCm.error!)
+    if ('missing' in heightCm) return incomplete()
+    return result(length * width * (heightCm.value! / 100) * n)
+  }
+
+  // Profundidade/espessura em metros. thicknessCm é fallback para registros antigos.
+  const legacyThicknessRaw = (el.thicknessCm ?? '').trim()
+  const legacyThickness = parseDecimal(legacyThicknessRaw)
+  const depthRaw =
+    (el.depth ?? '').trim() !== ''
+      ? el.depth!
+      : legacyThicknessRaw === ''
+        ? ''
+        : legacyThickness.ok && legacyThickness.value !== null
+          ? String(legacyThickness.value / 100)
+          : legacyThicknessRaw
+  const depthLabel = type === 'pilar' ? 'Espessura' : 'Profundidade/espessura'
+  const depth = positive(depthRaw, depthLabel)
+  if ('error' in depth) return invalid(depth.error!)
+  if ('missing' in depth) return incomplete()
+
+  return result(length * width * depth.value! * n)
+}
 export interface MeasureSummary {
   kind: MeasureKind
   /** Soma geométrica sem margem (precisão total) */

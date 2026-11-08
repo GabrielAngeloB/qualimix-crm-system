@@ -50,12 +50,11 @@ O CRM é construído em marcos independentes. Cada marco deixa o sistema utiliz�
 - PDF gerado no servidor e guardado por versão (armazenamento de objetos compatível com S3), com link de compartilhamento assinado e com prazo.
 - Confirmação explícita de envio pelo WhatsApp.
 
-## Marco 6 — Pedidos, agenda e caminhões
+## Marco 6 — Pedidos e agenda operacional
 
-- **Interface local implementada parcialmente:** conversão de orçamento aceito em pedido, agenda ligada a pedido/cliente/obra/orçamento, reagendamento, status e detecção de conflito do mesmo caminhão no mesmo horário.
+- **Interface local implementada parcialmente:** conversão de orçamento aceito em pedido e agenda ligada a pedido/cliente/obra/orçamento, com reagendamento, status e identificação livre de recurso operacional.
 - **Persistência final pendente:** migrar o fluxo para Supabase com transação e chave única por versão aceita.
-- Cadastro de caminhões próprios e de parceiros, com capacidade obrigatória antes do uso.
-- Divisão do volume em viagens, detecção de conflitos por intervalo e recursos.
+- Não haverá módulo separado de cadastro ou gestão de caminhões/frota neste escopo.
 - Registro de conclusão e ocorrências pela equipe.
 
 ## Marco 7 — Financeiro

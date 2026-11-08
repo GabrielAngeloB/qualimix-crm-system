@@ -20,17 +20,19 @@ import {
   computeQuote,
   defaultExtras,
   summarizeMeasures,
+  type CatalogItem,
   type Issue,
   type MeasureElement,
   type QuoteExtras,
   type QuoteLine,
-  type CatalogItem,
 } from '../lib/quote'
-import { addDays, brl, brlCents, dateBR, num, parseDecimal } from '../lib/format'
+import { addDays, brl, brlCents, dateBR, daysBetween, num, parseDecimal } from '../lib/format'
 import { formatPhone } from '../lib/documents'
 import { useStore } from '../data/store'
-import { categoryLabel, paymentMethods } from '../data/settings'
-import { today, type QuoteRecord, type QuoteType } from '../data/fixtures'
+import { categoryLabel } from '../data/settings'
+import { type QuoteRecord, type QuoteType } from '../data/fixtures'
+import { today } from '../lib/clock'
+import { displayUserName, localUserId } from '../data/session'
 import { MeasureCalculator, blankElement, newId } from './MeasureCalculator'
 import { ProposalModal, WhatsAppDialog } from './QuoteShare'
 import type { ProposalData } from './ProposalDocument'
@@ -40,7 +42,6 @@ export interface Draft {
   type: QuoteType
   clientId: string
   siteId: string
-  opportunityId: string | null
   ownerId: string
   volumeElements: MeasureElement[]
   volumeMargin: string
@@ -54,11 +55,12 @@ export interface Draft {
   executionDeadline: string
   notes: string
   origin: string | null
+  opportunityId: string | null
 }
 
 const DRAFT_KEY = 'qmx-orcamento-rascunho-v1'
 
-function makeLine(catalogId: string | null, quantityMode: QuoteLine['quantityMode'] = 'manual', catalogItems: CatalogItem[] = []): QuoteLine {
+function makeLine(catalogId: string | null, catalogItems: CatalogItem[], quantityMode: QuoteLine['quantityMode'] = 'manual'): QuoteLine {
   const c = catalogItems.find((x) => x.id === catalogId)
   return {
     id: newId(),
@@ -73,10 +75,10 @@ function makeLine(catalogId: string | null, quantityMode: QuoteLine['quantityMod
   }
 }
 
-function templateFor(type: QuoteType, catalogItems: CatalogItem[] = []): Pick<Draft, 'lines' | 'volumeElements' | 'areaElements'> {
+function templateFor(type: QuoteType, catalogItems: CatalogItem[]): Pick<Draft, 'lines' | 'volumeElements' | 'areaElements'> {
   const lines: QuoteLine[] = []
-  if (type !== 'piso') lines.push(makeLine('c-fck25', 'volume', catalogItems))
-  if (type !== 'concreto') lines.push(makeLine('p-polido', 'area', catalogItems))
+  if (type !== 'piso') lines.push(makeLine('c-fck25', catalogItems, 'volume'))
+  if (type !== 'concreto') lines.push(makeLine('p-polido', catalogItems, 'area'))
   return {
     lines,
     volumeElements: type !== 'piso' ? [blankElement('volume')] : [],
@@ -84,13 +86,12 @@ function templateFor(type: QuoteType, catalogItems: CatalogItem[] = []): Pick<Dr
   }
 }
 
-function emptyDraft(validityDays: number | null, ownerId = '', catalogItems: CatalogItem[] = []): Draft {
+function emptyDraft(validityDays: number | null, catalogItems: CatalogItem[]): Draft {
   return {
     type: 'concreto',
     clientId: '',
     siteId: '',
-    opportunityId: null,
-    ownerId,
+    ownerId: localUserId,
     volumeMargin: '',
     areaMargin: '',
     extras: defaultExtras(),
@@ -100,93 +101,90 @@ function emptyDraft(validityDays: number | null, ownerId = '', catalogItems: Cat
     executionDeadline: '',
     notes: '',
     origin: null,
+    opportunityId: null,
     ...templateFor('concreto', catalogItems),
   }
 }
 
-function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
+function fromRecord(q: QuoteRecord, validityDays: number | null, copy = true): Draft {
   return {
     type: q.type,
     clientId: q.clientId,
     siteId: q.siteId,
-    opportunityId: q.opportunityId,
     ownerId: q.ownerId,
-    volumeElements: q.volumeElements.map((e) => ({ ...e, id: newId() })),
+    volumeElements: q.volumeElements.map((e) => ({ ...e, id: copy ? newId() : e.id })),
     volumeMargin: q.volumeMargin,
-    areaElements: q.areaElements.map((e) => ({ ...e, id: newId() })),
+    areaElements: q.areaElements.map((e) => ({ ...e, id: copy ? newId() : e.id })),
     areaMargin: q.areaMargin,
-    // Preços manuais não são herdados: a cópia usa as condições atuais do catálogo
-    lines: q.lines.map((l) => ({ ...l, id: newId(), unitPriceInput: '' })),
+    // Na duplicação, preços manuais são limpos; na edição, o rascunho é preservado.
+    lines: q.lines.map((l) => ({ ...l, id: copy ? newId() : l.id, unitPriceInput: copy ? '' : l.unitPriceInput })),
     extras: structuredClone(q.extras),
     paymentMethodIds: [...q.paymentMethodIds],
     paymentTerms: q.paymentTerms,
-    validityDays: validityDays?.toString() ?? '',
+    validityDays: copy
+      ? validityDays?.toString() ?? ''
+      : q.validUntil ? String(Math.max(1, daysBetween(today, q.validUntil))) : '',
     executionDeadline: q.executionDeadline,
     notes: q.notes,
-    origin: q.number,
+    origin: copy ? q.number : null,
+    opportunityId: copy ? null : q.opportunityId,
   }
 }
 
-export function QuoteBuilder({ origin, opportunityId }: { origin?: string; opportunityId?: string }) {
-  const { clients, sites, quotes, opportunities, loading, ctx, demoMode, toast, saveQuote, team, currentUserId } = useStore()
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog))
+export function QuoteBuilder({ origin, opportunityId, editQuoteId }: { origin?: string; opportunityId?: string; editQuoteId?: string }) {
+  const { clients, sites, quotes, opportunities, ctx, settings, settingsReady, demoMode, toast, addQuote, updateQuote, workspaceReady } = useStore()
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, settings.catalog))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [showProposal, setShowProposal] = useState(false)
-  const [saving, setSaving] = useState(false)
   const [showWa, setShowWa] = useState(false)
+  const [savedQuoteId, setSavedQuoteId] = useState<string | null>(null)
 
+  // Carrega uma oportunidade, duplica um orçamento ou recupera o rascunho local.
   useEffect(() => {
-    if (currentUserId) setDraft((current) => ({ ...current, ownerId: currentUserId }))
-  }, [currentUserId])
-
-  useEffect(() => {
-    if (!ctx.catalog.length) return
-    const products = new Map(ctx.catalog.map((product) => [product.id, product]))
-    setDraft((current) => ({
-      ...current,
-      lines: current.lines.map((line) => {
-        const product = line.catalogId ? products.get(line.catalogId) : undefined
-        return product
-          ? { ...line, description: product.name, unit: product.unit, category: product.category }
-          : line
-      }),
-    }))
-  }, [ctx.catalog])
-
-  // Carrega duplicação, orçamento iniciado por uma oportunidade ou rascunho local.
-  useEffect(() => {
-    if (loading) return
+    if (!workspaceReady || !settingsReady || loaded || savedQuoteId) return
+    const editable = editQuoteId ? quotes.find((quote) => quote.id === editQuoteId && !quote.demo && quote.status === 'Rascunho') : undefined
+    const linked = opportunityId ? opportunities.find((o) => o.id === opportunityId) : undefined
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
-    const linkedOpportunity = opportunityId
-      ? opportunities.find((item) => item.id === opportunityId)
-      : undefined
-
-    if (src) {
-      setDraft({
-        ...fromRecord(src, ctx.rules.validityDays),
-        opportunityId: linkedOpportunity?.id ?? src.opportunityId,
-        ownerId: currentUserId,
-      })
-      toast({ tone: 'info', title: `Cópia de ${src.number}`, body: 'Os preços foram atualizados para as condições atuais do catálogo. Revise antes de gerar a proposta.' })
-    } else if (opportunityId) {
-      if (!linkedOpportunity) {
-        toast({ tone: 'erro', title: 'Oportunidade não encontrada', body: 'Atualize o funil e tente iniciar o orçamento novamente.' })
-      } else {
-        setDraft({
-          ...emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog),
-          clientId: linkedOpportunity.clientId,
-          siteId: linkedOpportunity.siteId ?? '',
-          opportunityId: linkedOpportunity.id,
-        })
-        toast({ tone: 'info', title: 'Orçamento vinculado ao lead', body: linkedOpportunity.title })
+    if (editable) {
+      setDraft(fromRecord(editable, ctx.rules.validityDays, false))
+      setSavedQuoteId(editable.id)
+      toast({ tone: 'info', title: `Editando ${editable.number}`, body: 'O rascunho existente será atualizado sem gerar um novo orçamento.' })
+    } else if (editQuoteId) {
+      setDraft(emptyDraft(ctx.rules.validityDays, settings.catalog))
+      toast({ tone: 'erro', title: 'Rascunho não encontrado', body: 'Somente orçamentos reais ainda em rascunho podem ser editados.' })
+    } else if (linked) {
+      const base: Draft = {
+        ...emptyDraft(ctx.rules.validityDays, settings.catalog),
+        clientId: linked.clientId,
+        siteId: linked.siteId ?? '',
+        ownerId: linked.ownerId,
+        opportunityId: linked.id,
+        notes: `Oportunidade de origem: ${linked.title}`,
       }
+      let nextDraft = base
+      try {
+        const raw = localStorage.getItem(DRAFT_KEY)
+        if (raw) {
+          const saved = JSON.parse(raw) as Partial<Draft>
+          if (saved.opportunityId === linked.id) nextDraft = { ...base, ...saved }
+        }
+      } catch {
+        localStorage.removeItem(DRAFT_KEY)
+      }
+      setDraft(nextDraft)
+      toast({ tone: 'info', title: 'Oportunidade carregada', body: 'Cliente, obra e responsável foram preenchidos. O orçamento permanece editável.' })
+    } else if (opportunityId) {
+      setDraft(emptyDraft(ctx.rules.validityDays, settings.catalog))
+      toast({ tone: 'erro', title: 'Oportunidade não encontrada', body: 'Volte ao funil e abra o rascunho pela oportunidade correta.' })
+    } else if (src) {
+      setDraft(fromRecord(src, ctx.rules.validityDays))
+      toast({ tone: 'info', title: `Cópia de ${src.number}`, body: 'Os preços foram atualizados para as condições atuais do catálogo. Revise antes de gerar a proposta.' })
     } else {
       try {
         const raw = localStorage.getItem(DRAFT_KEY)
         if (raw) {
-          const savedDraft = JSON.parse(raw) as Draft
-          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog), ...savedDraft, ownerId: currentUserId || savedDraft.ownerId })
+          setDraft({ ...emptyDraft(ctx.rules.validityDays, settings.catalog), ...(JSON.parse(raw) as Draft) })
           toast({ tone: 'info', title: 'Rascunho recuperado', body: 'Continuamos de onde você parou.' })
         }
       } catch {
@@ -194,18 +192,18 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
       }
     }
     setLoaded(true)
-  }, [origin, opportunityId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [origin, opportunityId, editQuoteId, workspaceReady, loaded, savedQuoteId, opportunities, quotes, ctx.rules.validityDays, settingsReady, settings.catalog, toast])
 
   // Autosalvamento local (prevenção de perda de dados)
   useEffect(() => {
-    if (!loaded) return
+    if (!loaded || savedQuoteId) return
     const t = setTimeout(() => {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
       const d = new Date()
       setSavedAt(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
     }, 500)
     return () => clearTimeout(t)
-  }, [draft, loaded])
+  }, [draft, loaded, savedQuoteId])
 
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => setDraft((d) => ({ ...d, [k]: v }))
   const setExtras = (p: Partial<QuoteExtras>) => setDraft((d) => ({ ...d, extras: { ...d.extras, ...p } }))
@@ -235,12 +233,15 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
   const client = clients.find((c) => c.id === draft.clientId)
   const clientSites = sites.filter((s) => s.clientId === draft.clientId)
   const site = sites.find((s) => s.id === draft.siteId)
+  const linkedOpportunity = opportunities.find((o) => o.id === draft.opportunityId)
 
-  const nextNumber = useMemo(() => {
+  const savedQuote = savedQuoteId ? quotes.find((quote) => quote.id === savedQuoteId) : undefined
+  const candidateNumber = useMemo(() => {
     const year = today.slice(0, 4)
     const max = quotes.reduce((m, q) => Math.max(m, Number(q.number.split('-')[2]) || 0), 0)
     return `ORC-${year}-${String(max + 1).padStart(4, '0')}`
   }, [quotes])
+  const nextNumber = savedQuote?.number ?? candidateNumber
 
   const proposal: ProposalData = {
     number: nextNumber,
@@ -249,12 +250,12 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
     validUntil,
     client,
     site,
-    ownerName: team.find((member) => member.id === draft.ownerId)?.name ?? '—',
+    ownerName: displayUserName(draft.ownerId),
     lines: draft.lines,
     result,
     volume,
     area,
-    payments: draft.paymentMethodIds.map((id) => paymentMethods.find((m) => m.id === id)?.label ?? id),
+    payments: draft.paymentMethodIds.map((id) => settings.paymentMethods.find((m) => m.id === id)?.label ?? id),
     paymentTerms: draft.paymentTerms,
     executionDeadline: draft.executionDeadline,
     notes: draft.notes,
@@ -262,10 +263,59 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
     demo: demoMode,
   }
 
+  const saveDraftToCrm = () => {
+    if (demoMode) {
+      toast({ tone: 'erro', title: 'Modo demonstração ativo', body: 'Desative os dados de demonstração antes de registrar um orçamento real.' })
+      return
+    }
+    if (!client || !site) {
+      toast({ tone: 'erro', title: 'Cliente e obra obrigatórios', body: 'Selecione um cliente e uma obra antes de salvar o orçamento.' })
+      return
+    }
+    const record: QuoteRecord = {
+      id: savedQuoteId ?? newId(),
+      number: nextNumber,
+      version: savedQuote?.version ?? 1,
+      createdAt: savedQuote?.createdAt ?? today,
+      validUntil: validUntil ?? '',
+      sentAt: null,
+      status: 'Rascunho',
+      type: draft.type,
+      clientId: draft.clientId,
+      siteId: draft.siteId,
+      ownerId: draft.ownerId,
+      opportunityId: draft.opportunityId,
+      volumeElements: structuredClone(draft.volumeElements),
+      volumeMargin: draft.volumeMargin,
+      areaElements: structuredClone(draft.areaElements),
+      areaMargin: draft.areaMargin,
+      lines: structuredClone(draft.lines),
+      extras: structuredClone(draft.extras),
+      paymentMethodIds: [...draft.paymentMethodIds],
+      paymentTerms: draft.paymentTerms,
+      executionDeadline: draft.executionDeadline,
+      notes: draft.notes,
+      demo: false,
+    }
+    try {
+      if (savedQuoteId) {
+        updateQuote(record)
+        toast({ tone: 'ok', title: 'Rascunho atualizado neste navegador', body: `${record.number} foi atualizado sem criar outro orçamento.` })
+      } else {
+        addQuote(record)
+        setSavedQuoteId(record.id)
+        toast({ tone: 'ok', title: 'Orçamento salvo neste navegador', body: `${record.number} foi salvo localmente e vinculado à oportunidade, quando aplicável.` })
+      }
+      localStorage.removeItem(DRAFT_KEY)
+    } catch (error) {
+      toast({ tone: 'erro', title: 'Não foi possível salvar', body: error instanceof Error ? error.message : 'Revise os dados e tente novamente.' })
+    }
+  }
+
   const changeType = (type: QuoteType) => {
     setDraft((d) => {
       const pristine = d.lines.every((l) => l.quantity === '' && l.unitPriceInput === '') && [...d.volumeElements, ...d.areaElements].every((e) => !e.length && !e.width && !e.informed)
-      if (pristine) return { ...d, type, ...templateFor(type, ctx.catalog) }
+      if (pristine) return { ...d, type, ...templateFor(type, settings.catalog) }
       return {
         ...d,
         type,
@@ -278,7 +328,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
   const discard = () => {
     if (!confirm('Descartar este rascunho? Os dados preenchidos serão apagados.')) return
     localStorage.removeItem(DRAFT_KEY)
-    setDraft(emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog))
+    setDraft(emptyDraft(ctx.rules.validityDays, settings.catalog))
     toast({ tone: 'ok', title: 'Rascunho descartado' })
   }
 
@@ -291,7 +341,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
       <PageHeader
         eyebrow="Orçamentos"
         title="Novo orçamento"
-        description={draft.origin ? <>Cópia do orçamento <strong className="text-ink">{draft.origin}</strong> com preços atualizados.</> : 'Calcule volume e área, monte os itens e gere a proposta comercial.'}
+        description={savedQuote ? <>Editando o rascunho <strong className="text-ink">{savedQuote.number}</strong>. As alterações atualizam o mesmo registro local.</> : draft.opportunityId ? <>Rascunho iniciado pela oportunidade <strong className="text-ink">{linkedOpportunity?.title ?? 'não localizada'}</strong>. Cliente, obra e responsável vieram do funil e podem ser ajustados.</> : draft.origin ? <>Cópia do orçamento <strong className="text-ink">{draft.origin}</strong> com preços atualizados.</> : 'Calcule volume e área, monte os itens e gere a proposta comercial.'}
         actions={
           <>
             <Button variant="ghost" onClick={discard}>
@@ -332,7 +382,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                     onChange={(e) => {
                       const cid = e.target.value
                       const own = sites.filter((s) => s.clientId === cid)
-                      setDraft((d) => ({ ...d, clientId: cid, siteId: own.length === 1 ? own[0].id : '' }))
+                      setDraft((d) => ({ ...d, clientId: cid, siteId: own.length === 1 ? own[0].id : '', opportunityId: cid === d.clientId ? d.opportunityId : null }))
                     }}
                   >
                     <option value="">Selecione…</option>
@@ -382,7 +432,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
             <Card>
               <CardHeader step={2} title="Calculadora de volume" subtitle="Some lajes, vigas, pilares ou etapas de concretagem. Ou informe o volume passado pelo cliente." action={<Calculator className="h-6 w-6 text-brand" />} />
               <div className="p-5">
-                <MeasureCalculator kind="volume" elements={draft.volumeElements} margin={draft.volumeMargin} summary={volume} onChange={(v) => set('volumeElements', v)} onMargin={(v) => set('volumeMargin', v)} />
+                <MeasureCalculator kind="volume" elementTypes={settings.elementTypes} elements={draft.volumeElements} margin={draft.volumeMargin} summary={volume} onChange={(v) => set('volumeElements', v)} onMargin={(v) => set('volumeMargin', v)} />
               </div>
             </Card>
           )}
@@ -390,7 +440,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
             <Card>
               <CardHeader step={showVolume ? 3 : 2} title="Calculadora de área de piso" subtitle="Polido ou sarrafeado: some ambientes, ou informe a área." action={<Ruler className="h-6 w-6 text-brand" />} />
               <div className="p-5">
-                <MeasureCalculator kind="area" elements={draft.areaElements} margin={draft.areaMargin} summary={area} onChange={(v) => set('areaElements', v)} onMargin={(v) => set('areaMargin', v)} />
+                <MeasureCalculator kind="area" elementTypes={settings.elementTypes} elements={draft.areaElements} margin={draft.areaMargin} summary={area} onChange={(v) => set('areaElements', v)} onMargin={(v) => set('areaMargin', v)} />
               </div>
             </Card>
           )}
@@ -410,12 +460,12 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
               {draft.lines.length === 0 && <p className="py-6 text-center text-sm text-muted">Nenhum item. Adicione produtos ou serviços abaixo.</p>}
               {draft.lines.map((l, i) => {
                 const c = result.lines[i]
-                const item = ctx.catalog.find((x) => x.id === l.catalogId)
+                const item = settings.catalog.find((x) => x.id === l.catalogId)
                 const canVolume = l.unit === 'm³'
                 const canArea = l.unit === 'm²'
                 const ref = item?.basePrice ?? (demoMode ? item?.demoPrice : null)
                 return (
-                  <div key={l.id} className={cx('grid grid-cols-2 gap-3 border-b border-line py-3 md:grid-cols-[minmax(0,2.2fr)_1.4fr_1.1fr_0.7fr_1fr_auto] md:items-start', c?.errors.length ? 'bg-brand-soft/30' : false)}>
+                  <div key={l.id} className={cx('grid grid-cols-2 gap-3 border-b border-line py-3 md:grid-cols-[minmax(0,2.2fr)_1.4fr_1.1fr_0.7fr_1fr_auto] md:items-start', !!c?.errors.length && 'bg-brand-soft/30')}>
                     <div className="col-span-2 min-w-0 md:col-span-1">
                       {l.catalogId ? (
                         <>
@@ -423,7 +473,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                           <p className="text-xs text-muted">{item?.code} · {categoryLabel[l.category]} · {l.unit}</p>
                         </>
                       ) : (
-                        <input aria-label="Descrição do item livre" maxLength={180} className={inputCls()} value={l.description} placeholder="Ex.: Taxa de mobilização" onChange={(e) => patchLine(l.id, { description: e.target.value })} />
+                        <input aria-label="Descrição do item livre" className={inputCls()} value={l.description} onChange={(e) => patchLine(l.id, { description: e.target.value })} />
                       )}
                     </div>
                     <div>
@@ -436,14 +486,14 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                         </select>
                       )}
                       {l.quantityMode === 'manual' ? (
-                        <input aria-label={`Quantidade de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.quantity} placeholder="Ex.: 12,5" onChange={(e) => patchLine(l.id, { quantity: e.target.value })} />
+                        <input aria-label={`Quantidade de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.quantity} placeholder="0" onChange={(e) => patchLine(l.id, { quantity: e.target.value })} />
                       ) : (
                         <div className="flex h-10 items-center rounded-md border border-dashed border-line px-3 font-semibold tabular">{c?.quantity != null ? `${num(c.quantity, 2)} ${l.unit}` : '—'}</div>
                       )}
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-muted">Preço unitário (R$ / {l.unit})</label>
-                      <input aria-label={`Preço unitário de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.unitPriceInput} placeholder={ref != null ? num(ref, 2) : 'Ex.: 420,00'} onChange={(e) => patchLine(l.id, { unitPriceInput: e.target.value })} />
+                      <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Preço unitário</label>
+                      <input aria-label={`Preço unitário de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.unitPriceInput} placeholder={ref != null ? num(ref, 2) : 'Pendente'} onChange={(e) => patchLine(l.id, { unitPriceInput: e.target.value })} />
                       <div className="mt-1">
                         {c?.priceSource === 'tabela' && <Badge tone="ok">Tabela oficial</Badge>}
                         {c?.priceSource === 'demonstracao' && <Badge tone="warn">Fictício (demo)</Badge>}
@@ -453,7 +503,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Desconto %</label>
-                      <input aria-label={`Desconto de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.discountPct} placeholder="Ex.: 5" onChange={(e) => patchLine(l.id, { discountPct: e.target.value })} />
+                      <input aria-label={`Desconto de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.discountPct} placeholder="0" onChange={(e) => patchLine(l.id, { discountPct: e.target.value })} />
                     </div>
                     <div className="text-right">
                       <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Subtotal</label>
@@ -478,14 +528,14 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                   onChange={(e) => {
                     const v = e.target.value
                     if (!v) return
-                    const it = ctx.catalog.find((x) => x.id === v)
+                    const it = settings.catalog.find((x) => x.id === v)
                     const mode = it?.unit === 'm³' && it.category === 'concreto' ? 'volume' : it?.unit === 'm²' ? 'area' : 'manual'
-                    set('lines', [...draft.lines, makeLine(v === 'livre' ? null : v, mode, ctx.catalog)])
+                    set('lines', [...draft.lines, makeLine(v === 'livre' ? null : v, settings.catalog, mode)])
                   }}
                 >
                   <option value="">Adicionar produto ou serviço…</option>
                   {(Object.keys(categoryLabel) as (keyof typeof categoryLabel)[]).map((cat) => {
-                    const items = ctx.catalog.filter((x) => x.category === cat && x.active)
+                    const items = settings.catalog.filter((x) => x.category === cat && x.active)
                     return items.length ? (
                       <optgroup key={cat} label={categoryLabel[cat]}>
                         {items.map((x) => (
@@ -509,7 +559,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                 {draft.extras.freight.mode === 'fixo' && <RuleValue label="Valor fixo" v={r.freight.fixed} />}
                 {draft.extras.freight.mode === 'km' && (
                   <div className="mt-3 flex items-end gap-3">
-                    <Field label="Distância (km)" hint="Distância usada no cálculo do frete. Ex.: 25,5 km." className="w-32">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.freight.km} placeholder="Ex.: 25,5" onChange={(e) => setExtras({ freight: { ...draft.extras.freight, km: e.target.value } })} />}</Field>
+                    <Field label="Distância (km)" className="w-32">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.freight.km} onChange={(e) => setExtras({ freight: { ...draft.extras.freight, km: e.target.value } })} />}</Field>
                     <RuleValue label="Valor por km" v={r.freight.perKm} />
                   </div>
                 )}
@@ -533,7 +583,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                     {draft.extras.pumping.mode === 'm3' && <RuleValue label={`Por m³ × ${num(result.concreteVolume, 2)} m³`} v={r.pumping.perM3} />}
                     {draft.extras.pumping.mode === 'hora' && (
                       <>
-                        <Field label="Horas" hint="Tempo previsto de bombeamento. Ex.: 2,5 horas." className="w-24">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.pumping.hours} placeholder="Ex.: 2,5" onChange={(e) => setExtras({ pumping: { ...draft.extras.pumping, hours: e.target.value } })} />}</Field>
+                        <Field label="Horas" className="w-24">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.pumping.hours} onChange={(e) => setExtras({ pumping: { ...draft.extras.pumping, hours: e.target.value } })} />}</Field>
                         <RuleValue label="Por hora" v={r.pumping.perHour} />
                       </>
                     )}
@@ -554,7 +604,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                 <p className="mt-1 text-xs text-muted">Tolerância: {r.stay.toleranceMin === null ? 'não configurada' : `${r.stay.toleranceMin} min`}</p>
                 {draft.extras.stay.include && (
                   <div className="mt-3 flex items-end gap-3">
-                    <Field label="Horas adicionais" hint="Tempo acima da tolerância configurada. Ex.: 1,5 hora." className="w-32">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.stay.hours} placeholder="Ex.: 1,5" onChange={(e) => setExtras({ stay: { ...draft.extras.stay, hours: e.target.value } })} />}</Field>
+                    <Field label="Horas adicionais" className="w-32">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.stay.hours} onChange={(e) => setExtras({ stay: { ...draft.extras.stay, hours: e.target.value } })} />}</Field>
                     <RuleValue label="Por hora" v={r.stay.perHour} />
                   </div>
                 )}
@@ -568,8 +618,8 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                 <p className="mt-1 text-xs text-muted">
                   {r.minVolume.m3 === null ? 'Volume mínimo não configurado' : `Mínimo ${num(r.minVolume.m3, 1)} m³ · ${r.minVolume.chargeDifference ? 'cobra a diferença' : 'apenas alerta'}`}
                 </p>
-                <Field label="Desconto geral (R$)" className="mt-3 max-w-[200px]" hint={`Informe o desconto total em reais, não em porcentagem. Ex.: 150,00. Sem aprovação até ${r.maxDiscountPctWithoutApproval === null ? '— (não configurado)' : `${r.maxDiscountPctWithoutApproval}%`}`}>
-                  {(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.globalDiscount} placeholder="Ex.: 150,00" onChange={(e) => setExtras({ globalDiscount: e.target.value })} />}
+                <Field label="Desconto geral (R$)" className="mt-3 max-w-[200px]" hint={`Sem aprovação até ${r.maxDiscountPctWithoutApproval === null ? '— (não configurado)' : `${r.maxDiscountPctWithoutApproval}%`}`}>
+                  {(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.globalDiscount} placeholder="0,00" onChange={(e) => setExtras({ globalDiscount: e.target.value })} />}
                 </Field>
               </RuleBlock>
             </div>
@@ -582,7 +632,7 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
               <div className="md:col-span-2">
                 <p className="mb-2 text-[13px] font-semibold text-ink-2">Formas de pagamento</p>
                 <div className="flex flex-wrap gap-2">
-                  {paymentMethods.map((m) => {
+                  {settings.paymentMethods.map((m) => {
                     const enabled = ctx.enabledPaymentMethodIds.includes(m.id)
                     const on = draft.paymentMethodIds.includes(m.id)
                     return (
@@ -601,17 +651,17 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                 </div>
                 {ctx.enabledPaymentMethodIds.length === 0 && <p className="mt-2 text-xs text-warn">Nenhuma forma de pagamento habilitada. Confirme as modalidades aceitas em Configurações.</p>}
               </div>
-              <Field label="Prazo e condições de pagamento" hint="Descreva como o cliente pagará. Ex.: 30% de entrada e saldo em 28 dias.">
-                {(id) => <input id={id} maxLength={500} className={inputCls()} value={draft.paymentTerms} placeholder="Ex.: 30% de entrada e saldo em 28 dias" onChange={(e) => set('paymentTerms', e.target.value)} />}
+              <Field label="Prazo e condições de pagamento" hint="Ex.: entrada, parcelamento, faturamento em 28 dias">
+                {(id) => <input id={id} className={inputCls()} value={draft.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)} />}
               </Field>
-              <Field label="Validade da proposta (dias)" required hint={validUntil ? `Válida até ${dateBR(validUntil)}` : r.validityDays === null ? 'Validade padrão não configurada' : undefined}>
-                {(id) => <input id={id} inputMode="numeric" maxLength={3} className={inputCls(!validUntil && draft.validityDays !== '')} value={draft.validityDays} placeholder="Ex.: 15" onChange={(e) => set('validityDays', e.target.value)} />}
+              <Field label="Validade da proposta (dias)" hint={validUntil ? `Válida até ${dateBR(validUntil)}` : 'Opcional para salvar rascunho; obrigatória para enviar a proposta.'}>
+                {(id) => <input id={id} inputMode="numeric" className={inputCls(!validUntil && draft.validityDays !== '')} value={draft.validityDays} onChange={(e) => set('validityDays', e.target.value)} />}
               </Field>
               <Field label="Prazo de execução (opcional)">
-                {(id) => <input id={id} maxLength={180} className={inputCls()} value={draft.executionDeadline} placeholder="Ex.: concretagem prevista para a 2ª quinzena" onChange={(e) => set('executionDeadline', e.target.value)} />}
+                {(id) => <input id={id} className={inputCls()} value={draft.executionDeadline} placeholder="Ex.: concretagem prevista para a 2ª quinzena" onChange={(e) => set('executionDeadline', e.target.value)} />}
               </Field>
               <Field label="Observações comerciais">
-                {(id) => <textarea id={id} rows={3} maxLength={2000} className={cx(inputCls(), 'h-auto py-2')} value={draft.notes} placeholder="Ex.: acesso pela rua lateral; confirmar disponibilidade de bomba." onChange={(e) => set('notes', e.target.value)} />}
+                {(id) => <textarea id={id} rows={3} className={cx(inputCls(), 'h-auto py-2')} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />}
               </Field>
             </div>
           </Card>
@@ -655,32 +705,13 @@ export function QuoteBuilder({ origin, opportunityId }: { origin?: string; oppor
                 <Button
                   variant="primary"
                   className="w-full"
-                  disabled={saving || demoMode || !client || !site || !validDays}
-                  onClick={async () => {
-                    if (!validDays || !client || !site) return
-                    setSaving(true)
-                    try {
-                      const saved = await saveQuote({
-                        type: draft.type, clientId: draft.clientId, siteId: draft.siteId,
-                        opportunityId: draft.opportunityId,
-                        volumeElements: draft.volumeElements, volumeMargin: draft.volumeMargin,
-                        areaElements: draft.areaElements, areaMargin: draft.areaMargin,
-                        lines: draft.lines, extras: draft.extras, paymentMethodIds: draft.paymentMethodIds,
-                        paymentTerms: draft.paymentTerms, validityDays: validDays,
-                        executionDeadline: draft.executionDeadline, notes: draft.notes,
-                      })
-                      toast({ tone: 'info', title: 'Orçamento registrado', body: saved.number })
-                    } catch (error) {
-                      toast({ tone: 'erro', title: 'Falha ao salvar orçamento', body: error instanceof Error ? error.message : 'Erro inesperado.' })
-                    } finally {
-                      setSaving(false)
-                    }
-                  }}
+                  disabled={demoMode || !client || !site || !validUntil || (!!savedQuoteId && !savedQuote)}
+                  onClick={saveDraftToCrm}
                 >
-                  <FileText className="h-4 w-4" /> {saving ? 'Salvando…' : 'Salvar orçamento no CRM'}
+                  <FileText className="h-4 w-4" /> {savedQuoteId ? 'Atualizar rascunho local' : 'Salvar rascunho local'}
                 </Button>
-                {demoMode && <p className="text-center text-xs text-warn">Desative os dados de demonstração para salvar um orçamento real.</p>}
-                <Button variant={canIssue ? 'secondary' : 'ghost'} className="w-full" onClick={() => setShowProposal(true)}>
+                {demoMode && <p className="text-center text-xs text-warn">Desative o modo demonstração para salvar um orçamento real.</p>}
+                <Button variant={canIssue ? 'secondary' : 'secondary'} className="w-full" onClick={() => setShowProposal(true)}>
                   {canIssue ? <FileText className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   {canIssue ? 'Gerar proposta em PDF' : 'Pré-visualizar proposta'}
                 </Button>
