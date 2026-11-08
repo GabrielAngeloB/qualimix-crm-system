@@ -198,7 +198,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
     onClose()
   }
 
-  const submit = () => {
+  const submit = async () => {
     setTried(true)
     const e = validate()
     setErrors(e)
@@ -213,8 +213,12 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
     const site: Site | undefined = f.siteName.trim()
       ? { id: newId(), clientId: id, name: f.siteName.trim(), address: f.siteAddress.trim(), city: f.city.trim(), region: f.region, contactName: f.siteContact.trim(), contactPhone: onlyDigits(f.sitePhone), serviceType: '', accessNotes: '', restrictions: f.siteRestrictions.trim(), demo: false }
       : undefined
-    addClient(client, site)
-    toast({ tone: 'ok', title: 'Cliente cadastrado', body: 'Disponível para orçamentos nesta sessão do navegador.' })
+    try {
+      await addClient(client, site)
+    } catch (error) {
+      toast({ tone: 'erro', title: 'Falha ao cadastrar cliente', body: error instanceof Error ? error.message : 'Erro ao salvar no banco.' })
+      return
+    }
     setF(emptyForm)
     setTried(false)
     onClose()
