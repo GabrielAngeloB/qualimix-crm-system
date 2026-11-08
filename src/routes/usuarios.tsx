@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { createFileRoute } from '@tanstack/react-router'
-import { createUser, deleteUser, listUsers, setUserActive } from '../lib/auth.functions'
+import { createUser, listUsers, setUserActive } from '../lib/auth.functions'
 
 type UserRow = { id: string; nome: string; username: string; perfil: 'admin' | 'user'; ativo: boolean; created_at: string }
 
@@ -42,12 +42,7 @@ function UsersPage() {
     catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível atualizar o usuário.') }
   }
 
-  async function remove(user: UserRow) {
-    if (!confirm(`Desativar a conta de ${user.nome}? Os registros vinculados serão preservados.`)) return
-    setError(''); setNotice('')
-    try { await deleteUser({ data: { id: user.id } }); await refresh() }
-    catch (err) { setError(err instanceof Error ? err.message : 'Não foi possível excluir o usuário.') }
-  }
+
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -67,7 +62,7 @@ function UsersPage() {
             <td className="px-4 py-3"><strong>{user.nome}</strong><span className="block text-xs text-muted">@{user.username}</span></td>
             <td className="px-4 py-3">{user.perfil === 'admin' ? 'Administrador' : 'Usuário'}</td>
             <td className="px-4 py-3">{user.ativo ? 'Ativo' : 'Desativado'}</td>
-            <td className="px-4 py-3 text-right"><button onClick={() => void toggle(user)} className="mr-3 font-semibold text-brand hover:underline">{user.ativo ? 'Desativar' : 'Ativar'}</button><button onClick={() => void remove(user)} className="font-semibold text-muted hover:text-brand">Desativar e preservar histórico</button></td>
+            <td className="px-4 py-3 text-right"><button onClick={() => void toggle(user)} className="font-semibold text-brand hover:underline">{user.ativo ? 'Desativar e revogar sessões' : 'Ativar'}</button></td>
           </tr>)}</tbody>
         </table>
         {!users.length && <p className="p-5 text-sm text-muted">Nenhum usuário encontrado.</p>}
