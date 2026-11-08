@@ -17,7 +17,7 @@ export const Route = createFileRoute('/pedidos')({
 })
 
 function Pedidos() {
-  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, jobBalance, toast, currentRole } = useStore()
+  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, jobBalance, toast, currentRole, views } = useStore()
   const canCreateOrder = currentRole === 'administrador' || currentRole === 'comercial'
   const canEditOrderAmount = currentRole === 'administrador' || currentRole === 'comercial'
   const [dueDates, setDueDates] = useState<Record<string, string>>({})
@@ -26,6 +26,7 @@ function Pedidos() {
   const [editingOrderId, setEditingOrderId] = useState<string | null>(null)
   const [amountDraft, setAmountDraft] = useState('')
 
+  const orderSummaryById = useMemo(() => new Map(views.orders.map((row) => [String(row.id), row])), [views.orders])
   const accepted = useMemo(
     () => quotes.filter((quote) => !quote.demo && quote.status === 'Aceito' && !workOrders.some((order) => order.quoteId === quote.id)),
     [quotes, workOrders],
@@ -142,7 +143,13 @@ function Pedidos() {
                 {workOrders.map((order) => {
                   const client = clients.find((item) => item.id === order.clientId)
                   const site = sites.find((item) => item.id === order.siteId)
-                  const balance = jobBalance(order.id) ?? order.contractedCents
+                  const summary = orderSummaryById.get(order.id)
+                  const balance = summary
+                    ? Number(summary.saldo_obra_centavos ?? order.contractedCents)
+                    : jobBalance(order.id) ?? order.contractedCents
+                  const costCents = summary
+                    ? Number(summary.total_custos_centavos ?? 0)
+                    : order.contractedCents - balance
                   return (
                     <tr key={order.id} className="border-b border-line last:border-0">
                       <td className="px-4 py-3">
@@ -183,7 +190,7 @@ function Pedidos() {
                         )}
                         {order.valueHistory && order.valueHistory.length > 0 && <span className="block text-xs text-muted">{order.valueHistory.length} alteração(ões) de valor</span>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular">{brlCents(order.contractedCents - balance)}</td>
+                      <td className="px-4 py-3 text-right tabular">{brlCents(costCents)}</td>
                       <td className={cx('px-4 py-3 text-right font-semibold tabular', balance < 0 && 'text-brand')}>{brlCents(balance)}</td>
                       <td className="px-4 py-3"><Badge>{order.status}</Badge></td>
                       <td className="px-4 py-3"><Link to="/orcamentos" className="text-brand hover:underline">{order.quoteId}</Link></td>
