@@ -270,7 +270,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               </select>
             )}
           </Field>
-          <Field label="Observações" error={liveErrors.notes} hint="Ex.: prefere contato pela manhã; falar com o setor de compras." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={2000} className={cx(inputCls(!!liveErrors.notes), 'h-auto py-2')} value={f.notes} placeholder="Ex.: Prefere contato pela manhã; falar com compras." onChange={(e) => up('notes', e.target.value)} /></Field>
+          <Field label="Observações" error={liveErrors.notes} hint="Ex.: prefere contato pela manhã; falar com o setor de compras." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={2000} className={cx(inputCls(!!liveErrors.notes), 'h-auto py-2')} value={f.notes} placeholder="Ex.: Prefere contato pela manhã; falar com compras." onChange={(e) => up('notes', e.target.value)} />}</Field>
         </div>
 
         <div className="rounded-lg border border-dashed border-line p-4">
