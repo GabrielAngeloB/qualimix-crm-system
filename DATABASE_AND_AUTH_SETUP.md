@@ -83,6 +83,8 @@ As alterações abaixo já foram aplicadas diretamente ao projeto Supabase conec
 - 20261108200023 — crm_operational_reporting_views_and_financial_guards: views vw_financeiro_resumo, vw_pedidos_resumo, vw_profissionais_resumo, vw_agenda_resumo e vw_tarefas_resumo; bloqueio de baixas acima do saldo e atualização automática do status.
 - 20261108200050 — fix_financial_payment_status_trigger: correção do cálculo do status depois de INSERT/UPDATE/DELETE de pagamento.
 - 20261108202132 — grant_custom_server_role_access_for_crm_operations: permissões e policies para a conexão técnica do servidor.
+- 20261108202709 — align_overdue_status_with_partial_payments: alinha status de parcelas parcialmente pagas e vencidas entre aplicação, views e banco.
+- 20261108202731 — harden_financial_payment_trigger_execution: valida INSERT/UPDATE de baixas sem acessar OLD em inserções e concede execução dos triggers ao papel técnico.
 
 Verificação realizada no banco: as 7 tabelas operacionais têm RLS ativado; as 5 views novas executam sem erro; e as 9 views totais do CRM estão disponíveis. As views novas retornam zero linhas porque ainda não existem dados operacionais reais cadastrados — nenhum valor de demonstração foi inserido como se fosse produção.
 
