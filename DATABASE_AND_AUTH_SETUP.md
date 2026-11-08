@@ -69,3 +69,32 @@ Após configurar DATABASE_URL e executar a migration, rode pnpm install, pnpm ty
 - O carregamento inicial foi consolidado em uma única consulta SQL com agregações JSON, evitando dez viagens separadas ao banco remoto. O servidor continua mantendo `DATABASE_URL` fora do navegador.
 - O carregamento ainda traz os registros existentes em lote. Se o CRM crescer muito, a próxima etapa é paginação no servidor e carregamento sob demanda por tela, em vez de carregar toda a base ao entrar.
 - Registros com `is_demo=true` são intencionalmente ocultados das telas de produção. Se um cadastro de teste for na verdade um cliente real, confira sua identidade e altere somente esse registro para `is_demo=false`.
+
+
+## Módulos operacionais e financeiros
+
+A branch também inclui persistência server-side para Pedidos, Financeiro, Profissionais, Agenda e Tarefas. O esquema de nove tabelas do arquivo base continua sendo apenas o ponto de partida e **não deve ser executado novamente** em um banco já inicializado.
+
+Depois da migration de autenticação (20261108000200_custom_server_auth.sql) e antes de habilitar a versão desta branch, confira e aplique as migrations operacionais versionadas no repositório:
+
+- create_financial_and_operational_tables: cria pedidos, profissionais, despesas, lançamentos financeiros, pagamentos, agenda e tarefas, com chaves estrangeiras, checks, índices e RLS.
+- crm_operational_reporting_views_and_financial_guards: cria as views vw_financeiro_resumo, vw_pedidos_resumo, vw_profissionais_resumo, vw_agenda_resumo e vw_tarefas_resumo, além das travas de saldo e atualização de status das baixas.
+
+> As migrations acima foram aplicadas diretamente no projeto Qualimix Cimentos durante a integração desta branch. Confira o histórico de migrations do projeto antes de reaplicar qualquer SQL. Não rode novamente uma migration que já conste no histórico.
+
+### Papel restrito da aplicação
+
+Depois das migrations, execute uma cópia de supabase/security/001_create_app_role.sql no SQL Editor conectado como postgres. Substitua o placeholder de senha apenas nessa cópia local. O script concede os acessos usados pelas Server Functions, incluindo as novas tabelas e views. Não dê service_role, postgres ou a chave secreta ao navegador.
+
+A conexão da aplicação deve utilizar qualimix_app na variável server-only DATABASE_URL. Confirme o resultado do SELECT final: rolsuper=false, rolcreatedb=false, rolcreaterole=false, rolbypassrls=false e rolcanlogin=true.
+
+### Fluxos e integridade
+
+- Converter orçamento aceito em pedido e primeira conta a receber ocorre numa única transação. Um orçamento não pode gerar pedidos duplicados.
+- Registrar despesa e criar conta a pagar ocorre numa única transação.
+- Pagamentos são lançamentos imutáveis pelo fluxo normal do CRM. O banco bloqueia baixas maiores que o saldo, inclusive em requisições simultâneas.
+- Cancelar uma conta não apaga baixas nem despesas; a ação preserva o histórico.
+- Valores monetários são guardados em centavos inteiros; os formulários e Server Functions validam novamente os dados enviados pelo navegador.
+- As views novas usam security_invoker=true; o papel técnico recebe SELECT nas tabelas-base e nas próprias views.
+
+O login continua sendo o login próprio da aplicação (public.usuarios + public.perfis + cookie de sessão). Não misture esse fluxo com políticas que dependam de auth.uid() para autenticar usuários finais. O papel PostgreSQL restrito é apenas a identidade técnica do servidor; cada ação continua verificando o perfil do usuário autenticado na Server Function.
