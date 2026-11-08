@@ -57,7 +57,7 @@ function Profissionais() {
     })
   }
 
-  const save = () => {
+  const save = async () => {
     const parsed = parseDecimal(form.rate)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
       toast({ tone: 'erro', title: 'Custo inválido', body: 'Informe um custo padrão maior que zero.' })
@@ -78,7 +78,7 @@ function Profissionais() {
       demo: false,
     }
     try {
-      saveProfessional(professional)
+      await saveProfessional(professional)
       toast({ tone: 'ok', title: editingId ? 'Profissional atualizado' : 'Profissional cadastrado', body: professional.name })
       setForm(blank)
       setEditingId(null)
@@ -136,7 +136,7 @@ function Profissionais() {
         </div>
         <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
           {editingId && <Button onClick={() => { setEditingId(null); setForm(blank) }}>Cancelar edição</Button>}
-          <Button variant="primary" onClick={save}><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar profissional'}</Button>
+          <Button variant="primary" onClick={() => void save()}><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar profissional'}</Button>
         </div>
       </Card>
 
