@@ -24,7 +24,8 @@ export const Route = createFileRoute('/clientes')({
 function Clientes() {
   const { id, novo } = Route.useSearch()
   const navigate = useNavigate()
-  const { clients, sites, quotes } = useStore()
+  const { clients, sites, quotes, currentRole } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [q, setQ] = useState('')
   const [type, setType] = useState('')
   const [region, setRegion] = useState('')
@@ -32,8 +33,8 @@ function Clientes() {
   const [status, setStatus] = useState('ativos')
   const [creating, setCreating] = useState(false)
   useEffect(() => {
-    if (novo) setCreating(true)
-  }, [novo])
+    if (novo && canEdit) setCreating(true)
+  }, [novo, canEdit])
 
   const filtered = useMemo(() => {
     const t = q.trim().toLowerCase()
@@ -58,11 +59,11 @@ function Clientes() {
         eyebrow="Comercial"
         title="Clientes e obras"
         description="Localize clientes pelo nome, CPF/CNPJ ou telefone. Cada cliente pode ter várias obras."
-        actions={
+        actions={canEdit ? (
           <Button variant="primary" onClick={() => setCreating(true)}>
             <Plus className="h-4 w-4" /> Novo cliente
           </Button>
-        }
+        ) : undefined}
       />
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
         <MiniStat label="Clientes ativos" value={String(clients.filter((c) => c.active).length)} />
@@ -85,7 +86,7 @@ function Clientes() {
           </select>
         </div>
         {t.total === 0 ? (
-          <EmptyState icon={<Users className="h-6 w-6" />} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} action={<Button variant="primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Cadastrar cliente</Button>}>
+          <EmptyState icon={<Users className="h-6 w-6" />} title={clients.length ? 'Nenhum cliente encontrado' : 'Nenhum cliente cadastrado'} action={canEdit ? <Button variant="primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Cadastrar cliente</Button> : undefined}>
             {clients.length ? 'Ajuste a pesquisa ou os filtros.' : 'Cadastre o primeiro cliente para começar a orçar.'}
           </EmptyState>
         ) : (
@@ -133,14 +134,14 @@ function Clientes() {
         <Pagination {...t} />
       </Card>
 
-      <ClientForm
+      {canEdit && <ClientForm
         open={creating}
         onClose={() => {
           setCreating(false)
           if (novo) navigate({ to: '/clientes', search: {} })
         }}
         onCreated={(cid) => navigate({ to: '/clientes', search: { id: cid } })}
-      />
+      />}
       {selected && <ClientDetail client={selected} onClose={closeDetail} />}
     </>
   )
