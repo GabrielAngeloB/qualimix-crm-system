@@ -20,7 +20,7 @@ export const Route = createFileRoute('/agenda')({
 const statuses: ScheduleStatus[] = ['Planejada', 'Confirmada', 'Em preparação', 'Em execução', 'Concluída', 'Reagendada', 'Cancelada']
 
 function Agenda() {
-  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast, currentRole } = useStore()
+  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast, currentRole, views } = useStore()
   const canEditSchedule = currentRole === 'administrador' || currentRole === 'operacao'
   const [orderId, setOrderId] = useState('')
   const [date, setDate] = useState('')
@@ -30,6 +30,7 @@ function Agenda() {
   const [dateEdits, setDateEdits] = useState<Record<string, string>>({})
   const [timeEdits, setTimeEdits] = useState<Record<string, string>>({})
 
+  const scheduleSummaryById = useMemo(() => new Map(views.schedule.map((row) => [String(row.id), row])), [views.schedule])
   const plannedOrders = useMemo(() => workOrders.filter((order) => order.status !== 'Cancelada'), [workOrders])
   const sortedEvents = useMemo(() => [...scheduleEvents].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [scheduleEvents])
 
@@ -146,7 +147,7 @@ function Agenda() {
       <Card>
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-xl font-bold uppercase">Programações registradas</h2>
-          <p className="text-sm text-muted">{scheduleEvents.length} serviço(s) no calendário.</p>
+          <p className="text-sm text-muted">{views.schedule.length || scheduleEvents.length} serviço(s) no calendário.</p>
         </div>
         {sortedEvents.length === 0 ? (
           <EmptyState icon={<CalendarDays className="h-6 w-6" />} title="Agenda vazia">
@@ -171,6 +172,7 @@ function Agenda() {
                   const order = workOrders.find((item) => item.id === event.workOrderId)
                   const client = clients.find((item) => item.id === event.clientId)
                   const site = sites.find((item) => item.id === event.siteId)
+                  const scheduleSummary = scheduleSummaryById.get(event.id)
                   return (
                     <tr key={event.id} className="border-b border-line last:border-0 align-top">
                       <td className="px-4 py-3">
@@ -182,10 +184,10 @@ function Agenda() {
                           </div>
                         ) : <div className="min-w-[150px] py-2 font-medium tabular">{dateBR(event.date)} · {event.time}</div>}
                       </td>
-                      <td className="px-4 py-3"><strong className="block">{client?.name ?? '—'}</strong><span className="text-xs text-muted">{site?.name ?? '—'}</span></td>
+                      <td className="px-4 py-3"><strong className="block">{scheduleSummary?.cliente_nome ?? client?.name ?? '—'}</strong><span className="text-xs text-muted">{scheduleSummary?.obra_nome ?? site?.name ?? '—'}</span></td>
                       <td className="px-4 py-3">{event.service}<span className="block text-xs text-muted">{event.pump ? 'Com bombeamento' : 'Sem bombeamento'}</span>{event.notes && <span className="mt-1 block max-w-[220px] text-xs text-muted">{event.notes}</span>}</td>
                       <td className="px-4 py-3 tabular">{event.volumeM3 > 0 ? `${event.volumeM3.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m³` : '—'}<span className="block text-xs text-muted">{event.fck ? `FCK ${event.fck}` : '—'}</span></td>
-                      <td className="px-4 py-3"><strong>{order?.number ?? '—'}</strong><span className="block text-xs text-muted">{event.quoteId}</span></td>
+                      <td className="px-4 py-3"><strong>{scheduleSummary?.pedido_numero ?? order?.number ?? '—'}</strong><span className="block text-xs text-muted">{scheduleSummary?.orcamento_numero ?? event.quoteId}</span></td>
                               <td className="px-4 py-3">
                         {canEditSchedule
                           ? <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
