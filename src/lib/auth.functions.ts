@@ -203,7 +203,7 @@ export const bootstrapAdmin = createServerFn({ method: 'POST' })
     })
     if (error || !created.user) throw new Error('Não foi possível criar o administrador inicial.')
     const { error: profileError } = await admin.from('perfis').upsert({
-      id: created.user.id, nome: data.name, username: data.username, perfil: 'admin', ativo: true,
+      id: created.user.id, nome: data.name, username: data.username, perfil: 'admin', ativo: true, bootstrap_claim: true,
     }, { onConflict: 'id' })
     if (profileError) {
       await admin.auth.admin.deleteUser(created.user.id)
