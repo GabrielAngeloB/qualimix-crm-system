@@ -137,6 +137,20 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
     if (currentUserId) setDraft((current) => ({ ...current, ownerId: currentUserId }))
   }, [currentUserId])
 
+  useEffect(() => {
+    if (!ctx.catalog.length) return
+    const products = new Map(ctx.catalog.map((product) => [product.id, product]))
+    setDraft((current) => ({
+      ...current,
+      lines: current.lines.map((line) => {
+        const product = line.catalogId ? products.get(line.catalogId) : undefined
+        return product
+          ? { ...line, description: product.name, unit: product.unit, category: product.category }
+          : line
+      }),
+    }))
+  }, [ctx.catalog])
+
   // Carrega duplicação ou rascunho guardado neste navegador
   useEffect(() => {
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
