@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Clock, KanbanSquare, List, SquareKanban, TriangleAlert } from 'lucide-react'
+import { Bell, Clock, KanbanSquare, List, Plus, SquareKanban, TriangleAlert } from 'lucide-react'
 import { useStore } from '../data/store'
 import { funnelStages, leadSources, lossReasons, type StageId } from '../data/settings'
 import { today, type Opportunity } from '../data/fixtures'
@@ -26,7 +26,7 @@ function followUp(o: Opportunity) {
 }
 
 function Funil() {
-  const { opportunities, clients, updateOpportunity, toast, team } = useStore()
+  const { opportunities, clients, sites, updateOpportunity, createOpportunity, toast, team } = useStore()
   const [view, setView] = useState<'kanban' | 'tabela'>('kanban')
   const [owner, setOwner] = useState('')
   const [source, setSource] = useState('')
@@ -35,9 +35,17 @@ function Funil() {
   const [losing, setLosing] = useState<{ id: string; reason: string; note: string } | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
   const [detail, setDetail] = useState<string | null>(null)
+  const [newLeadOpen, setNewLeadOpen] = useState(false)
+  const [leadTitle, setLeadTitle] = useState('')
+  const [leadClientId, setLeadClientId] = useState('')
+  const [leadSiteId, setLeadSiteId] = useState('')
+  const [leadSource, setLeadSource] = useState<string>(leadSources[0])
+  const [leadValue, setLeadValue] = useState('')
+  const [leadSaving, setLeadSaving] = useState(false)
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
   const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
+  const leadSites = sites.filter((site) => site.clientId === leadClientId)
 
   const filtered = useMemo(
     () =>
@@ -50,6 +58,37 @@ function Funil() {
   const overdue = filtered.filter((o) => isOpen(o) && o.nextContact && daysBetween(today, o.nextContact) < 0)
   const todayList = filtered.filter((o) => isOpen(o) && o.nextContact && daysBetween(today, o.nextContact) === 0)
   const stale = filtered.filter((o) => isOpen(o) && (!o.lastContact || daysBetween(o.lastContact, today) >= STALE_DAYS))
+
+  const submitLead = async () => {
+    if (!leadClientId) {
+      toast({ tone: 'erro', title: 'Selecione um cliente', body: 'Cadastre o cliente antes de criar a oportunidade.' })
+      return
+    }
+    const estimatedValue = leadValue.trim() ? Number(leadValue) : null
+    if (estimatedValue !== null && (!Number.isFinite(estimatedValue) || estimatedValue < 0)) {
+      toast({ tone: 'erro', title: 'Valor estimado inválido' })
+      return
+    }
+    setLeadSaving(true)
+    try {
+      await createOpportunity({
+        title: leadTitle,
+        clientId: leadClientId,
+        siteId: leadSiteId || null,
+        source: leadSource,
+        estimatedValue,
+      })
+      setNewLeadOpen(false)
+      setLeadTitle('')
+      setLeadSiteId('')
+      setLeadValue('')
+      setLeadSource(leadSources[0])
+    } catch (error) {
+      toast({ tone: 'erro', title: 'Não foi possível criar o lead', body: error instanceof Error ? error.message : 'Erro inesperado.' })
+    } finally {
+      setLeadSaving(false)
+    }
+  }
 
   const move = (o: Opportunity, to: StageId) => {
     if (to === o.stage) return
@@ -68,7 +107,7 @@ function Funil() {
         eyebrow="Comercial"
         title="Funil comercial"
         description="Acompanhe cada oportunidade do primeiro contato ao fechamento. O fechamento é sempre uma ação explícita."
-        actions={<SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} />}
+        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadClientId(clients[0]?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
@@ -253,6 +292,21 @@ function Funil() {
         <p className="text-sm">Confirme que o cliente aceitou a proposta. Gerar ou enviar um orçamento não fecha a oportunidade automaticamente.</p>
       </Modal>
 
+      <Modal
+        open={newLeadOpen}
+        onClose={() => setNewLeadOpen(false)}
+        title="Cadastrar novo lead"
+        footer={<><Button variant="ghost" onClick={() => setNewLeadOpen(false)}>Cancelar</Button><Button variant="primary" disabled={leadSaving || !leadTitle.trim() || !leadClientId} onClick={() => void submitLead()}>{leadSaving ? 'Salvando…' : 'Salvar oportunidade'}</Button></>}
+      >
+        {clients.length === 0 ? <EmptyState icon={<KanbanSquare className="h-6 w-6" />} title="Cadastre um cliente primeiro">Uma oportunidade precisa estar vinculada a um cliente real.</EmptyState> : <div className="grid gap-3 sm:grid-cols-2">
+          <Field label="Título da oportunidade" className="sm:col-span-2">{(id) => <input id={id} autoFocus maxLength={180} className={inputCls()} value={leadTitle} onChange={(e) => setLeadTitle(e.target.value)} placeholder="Ex.: Concretagem da laje — obra nova" />}</Field>
+          <Field label="Cliente">{(id) => <select id={id} className={inputCls()} value={leadClientId} onChange={(e) => { setLeadClientId(e.target.value); setLeadSiteId('') }}><option value="">Selecione…</option>{clients.filter((client) => client.active).map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>}</Field>
+          <Field label="Obra (opcional)">{(id) => <select id={id} className={inputCls()} value={leadSiteId} onChange={(e) => setLeadSiteId(e.target.value)}><option value="">Sem obra definida</option>{leadSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>}</Field>
+          <Field label="Origem do lead">{(id) => <select id={id} className={inputCls()} value={leadSource} onChange={(e) => setLeadSource(e.target.value)}>{leadSources.map((source) => <option key={source} value={source}>{source}</option>)}</select>}</Field>
+          <Field label="Valor estimado (opcional)">{(id) => <input id={id} type="number" min="0" step="0.01" className={inputCls()} value={leadValue} onChange={(e) => setLeadValue(e.target.value)} placeholder="0,00" />}</Field>
+          <p className="text-xs text-muted sm:col-span-2">O lead será criado na etapa “Novo”, vinculado ao usuário autenticado e salvo diretamente no PostgreSQL.</p>
+        </div>}
+      </Modal>
       {selected && <OpportunityDrawer o={selected} onClose={() => setDetail(null)} clientName={clientName(selected.clientId)} onMove={(to) => move(selected, to)} userName={ownerName} />}
     </>
   )
