@@ -27,7 +27,7 @@ function followUp(o: Opportunity) {
 }
 
 function Funil() {
-  const { opportunities, clients, sites, updateOpportunity, createOpportunity, toast, team, currentRole } = useStore()
+  const { opportunities, clients, sites, updateOpportunity, createOpportunity, toast, team, currentRole, views, demoMode } = useStore()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [view, setView] = useState<'kanban' | 'tabela'>('kanban')
   const [owner, setOwner] = useState('')
@@ -155,7 +155,11 @@ function Funil() {
           <div className="grid auto-cols-[270px] grid-flow-col gap-3">
             {funnelStages.map((s, idx) => {
               const items = filtered.filter((o) => o.stage === s.id)
-              const total = items.reduce((a, o) => a + (o.estimatedValue ?? 0), 0)
+              const databaseSummary = !demoMode && !owner && !source && !period
+                ? views.funnel.find((row) => row.etapa === s.id)
+                : undefined
+              const itemCount = databaseSummary ? Number(databaseSummary.quantidade ?? 0) : items.length
+              const total = databaseSummary ? Number(databaseSummary.valor_estimado ?? 0) : items.reduce((a, o) => a + (o.estimatedValue ?? 0), 0)
               return (
                 <section key={s.id} aria-label={s.label} className={cx('flex min-h-[320px] flex-col rounded-lg border border-line bg-surface-2', s.id === 'fechado' && 'border-ok/30', s.id === 'perdido' && 'opacity-80')}>
                   <header className="border-b border-line px-3 py-3">
@@ -164,7 +168,7 @@ function Funil() {
                         <span className="mr-1 text-muted">{idx + 1}.</span>
                         {s.label}
                       </h2>
-                      <span className="rounded bg-ink px-1.5 text-xs font-bold text-bg">{items.length}</span>
+                      <span className="rounded bg-ink px-1.5 text-xs font-bold text-bg">{itemCount}</span>
                     </div>
                     <p className="text-xs text-muted tabular">{total ? `${brl(total)} estimados` : '—'}</p>
                   </header>
