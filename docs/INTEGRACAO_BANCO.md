@@ -160,4 +160,4 @@ Esses itens não são falhas de conexão do banco; são funcionalidades/telas qu
 - O advisor de segurança do Supabase reportou: funções `has_role` e `is_active_user` SECURITY DEFINER executáveis por `authenticated` (utilizadas pelas policies existentes); proteção de senha vazada desativada no Supabase Auth; e `private.tabelas_exclusao` com RLS sem policy.
 - O advisor de performance reportou 24 FKs sem índice de cobertura e 31 índices sem uso observado. Nenhum índice foi removido. A criação de índices adicionais exige análise de workload e janela de escrita.
 
-A integração das páginas não deve ser considerada homologada em produção até CI, testes locais e fluxo de homologação com massa de teste isolada concluírem com sucesso.
+O CI do último commit foi concluído com sucesso: instalação, build de produção (`pnpm typecheck`, que executa Vite build + `tsc --noEmit`) e `pnpm test`. `pnpm lint` continua falhando pela dívida global de formatação descrita acima. A integração ainda precisa de homologação ponta a ponta em ambiente isolado antes de ser considerada pronta para produção.
