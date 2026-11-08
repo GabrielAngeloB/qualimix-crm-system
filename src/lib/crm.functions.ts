@@ -94,10 +94,11 @@ export type CrmData = {
   products: CatalogItem[]
   team: TeamUser[]
   views: CrmViews
+  currentUserId: string
 }
 
 export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): Promise<CrmData> => {
-  await requireCurrentProfile()
+  const currentProfile = await requireCurrentProfile()
   const db = getPool()
   const [clients, sites, opportunities, quotes, products, profiles, clientView, funnelView, quoteView, fleetView] = await Promise.all([
     db.query('SELECT * FROM public.clientes WHERE is_demo = false ORDER BY created_at DESC'),
@@ -135,6 +136,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
       quotes: quoteView.rows,
       fleet: fleetView.rows,
     },
+    currentUserId: currentProfile.id,
   }
 })
 
