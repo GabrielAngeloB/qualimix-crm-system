@@ -14,6 +14,8 @@ import {
 import { assertSameOrigin, requireCurrentProfile, type AuthProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
 import { onlyDigits } from './documents'
+import { addDays } from './format'
+import { todayInSaoPaulo } from './clock'
 import { isValidIsoDate, normalizeBrazilPhone, parseOptionalAmount, validateClientFields, validateLeadFields, validateOptionalDecimal } from './crm-validation'
 
 const isoDate = (value: unknown): string => {
@@ -646,7 +648,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
       extras: data.extras, paymentMethodIds: data.paymentMethodIds,
     }, ctx)
 
-    const validUntil = new Date(Date.now() + data.validityDays * 86_400_000).toISOString().slice(0,10)
+    const validUntil = addDays(todayInSaoPaulo(), data.validityDays)
     const savedInput = {
       volumeElements: data.volumeElements, volumeMargin: data.volumeMargin,
       areaElements: data.areaElements, areaMargin: data.areaMargin, lines,

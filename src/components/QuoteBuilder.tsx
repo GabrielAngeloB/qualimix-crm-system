@@ -26,12 +26,12 @@ import {
   type QuoteExtras,
   type QuoteLine,
 } from '../lib/quote'
-import { addDays, brl, brlCents, dateBR, daysBetween, num, parseDecimal } from '../lib/format'
+import { addDays, brl, brlCents, dateBR, daysBetween, num, parseDecimal, timeBR } from '../lib/format'
 import { formatPhone } from '../lib/documents'
 import { useStore } from '../data/store'
 import { categoryLabel } from '../data/settings'
 import { type QuoteRecord, type QuoteType } from '../data/fixtures'
-import { today } from '../lib/clock'
+import { todayInSaoPaulo } from '../lib/clock'
 import { displayUserName, localUserId } from '../data/session'
 import { MeasureCalculator, blankElement, newId } from './MeasureCalculator'
 import { ProposalModal, WhatsAppDialog } from './QuoteShare'
@@ -133,6 +133,7 @@ function fromRecord(q: QuoteRecord, validityDays: number | null, copy = true): D
 
 export function QuoteBuilder({ origin, opportunityId, editQuoteId }: { origin?: string; opportunityId?: string; editQuoteId?: string }) {
   const { clients, sites, quotes, opportunities, ctx, settings, settingsReady, demoMode, toast, addQuote, updateQuote, workspaceReady } = useStore()
+  const today = todayInSaoPaulo()
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, settings.catalog))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
@@ -199,8 +200,7 @@ export function QuoteBuilder({ origin, opportunityId, editQuoteId }: { origin?: 
     if (!loaded || savedQuoteId) return
     const t = setTimeout(() => {
       localStorage.setItem(DRAFT_KEY, JSON.stringify(draft))
-      const d = new Date()
-      setSavedAt(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`)
+      setSavedAt(timeBR(new Date()))
     }, 500)
     return () => clearTimeout(t)
   }, [draft, loaded, savedQuoteId])
