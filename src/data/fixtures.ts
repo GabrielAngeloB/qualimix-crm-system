@@ -12,6 +12,7 @@ import {
   type MeasureElement,
   type QuoteExtras,
   type QuoteLine,
+  type QuoteResult,
 } from '../lib/quote'
 import { catalog, type QuoteStatus, type StageId } from './settings'
 
@@ -119,6 +120,9 @@ export interface QuoteRecord {
   executionDeadline: string
   notes: string
   demo: boolean
+  /** Snapshot persistido pelo servidor: mantém o valor original mesmo se o catálogo mudar. */
+  savedResult?: QuoteResult | null
+  savedFck?: number | null
 }
 
 let seq = 0
