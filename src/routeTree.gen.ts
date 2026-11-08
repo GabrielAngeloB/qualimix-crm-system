@@ -11,13 +11,16 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AgendaRouteImport } from './routes/agenda'
+import { Route as BootstrapRouteImport } from './routes/bootstrap'
 import { Route as ClientesRouteImport } from './routes/clientes'
 import { Route as ConfiguracoesRouteImport } from './routes/configuracoes'
 import { Route as FinanceiroRouteImport } from './routes/financeiro'
 import { Route as FunilRouteImport } from './routes/funil'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProfissionaisRouteImport } from './routes/profissionais'
 import { Route as TarefasRouteImport } from './routes/tarefas'
+import { Route as UsuariosRouteImport } from './routes/usuarios'
 import { Route as OrcamentosIndexRouteImport } from './routes/orcamentos.index'
 import { Route as OrcamentosNovoRouteImport } from './routes/orcamentos.novo'
 
@@ -29,6 +32,11 @@ const IndexRoute = IndexRouteImport.update({
 const AgendaRoute = AgendaRouteImport.update({
   id: '/agenda',
   path: '/agenda',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BootstrapRoute = BootstrapRouteImport.update({
+  id: '/bootstrap',
+  path: '/bootstrap',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ClientesRoute = ClientesRouteImport.update({
@@ -51,6 +59,11 @@ const FunilRoute = FunilRouteImport.update({
   path: '/funil',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PedidosRoute = PedidosRouteImport.update({
   id: '/pedidos',
   path: '/pedidos',
@@ -64,6 +77,11 @@ const ProfissionaisRoute = ProfissionaisRouteImport.update({
 const TarefasRoute = TarefasRouteImport.update({
   id: '/tarefas',
   path: '/tarefas',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UsuariosRoute = UsuariosRouteImport.update({
+  id: '/usuarios',
+  path: '/usuarios',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OrcamentosIndexRoute = OrcamentosIndexRouteImport.update({
@@ -80,26 +98,32 @@ const OrcamentosNovoRoute = OrcamentosNovoRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/bootstrap': typeof BootstrapRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
+  '/login': typeof LoginRoute
   '/pedidos': typeof PedidosRoute
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
+  '/usuarios': typeof UsuariosRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos/': typeof OrcamentosIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/bootstrap': typeof BootstrapRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
+  '/login': typeof LoginRoute
   '/pedidos': typeof PedidosRoute
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
+  '/usuarios': typeof UsuariosRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos': typeof OrcamentosIndexRoute
 }
@@ -107,13 +131,16 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
+  '/bootstrap': typeof BootstrapRoute
   '/clientes': typeof ClientesRoute
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
+  '/login': typeof LoginRoute
   '/pedidos': typeof PedidosRoute
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
+  '/usuarios': typeof UsuariosRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos/': typeof OrcamentosIndexRoute
 }
@@ -122,39 +149,48 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/agenda'
+    | '/bootstrap'
     | '/clientes'
     | '/configuracoes'
     | '/financeiro'
     | '/funil'
+    | '/login'
     | '/pedidos'
     | '/profissionais'
     | '/tarefas'
+    | '/usuarios'
     | '/orcamentos/novo'
     | '/orcamentos/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/agenda'
+    | '/bootstrap'
     | '/clientes'
     | '/configuracoes'
     | '/financeiro'
     | '/funil'
+    | '/login'
     | '/pedidos'
     | '/profissionais'
     | '/tarefas'
+    | '/usuarios'
     | '/orcamentos/novo'
     | '/orcamentos'
   id:
     | '__root__'
     | '/'
     | '/agenda'
+    | '/bootstrap'
     | '/clientes'
     | '/configuracoes'
     | '/financeiro'
     | '/funil'
+    | '/login'
     | '/pedidos'
     | '/profissionais'
     | '/tarefas'
+    | '/usuarios'
     | '/orcamentos/novo'
     | '/orcamentos/'
   fileRoutesById: FileRoutesById
@@ -162,13 +198,16 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
+  BootstrapRoute: typeof BootstrapRoute
   ClientesRoute: typeof ClientesRoute
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FunilRoute: typeof FunilRoute
+  LoginRoute: typeof LoginRoute
   PedidosRoute: typeof PedidosRoute
   ProfissionaisRoute: typeof ProfissionaisRoute
   TarefasRoute: typeof TarefasRoute
+  UsuariosRoute: typeof UsuariosRoute
   OrcamentosNovoRoute: typeof OrcamentosNovoRoute
   OrcamentosIndexRoute: typeof OrcamentosIndexRoute
 }
@@ -187,6 +226,13 @@ declare module '@tanstack/react-router' {
       path: '/agenda'
       fullPath: '/agenda'
       preLoaderRoute: typeof AgendaRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/bootstrap': {
+      id: '/bootstrap'
+      path: '/bootstrap'
+      fullPath: '/bootstrap'
+      preLoaderRoute: typeof BootstrapRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/clientes': {
@@ -217,6 +263,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof FunilRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/pedidos': {
       id: '/pedidos'
       path: '/pedidos'
@@ -236,6 +289,13 @@ declare module '@tanstack/react-router' {
       path: '/tarefas'
       fullPath: '/tarefas'
       preLoaderRoute: typeof TarefasRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/usuarios': {
+      id: '/usuarios'
+      path: '/usuarios'
+      fullPath: '/usuarios'
+      preLoaderRoute: typeof UsuariosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/orcamentos/': {
@@ -258,13 +318,16 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
+  BootstrapRoute: BootstrapRoute,
   ClientesRoute: ClientesRoute,
   ConfiguracoesRoute: ConfiguracoesRoute,
   FinanceiroRoute: FinanceiroRoute,
   FunilRoute: FunilRoute,
+  LoginRoute: LoginRoute,
   PedidosRoute: PedidosRoute,
   ProfissionaisRoute: ProfissionaisRoute,
   TarefasRoute: TarefasRoute,
+  UsuariosRoute: UsuariosRoute,
   OrcamentosNovoRoute: OrcamentosNovoRoute,
   OrcamentosIndexRoute: OrcamentosIndexRoute,
 }

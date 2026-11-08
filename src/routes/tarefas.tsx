@@ -38,7 +38,8 @@ const blankForm = {
 
 function Tarefas() {
   const search = Route.useSearch()
-  const { tasks, opportunities, clients, saveTask, toast } = useStore()
+  const { tasks, opportunities, clients, saveTask, toast, currentRole, views } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade)
   const [form, setForm] = useState(() => ({
     ...blankForm,
@@ -54,12 +55,19 @@ function Tarefas() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<Filter>('pendentes')
 
-  const counts = useMemo(() => ({
-    pending: tasks.filter((task) => task.status === 'Pendente').length,
-    overdue: tasks.filter((task) => task.status === 'Pendente' && task.dueDate && task.dueDate < today).length,
-    today: tasks.filter((task) => task.status === 'Pendente' && task.dueDate === today).length,
-    completed: tasks.filter((task) => task.status === 'Concluída').length,
-  }), [tasks])
+  const counts = useMemo(() => views.tasks.length > 0
+    ? {
+        pending: views.tasks.filter((row) => row.status === 'Pendente').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0),
+        overdue: views.tasks.reduce((sum, row) => sum + Number(row.atrasadas ?? 0), 0),
+        today: views.tasks.reduce((sum, row) => sum + Number(row.para_hoje ?? 0), 0),
+        completed: views.tasks.filter((row) => row.status === 'Concluída').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0),
+      }
+    : {
+        pending: tasks.filter((task) => task.status === 'Pendente').length,
+        overdue: tasks.filter((task) => task.status === 'Pendente' && task.dueDate < today).length,
+        today: tasks.filter((task) => task.status === 'Pendente' && task.dueDate === today).length,
+        completed: tasks.filter((task) => task.status === 'Concluída').length,
+      }, [tasks, views.tasks])
 
   const visibleTasks = useMemo(() => tasks
     .filter((task) => {
@@ -68,7 +76,7 @@ function Tarefas() {
       if (filter === 'canceladas') return task.status === 'Cancelada'
       return true
     })
-    .sort((a, b) => ((a.dueDate || '9999-12-31') + (a.dueTime ?? '23:59')).localeCompare((b.dueDate || '9999-12-31') + (b.dueTime ?? '23:59'))), [tasks, filter])
+    .sort((a, b) => (a.dueDate + (a.dueTime ?? '23:59')).localeCompare(b.dueDate + (b.dueTime ?? '23:59'))), [tasks, filter])
 
   const resetForm = () => {
     setForm(blankForm)
@@ -89,7 +97,7 @@ function Tarefas() {
     setShowForm(true)
   }
 
-  const submitTask = () => {
+  const submitTask = async () => {
     const existing = tasks.find((task) => task.id === editingId)
     const task: CommercialTask = {
       id: editingId ?? 'task-' + crypto.randomUUID(),
@@ -105,7 +113,7 @@ function Tarefas() {
       demo: false,
     }
     try {
-      saveTask(task)
+      await saveTask(task)
       toast({ tone: 'ok', title: editingId ? 'Tarefa atualizada' : 'Tarefa agendada', body: task.title })
       resetForm()
     } catch (error) {
@@ -113,9 +121,9 @@ function Tarefas() {
     }
   }
 
-  const changeStatus = (task: CommercialTask, status: CommercialTaskStatus) => {
+  const changeStatus = async (task: CommercialTask, status: CommercialTaskStatus) => {
     try {
-      saveTask({
+      await saveTask({
         ...task,
         status,
         completedAt: status === 'Concluída' ? new Date().toISOString() : null,
@@ -137,7 +145,6 @@ function Tarefas() {
     if (state === 'Atrasada') return 'Atrasada'
     if (state === 'Hoje') return 'Hoje'
     if (state === 'Futura') return 'Agendada'
-    if (state === 'Sem prazo') return 'Sem prazo'
     return state
   }
   const stateTone = (task: CommercialTask) => {
@@ -151,7 +158,7 @@ function Tarefas() {
         eyebrow="Comercial"
         title="Tarefas e retornos"
         description="Organize os próximos passos, acompanhe prazos e mantenha o histórico de retorno das oportunidades."
-        actions={<Button variant="primary" onClick={() => { setEditingId(null); setForm(blankForm); setShowForm((value) => !value) }}><Plus className="h-4 w-4" /> Nova tarefa</Button>}
+        actions={canEdit ? <Button variant="primary" onClick={() => { setEditingId(null); setForm(blankForm); setShowForm((value) => !value) }}><Plus className="h-4 w-4" /> Nova tarefa</Button> : undefined}
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -173,7 +180,7 @@ function Tarefas() {
         </div>
       </div>
 
-      {showForm && (
+      {canEdit && showForm && (
         <Card className="mb-6">
           <CardHeader title={editingId ? 'Editar tarefa' : 'Nova tarefa'} subtitle="A tarefa pode ser geral ou vinculada a uma oportunidade do funil." />
           <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -198,7 +205,7 @@ function Tarefas() {
                 <option value="Alta">Alta</option>
               </select>}
             </Field>
-            <Field label="Data de vencimento (opcional)" hint="Sem data, a tarefa aparece como Sem prazo e não entra nos alertas de atraso.">
+            <Field label="Data de vencimento" required>
               {(id) => <input id={id} type="date" className={inputCls()} value={form.dueDate} onChange={(event) => setForm((current) => ({ ...current, dueDate: event.target.value }))} />}
             </Field>
             <Field label="Horário (opcional)">
@@ -210,7 +217,7 @@ function Tarefas() {
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
             <Button onClick={resetForm}>Cancelar</Button>
-            <Button variant="primary" disabled={form.title.trim().length < 3} onClick={submitTask}>Salvar tarefa</Button>
+            <Button variant="primary" disabled={form.title.trim().length < 3 || !form.dueDate} onClick={() => void submitTask()}>Salvar tarefa</Button>
           </div>
         </Card>
       )}
@@ -247,7 +254,7 @@ function Tarefas() {
                       <Badge tone={task.priority === 'Alta' ? 'warn' : 'neutral'}>Prioridade {task.priority.toLowerCase()}</Badge>
                     </div>
                     <p className="mt-1 text-sm text-muted">
-                      {task.dueDate ? dateBR(task.dueDate) : 'Sem prazo'}{task.dueTime ? ' · ' + task.dueTime : task.dueDate ? ' · Sem horário definido' : ''}
+                      {dateBR(task.dueDate)}{task.dueTime ? ' · ' + task.dueTime : ' · Sem horário definido'}
                       {opportunity ? ' · ' + opportunity.title : ' · Tarefa geral'}
                       {client ? ' · ' + client.name : ''}
                     </p>
@@ -257,11 +264,11 @@ function Tarefas() {
                     {task.status === 'Pendente' && (
                       <>
                         <Button size="sm" onClick={() => editTask(task)}>Editar</Button>
-                        <Button size="sm" variant="primary" onClick={() => changeStatus(task, 'Concluída')}><Check className="h-4 w-4" /> Concluir</Button>
-                        <Button size="sm" variant="danger" onClick={() => changeStatus(task, 'Cancelada')}><XCircle className="h-4 w-4" /> Cancelar</Button>
+                        <Button size="sm" variant="primary" onClick={() => void changeStatus(task, 'Concluída')}><Check className="h-4 w-4" /> Concluir</Button>
+                        <Button size="sm" variant="danger" onClick={() => void changeStatus(task, 'Cancelada')}><XCircle className="h-4 w-4" /> Cancelar</Button>
                       </>
                     )}
-                    {task.status === 'Concluída' && <Button size="sm" onClick={() => changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
+                    {canEdit && task.status === 'Concluída' && <Button size="sm" onClick={() => void changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
                     {opportunity && <Link to="/funil" className="inline-flex h-8 items-center px-2 text-sm font-semibold text-brand hover:underline">Ver funil</Link>}
                   </div>
                 </article>

@@ -1,10 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Copy, Eye, FileText, MessageCircle, Pencil, Plus, Search, Trash2 } from 'lucide-react'
+import { Copy, Eye, FileText, MessageCircle, Plus, Search } from 'lucide-react'
 import { useStore } from '../data/store'
-import { quoteStatuses } from '../data/settings'
-import { today } from '../lib/clock'
-import { displayUserName } from '../data/session'
+import { paymentMethods, quoteStatuses } from '../data/settings'
+import { today } from '../data/fixtures'
 import type { EvaluatedQuote } from '../data/derived'
 import { summarizeMeasures } from '../lib/quote'
 import { brlCents, dateBR, daysBetween, num } from '../lib/format'
@@ -16,20 +15,14 @@ import type { ProposalData } from '../components/ProposalDocument'
 
 export const Route = createFileRoute('/orcamentos/')({
   validateSearch: (s: Record<string, unknown>): { q?: string } => ({ q: typeof s.q === 'string' ? s.q : undefined }),
-  head: () => ({
-    meta: [
-      { title: 'Orçamentos — Qualimix CRM' },
-      { name: 'description', content: 'Pesquise, filtre e duplique orçamentos de concreto usinado e pisos e veja cada proposta.' },
-      { property: 'og:title', content: 'Orçamentos — Qualimix CRM' },
-      { property: 'og:description', content: 'Lista de orçamentos da Qualimix com filtros e propostas.' },
-    ],
-  }),
+  head: () => ({ meta: [{ title: 'Orçamentos — Qualimix CRM' }] }),
   component: Orcamentos,
 })
 
 function Orcamentos() {
   const { q: initialQ } = Route.useSearch()
-  const { quotes, clients, sites, updateQuoteStatus, removeDraftQuote, toast, settings } = useStore()
+  const { quotes, clients, sites, demoMode, team, currentRole, views } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [q, setQ] = useState(initialQ ?? '')
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
@@ -37,7 +30,13 @@ function Orcamentos() {
   const [wa, setWa] = useState<ProposalData | null>(null)
   useEffect(() => setQ(initialQ ?? ''), [initialQ])
 
+  const quoteSummaryById = useMemo(() => new Map(views.quotes.map((row) => [String(row.id), row])), [views.quotes])
+  const quoteTotalCents = (quote: EvaluatedQuote) => {
+    const summary = quoteSummaryById.get(quote.id)
+    return summary?.total_centavos == null ? quote.result.totalCents : Number(summary.total_centavos)
+  }
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
+  const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? '—'
 
   const filtered = useMemo(() => {
@@ -50,7 +49,7 @@ function Orcamentos() {
     )
   }, [quotes, q, status, type]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const t = useSortPage(filtered, { number: (x) => x.number, date: (x) => x.createdAt, client: (x) => clientName(x.clientId), total: (x) => x.result.totalCents ?? -1, status: (x) => x.status }, { key: 'number', dir: 'desc' })
+  const t = useSortPage(filtered, { number: (x) => x.number, date: (x) => x.createdAt, client: (x) => clientName(x.clientId), total: (x) => quoteTotalCents(x) ?? -1, status: (x) => x.status }, { key: 'number', dir: 'desc' })
 
   const toProposal = (x: EvaluatedQuote): ProposalData => ({
     number: x.number,
@@ -59,12 +58,12 @@ function Orcamentos() {
     validUntil: x.validUntil,
     client: clients.find((c) => c.id === x.clientId),
     site: sites.find((s) => s.id === x.siteId),
-    ownerName: displayUserName(x.ownerId),
+    ownerName: ownerName(x.ownerId),
     lines: x.lines,
     result: x.result,
     volume: summarizeMeasures(x.volumeElements, x.volumeMargin, 'volume'),
     area: summarizeMeasures(x.areaElements, x.areaMargin, 'area'),
-    payments: x.paymentMethodIds.map((id) => settings.paymentMethods.find((m) => m.id === id)?.label ?? id),
+    payments: x.paymentMethodIds.map((id) => paymentMethods.find((m) => m.id === id)?.label ?? id),
     paymentTerms: x.paymentTerms,
     executionDeadline: x.executionDeadline,
     notes: x.notes,
@@ -73,9 +72,9 @@ function Orcamentos() {
   })
 
   const open = quotes.filter((x) => x.status === 'Enviado ao cliente' || x.status === 'Em negociação')
-  const openCents = open.reduce((s, x) => s + (x.result.totalCents ?? 0), 0)
+  const openCents = open.reduce((s, x) => s + (quoteTotalCents(x) ?? 0), 0)
   const waiting = quotes.filter((x) => x.status === 'Aguardando aprovação').length
-  const expiring = quotes.filter((x) => (x.status === 'Enviado ao cliente' || x.status === 'Em negociação') && x.validUntil && daysBetween(today, x.validUntil) <= 3).length
+  const expiring = quotes.filter((x) => (x.status === 'Enviado ao cliente' || x.status === 'Em negociação') && daysBetween(today, x.validUntil) <= 3).length
 
   return (
     <>
@@ -83,11 +82,11 @@ function Orcamentos() {
         eyebrow="Comercial"
         title="Orçamentos"
         description="Concreto usinado, pisos e orçamentos combinados. Cada número é contado uma única vez, independentemente das versões."
-        actions={
+        actions={canEdit ? (
           <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
             <Plus className="h-4 w-4" /> Novo orçamento
           </Link>
-        }
+        ) : undefined}
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -116,7 +115,7 @@ function Orcamentos() {
 
         {t.total === 0 ? (
           <EmptyState icon={<FileText className="h-6 w-6" />} title={quotes.length ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento ainda'} action={<Link to="/orcamentos/novo" className="font-semibold text-brand hover:underline">Criar o primeiro orçamento</Link>}>
-            {quotes.length ? 'Ajuste a pesquisa ou os filtros.' : 'Crie um orçamento para começar.'}
+            {quotes.length ? 'Ajuste a pesquisa ou os filtros.' : demoMode ? '' : 'Os dados de demonstração estão ocultos. Crie um orçamento para começar.'}
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -143,7 +142,7 @@ function Orcamentos() {
                       </td>
                       <td className="px-4 py-3 tabular">
                         {dateBR(x.createdAt)}
-                        <span className="block text-xs text-muted">{x.validUntil ? `Válido até ${dateBR(x.validUntil)}` : 'Validade pendente'}</span>
+                        <span className="block text-xs text-muted">Válido até {dateBR(x.validUntil)}</span>
                       </td>
                       <td className="max-w-[260px] px-4 py-3">
                         <span className="block truncate font-semibold">{clientName(x.clientId)}</span>
@@ -153,47 +152,17 @@ function Orcamentos() {
                         {x.result.concreteVolume > 0 && <span className="block">{num(x.result.concreteVolume, 2)} m³{x.fck ? ` · FCK ${x.fck}` : ''}</span>}
                         {x.result.floorArea > 0 && <span className="block">{num(x.result.floorArea, 2)} m²</span>}
                       </td>
-                      <td className={cx('px-4 py-3 text-right font-display text-lg font-bold tabular', x.result.totalCents === null && 'text-warn')}>{brlCents(x.result.totalCents)}</td>
+                      <td className={cx('px-4 py-3 text-right font-display text-lg font-bold tabular', x.result.totalCents === null && 'text-warn')}>{brlCents(quoteTotalCents(x))}</td>
                       <td className="px-4 py-3">
-                        {x.demo ? (
-                          <Badge tone={statusTone(x.status)}>{x.status}</Badge>
-                        ) : (
-                          <select
-                            aria-label={`Atualizar status de ${x.number}`}
-                            className={cx(inputCls(), 'h-9 min-w-[170px] text-xs')}
-                            value={x.status}
-                            onChange={(event) => {
-                              updateQuoteStatus(x.id, event.target.value as (typeof quoteStatuses)[number])
-                              toast({ tone: 'info', title: 'Status do orçamento atualizado', body: x.number })
-                            }}
-                          >
-                            {quoteStatuses.map((option) => <option key={option} value={option}>{option}</option>)}
-                          </select>
-                        )}
+                        <Badge tone={statusTone(x.status)}>{x.status}</Badge>
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <IconBtn label="Ver proposta" onClick={() => setPreview(p)}><Eye className="h-4 w-4" /></IconBtn>
                           <IconBtn label="Compartilhar no WhatsApp" onClick={() => setWa(p)}><MessageCircle className="h-4 w-4" /></IconBtn>
-                          {!x.demo && x.status === 'Rascunho' && (
-                            <>
-                              <Link to="/orcamentos/novo" search={{ editar: x.id }} title="Editar rascunho" aria-label="Editar rascunho" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
-                                <Pencil className="h-4 w-4" />
-                              </Link>
-                              <IconBtn label="Excluir rascunho" onClick={() => {
-                                if (!confirm('Excluir este rascunho? Ele só pode ser removido se ainda não tiver pedido, agenda ou lançamento financeiro associado.')) return
-                                try {
-                                  removeDraftQuote(x.id)
-                                  toast({ tone: 'ok', title: 'Rascunho excluído', body: x.number })
-                                } catch (error) {
-                                  toast({ tone: 'erro', title: 'Não foi possível excluir', body: error instanceof Error ? error.message : 'O rascunho pode possuir vínculos.' })
-                                }
-                              }}><Trash2 className="h-4 w-4" /></IconBtn>
-                            </>
-                          )}
-                          <Link to="/orcamentos/novo" search={{ origem: x.id }} title="Duplicar com preços atuais" aria-label="Duplicar com preços atuais" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
+                          {canEdit && <Link to="/orcamentos/novo" search={{ origem: x.id }} title="Duplicar com preços atuais" aria-label="Duplicar com preços atuais" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
                             <Copy className="h-4 w-4" />
-                          </Link>
+                          </Link>}
                         </div>
                       </td>
                     </tr>
