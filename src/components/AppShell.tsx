@@ -2,11 +2,11 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Building2,
+  Bell,
   CalendarDays,
   ClipboardList,
   FileText,
   LayoutDashboard,
-  LogOut,
   Menu,
   Moon,
   Search,
@@ -18,32 +18,31 @@ import {
   X,
 } from 'lucide-react'
 import { useStore } from '../data/store'
-import { getAuthSession, logout } from '../lib/auth.functions'
 import { formatDocument, onlyDigits } from '../lib/documents'
 import { LogoSlot, Toaster, cx } from './ui'
 
-type NavItem = { label: string; icon: typeof Users; to?: string; soon?: string; roles?: string[] }
+type NavItem = { label: string; icon: typeof Users; to?: string; soon?: string }
 const nav: { group: string; items: NavItem[] }[] = [
   { group: 'Visão geral', items: [{ label: 'Painel', icon: LayoutDashboard, to: '/' }] },
   {
     group: 'Comercial',
     items: [
-      { label: 'Clientes e obras', icon: Users, to: '/clientes', roles: ['comercial', 'consulta'] },
-      { label: 'Funil comercial', icon: SquareKanban, to: '/funil', roles: ['comercial', 'consulta'] },
-      { label: 'Tarefas e retornos', icon: ClipboardList, to: '/tarefas', roles: ['comercial', 'consulta'] },
-      { label: 'Orçamentos', icon: FileText, to: '/orcamentos', roles: ['comercial', 'consulta'] },
+      { label: 'Clientes e obras', icon: Users, to: '/clientes' },
+      { label: 'Funil comercial', icon: SquareKanban, to: '/funil' },
+      { label: 'Tarefas e retornos', icon: Bell, to: '/tarefas' },
+      { label: 'Orçamentos', icon: FileText, to: '/orcamentos' },
     ],
   },
   {
     group: 'Operação',
     items: [
-      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos', roles: ['comercial', 'operacao', 'consulta'] },
-      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda', roles: ['operacao', 'consulta'] },
-      { label: 'Profissionais', icon: Users, to: '/profissionais', roles: ['operacao', 'financeiro', 'consulta'] },
+      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos' },
+      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda' },
+      { label: 'Profissionais', icon: Users, to: '/profissionais' },
     ],
   },
-  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro', roles: ['financeiro', 'consulta'] }] },
-  { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }, { label: 'Usuários', icon: Users, to: '/usuarios' }] },
+  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro' }] },
+  { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }] },
 ]
 
 function useTheme() {
@@ -63,17 +62,7 @@ function useTheme() {
 export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const path = useRouterState({ select: (s) => s.location.pathname })
-  const { demoMode, setDemoMode, loading } = useStore()
-  const showDemoToggle = import.meta.env.DEV
   const { theme, toggle } = useTheme()
-  const navigate = useNavigate()
-  const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string; role: string } | null>(null)
-  useEffect(() => {
-    void getAuthSession().then((session: { profile: { nome: string; perfil: 'admin' | 'user'; username: string; role: string } | null }) => {
-      setProfile(session.profile ?? null)
-    })
-  }, [])
-  const signOut = async () => { await logout(); await navigate({ to: '/login' }) }
 
   useEffect(() => setMenuOpen(false), [path])
 
@@ -90,7 +79,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div key={g.group} className="mb-5">
             <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{g.group}</p>
             <ul className="space-y-0.5">
-              {g.items.filter((it) => profile?.role === 'administrador' || (it.roles ? it.roles.includes(profile?.role ?? '') : false)).map((it) => {
+              {g.items.map((it) => {
                 const active = it.to && (it.to === '/' ? path === '/' : path.startsWith(it.to))
                 const inner = (
                   <>
@@ -124,16 +113,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ))}
       </div>
-      {showDemoToggle && <div className="border-t border-white/10 p-4">
-        <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-          <span>
-            <span className="block font-semibold">Dados de demonstração</span>
-            <span className="block text-xs text-white/45">{demoMode ? 'Fictícios visíveis' : 'Ocultos'}</span>
-          </span>
-          <input type="checkbox" className="peer sr-only" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} />
-          <span className="relative h-6 w-11 shrink-0 rounded-full bg-white/20 transition peer-checked:bg-brand after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-brand" />
-        </label>
-      </div>}
     </nav>
   )
 
@@ -147,14 +126,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="min-w-0">
-        {showDemoToggle && demoMode && (
-          <div className="no-print flex items-center gap-3 bg-ink px-4 py-1.5 text-xs text-bg">
-            <span className="stripe h-3 w-8 shrink-0 rounded-sm" />
-            <span className="truncate">
-              <strong className="uppercase tracking-wider">Ambiente de demonstração</strong> — clientes, obras e valores exibidos são fictícios.
-            </span>
-          </div>
-        )}
         <header className="no-print sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur md:px-6">
           <button className="lg:hidden" onClick={() => setMenuOpen(true)} aria-label="Abrir menu">
             <Menu className="h-6 w-6" />
@@ -164,15 +135,14 @@ export function AppShell({ children }: { children: ReactNode }) {
             {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           </button>
           <div className="hidden items-center gap-2 sm:flex">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">{profile?.nome?.slice(0, 1).toUpperCase() ?? 'U'}</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">QL</div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold">{profile?.nome ?? 'Usuário'}</div>
-              <div className="text-xs text-muted">{profile?.perfil === 'admin' ? 'Administrador' : 'Usuário'}</div>
+              <div className="text-sm font-semibold">Sessão local</div>
+              <div className="text-xs text-muted">Sem autenticação</div>
             </div>
           </div>
-          <button onClick={() => void signOut()} aria-label="Sair da conta" title="Sair" className="grid h-10 w-10 place-items-center rounded-md border border-line hover:bg-surface-2"><LogOut className="h-4 w-4" /></button>
         </header>
-        <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{loading && <p role="status" className="mb-4 text-xs text-muted">Sincronizando dados com o banco…</p>}{children}</main>
+        <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{children}</main>
       </div>
       <Toaster />
     </div>

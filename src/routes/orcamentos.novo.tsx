@@ -2,9 +2,10 @@ import { createFileRoute } from '@tanstack/react-router'
 import { QuoteBuilder } from '../components/QuoteBuilder'
 
 export const Route = createFileRoute('/orcamentos/novo')({
-  validateSearch: (s: Record<string, unknown>): { origem?: string; oportunidade?: string } => ({
+  validateSearch: (s: Record<string, unknown>): { origem?: string; oportunidade?: string; editar?: string } => ({
     origem: typeof s.origem === 'string' ? s.origem : undefined,
     oportunidade: typeof s.oportunidade === 'string' ? s.oportunidade : undefined,
+    editar: typeof s.editar === 'string' ? s.editar : undefined,
   }),
   head: () => ({
     meta: [
@@ -18,6 +19,6 @@ export const Route = createFileRoute('/orcamentos/novo')({
 })
 
 function NovoOrcamento() {
-  const { origem, oportunidade } = Route.useSearch()
-  return <QuoteBuilder key={oportunidade ?? origem ?? 'novo'} origin={origem} opportunityId={oportunidade} />
+  const { origem, oportunidade, editar } = Route.useSearch()
+  return <QuoteBuilder key={editar ?? oportunidade ?? origem ?? 'novo'} origin={origem} opportunityId={oportunidade} editQuoteId={editar} />
 }

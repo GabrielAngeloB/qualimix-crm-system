@@ -32,8 +32,7 @@ const blank = {
 }
 
 function Profissionais() {
-  const { professionals, financialEntries, saveProfessional, toast, currentRole } = useStore()
-  const canEditProfessionals = ['administrador', 'operacao', 'financeiro'].includes(currentRole)
+  const { professionals, financialEntries, saveProfessional, toast } = useStore()
   const [form, setForm] = useState(blank)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'ativos' | 'todos' | 'inativos'>('ativos')
@@ -50,7 +49,7 @@ function Profissionais() {
       document: professional.document,
       phone: professional.phone,
       serviceType: professional.serviceType,
-      rate: (professional.rateCents / 100).toFixed(2).replace('.', ','),
+      rate: professional.rateCents === null ? '' : (professional.rateCents / 100).toFixed(2).replace('.', ','),
       rateUnit: professional.rateUnit,
       paymentMethod: professional.paymentMethod,
       notes: professional.notes,
@@ -58,11 +57,15 @@ function Profissionais() {
     })
   }
 
-  const save = async () => {
-    const parsed = parseDecimal(form.rate)
-    if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
-      toast({ tone: 'erro', title: 'Custo inválido', body: 'Informe um custo padrão maior que zero.' })
-      return
+  const save = () => {
+    let rateCents: number | null = null
+    if (form.rate.trim()) {
+      const parsed = parseDecimal(form.rate)
+      if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
+        toast({ tone: 'erro', title: 'Custo inválido', body: 'Deixe o custo em branco ou informe um valor maior que zero.' })
+        return
+      }
+      rateCents = Math.round(parsed.value * 100)
     }
     const professional: Professional = {
       id: editingId ?? `prof-${crypto.randomUUID()}`,
@@ -70,7 +73,7 @@ function Profissionais() {
       document: form.document.replace(/\D/g, ''),
       phone: form.phone.trim(),
       serviceType: form.serviceType.trim(),
-      rateCents: Math.round(parsed.value * 100),
+      rateCents,
       rateUnit: form.rateUnit,
       paymentMethod: form.paymentMethod.trim(),
       active: form.active,
@@ -79,7 +82,7 @@ function Profissionais() {
       demo: false,
     }
     try {
-      await saveProfessional(professional)
+      saveProfessional(professional)
       toast({ tone: 'ok', title: editingId ? 'Profissional atualizado' : 'Profissional cadastrado', body: professional.name })
       setForm(blank)
       setEditingId(null)
@@ -103,10 +106,10 @@ function Profissionais() {
         actions={<Link to="/financeiro" className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-4 font-semibold hover:bg-surface-2"><Wallet className="h-4 w-4" /> Financeiro</Link>}
       />
 
-      {canEditProfessionals && <Card className="mb-6">
+      <Card className="mb-6">
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-xl font-bold uppercase">{editingId ? 'Editar profissional' : 'Novo profissional'}</h2>
-          <p className="text-sm text-muted">O custo de referência não cria despesas automaticamente. Cada pagamento precisa estar ligado a um custo/serviço registrado na obra.</p>
+          <p className="text-sm text-muted">O nome identifica o cadastro. Especialidade e custo de referência podem ser preenchidos depois; o custo pendente nunca será tratado como R$ 0,00.</p>
         </div>
         <div className="grid gap-4 p-5 md:grid-cols-2 lg:grid-cols-3">
           <Field label="Nome do profissional" required>
@@ -118,11 +121,11 @@ function Profissionais() {
           <Field label="Telefone">
             {(id) => <input id={id} className={inputCls()} value={form.phone} onChange={(event) => setForm((current) => ({ ...current, phone: event.target.value }))} />}
           </Field>
-          <Field label="Serviço / especialidade" required>
+          <Field label="Serviço / especialidade (opcional)">
             {(id) => <input id={id} className={inputCls()} placeholder="Ex.: lançamento, acabamento de piso" value={form.serviceType} onChange={(event) => setForm((current) => ({ ...current, serviceType: event.target.value }))} />}
           </Field>
-          <Field label="Custo de referência (R$)" required>
-            {(id) => <input id={id} inputMode="decimal" className={inputCls()} placeholder="0,00" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} />}
+          <Field label="Custo de referência (R$) (opcional)" hint="Deixe em branco quando ainda não tiver esse valor.">
+            {(id) => <input id={id} inputMode="decimal" className={inputCls()} placeholder="Pendente" value={form.rate} onChange={(event) => setForm((current) => ({ ...current, rate: event.target.value }))} />}
           </Field>
           <Field label="Unidade do custo">
             {(id) => <select id={id} className={inputCls()} value={form.rateUnit} onChange={(event) => setForm((current) => ({ ...current, rateUnit: event.target.value as ProfessionalRateUnit }))}>{units.map((unit) => <option key={unit} value={unit}>{unit}</option>)}</select>}
@@ -137,9 +140,9 @@ function Profissionais() {
         </div>
         <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
           {editingId && <Button onClick={() => { setEditingId(null); setForm(blank) }}>Cancelar edição</Button>}
-          <Button variant="primary" onClick={() => void save()}><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar profissional'}</Button>
+          <Button variant="primary" onClick={save}><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar profissional'}</Button>
         </div>
-      </Card>}
+      </Card>
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
@@ -163,10 +166,10 @@ function Profissionais() {
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2"><h3 className="text-lg font-bold">{professional.name}</h3><Badge tone={professional.active ? 'ok' : 'neutral'}>{professional.active ? 'Ativo' : 'Inativo'}</Badge></div>
-                      <p className="text-sm text-muted">{professional.serviceType} · {professional.document || 'Documento não informado'} · {professional.phone || 'Sem telefone'}</p>
-                      <p className="mt-1 font-semibold tabular">{brlCents(professional.rateCents)} / {professional.rateUnit} <span className="font-normal text-muted">· pagamento preferido: {professional.paymentMethod || 'não informado'}</span></p>
+                      <p className="text-sm text-muted">{professional.serviceType || 'Especialidade não informada'} · {professional.document || 'Documento não informado'} · {professional.phone || 'Sem telefone'}</p>
+                      <p className="mt-1 font-semibold tabular">{professional.rateCents === null ? 'Custo pendente' : `${brlCents(professional.rateCents)} / ${professional.rateUnit}`} <span className="font-normal text-muted">· pagamento preferido: {professional.paymentMethod || 'não informado'}</span></p>
                     </div>
-                    {canEditProfessionals && <Button size="sm" onClick={() => edit(professional)}>Editar cadastro</Button>}
+                    <Button size="sm" onClick={() => edit(professional)}>Editar cadastro</Button>
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-md bg-surface-2 p-3 text-sm"><p className="text-xs font-semibold uppercase text-muted">Em aberto a pagar</p><p className="font-display text-2xl font-bold tabular">{brlCents(openCents)}</p></div>

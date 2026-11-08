@@ -243,26 +243,19 @@ export function SegTabs<T extends string>({ value, onChange, options, label }: {
   )
 }
 
-/** Logo: espaço reservado até o administrador enviar o logotipo oficial. */
+/** Marca textual Qualimix. O logotipo opcional é aplicado nos documentos quando configurado. */
 export function LogoSlot({ compact, onDark }: { compact?: boolean; onDark?: boolean }) {
+  const { settings } = useStore()
+  const logoUrl = settings.company.logoUrl
+  const tradeName = settings.company.tradeName || 'Qualimix'
   return (
     <div className="flex items-center gap-3">
-      <div
-        title="Espaço para o logo oficial da Qualimix (Configurações › Identidade visual)"
-        className={cx(
-          'grid shrink-0 place-items-center rounded border-2 border-dashed text-[9px] font-bold uppercase tracking-wider',
-          compact ? 'h-9 w-9' : 'h-11 w-11',
-          onDark ? 'border-white/30 text-white/50' : 'border-line text-muted',
-        )}
-      >
-        Logo
-      </div>
-      <div className="leading-none">
+      {logoUrl ? <img src={logoUrl} alt={tradeName} className="max-h-11 max-w-36 object-contain" /> : <div className="leading-none">
         <div className={cx('font-display text-2xl font-extrabold uppercase tracking-wide', onDark ? 'text-white' : 'text-ink')}>
-          Quali<span className="text-brand">mix</span>
+          {tradeName.toLocaleLowerCase('pt-BR') === 'qualimix' ? <><span className="text-brand">Quali</span><span>mix</span></> : tradeName}
         </div>
         {!compact && <div className={cx('mt-1 text-[10px] font-semibold uppercase tracking-[0.2em]', onDark ? 'text-white/50' : 'text-muted')}>CRM & Gestão</div>}
-      </div>
+      </div>}
     </div>
   )
 }

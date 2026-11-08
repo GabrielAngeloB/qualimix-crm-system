@@ -18,6 +18,9 @@ const el = (p: Partial<MeasureElement>): MeasureElement => ({
   length: '',
   width: '',
   thicknessCm: '',
+  depth: '',
+  diameter: '',
+  factor: '',
   count: '1',
   informed: '',
   notes: '',
@@ -80,6 +83,58 @@ describe('calculadora de volume', () => {
     expect(s.estimated).toBeCloseTo(19.656, 10)
   })
 
+  it('calcula lajes H8, H10 e H12 usando a altura nominal em centímetros', () => {
+    expect(computeElement(el({ elementType: 'Laje H8', length: '10', width: '5' }), 'volume').value).toBeCloseTo(4, 10)
+    expect(computeElement(el({ elementType: 'Laje H10', length: '12', width: '8' }), 'volume').value).toBeCloseTo(9.6, 10)
+    expect(computeElement(el({ elementType: 'Laje H12', length: '10', width: '5' }), 'volume').value).toBeCloseTo(6, 10)
+  })
+
+  it('calcula viga e viga baldrame em metros cúbicos', () => {
+    expect(computeElement(el({ elementType: 'Viga', length: '6', width: '0,2', depth: '0,4' }), 'volume').value).toBeCloseTo(0.48, 10)
+    expect(computeElement(el({ elementType: 'Viga baldrame', length: '10', width: '0,15', depth: '0,3' }), 'volume').value).toBeCloseTo(0.45, 10)
+  })
+
+  it('calcula pilar por altura × largura × espessura', () => {
+    expect(computeElement(el({ elementType: 'Pilar', length: '3', width: '0,3', depth: '0,25' }), 'volume').value).toBeCloseTo(0.225, 10)
+  })
+
+  it('calcula sapata como comprimento × largura × profundidade', () => {
+    expect(computeElement(el({ elementType: 'Sapata', length: '2', width: '0,8', depth: '0,4' }), 'volume').value).toBeCloseTo(0.64, 10)
+  })
+
+  it('calcula radier e contrapiso com as três dimensões em metros', () => {
+    expect(computeElement(el({ elementType: 'Radier', length: '10', width: '8', depth: '0,15' }), 'volume').value).toBeCloseTo(12, 10)
+    expect(computeElement(el({ elementType: 'Contrapiso', length: '10', width: '8', depth: '0,05' }), 'volume').value).toBeCloseTo(4, 10)
+  })
+
+  it('calcula estacas e tubulões com π × raio² × profundidade × quantidade', () => {
+    const expected = Math.PI * 0.15 ** 2 * 8 * 2
+    expect(computeElement(el({ elementType: 'Estaca', diameter: '0,3', depth: '8', count: '2' }), 'volume').value).toBeCloseTo(expected, 10)
+    expect(computeElement(el({ elementType: 'Tubulão', diameter: '0,3', depth: '8', count: '2' }), 'volume').value).toBeCloseTo(expected, 10)
+  })
+
+  it('calcula escada por metro linear e índice editável', () => {
+    expect(computeElement(el({ elementType: 'Escada', length: '4', factor: '1,5' }), 'volume').value).toBeCloseTo(6, 10)
+    expect(computeElement(el({ elementType: 'Escada', length: '4', factor: '2' }), 'volume').value).toBeCloseTo(8, 10)
+    expect(computeElement(el({ elementType: 'Escada', length: '4', factor: '3' }), 'volume').value).toBeCloseTo(12, 10)
+  })
+
+  it('calcula piso e calçada por área em m²', () => {
+    expect(computeElement(el({ elementType: 'Piso', length: '40', width: '25' }), 'area').value).toBe(1000)
+    expect(computeElement(el({ elementType: 'Calçada', length: '10', width: '2' }), 'area').value).toBe(20)
+  })
+
+  it('impede que elementos volumétricos sejam calculados na calculadora de área', () => {
+    const r = computeElement(el({ elementType: 'Pilar', length: '3', width: '0,3', depth: '0,25' }), 'area')
+    expect(r.value).toBeNull()
+    expect(r.error).toContain('calculado em m³')
+  })
+
+  it('retorna incompleto quando faltam diâmetro, profundidade ou índice', () => {
+    expect(computeElement(el({ elementType: 'Estaca', diameter: '', depth: '8' }), 'volume').incomplete).toBe(true)
+    expect(computeElement(el({ elementType: 'Escada', length: '4', factor: '' }), 'volume').incomplete).toBe(true)
+  })
+
   it('aceita volume informado diretamente pelo cliente', () => {
     expect(computeElement(el({ mode: 'informado', informed: '7,5' }), 'volume').value).toBe(7.5)
   })
@@ -101,7 +156,7 @@ describe('calculadora de volume', () => {
   })
 
   it('área de piso = comprimento × largura × quantidade', () => {
-    expect(computeElement(el({ length: '40', width: '25' }), 'area').value).toBe(1000)
+    expect(computeElement(el({ elementType: 'Piso', length: '40', width: '25' }), 'area').value).toBe(1000)
   })
 })
 
@@ -140,7 +195,7 @@ describe('orçamento', () => {
   })
 
   it('piso polido por m²', () => {
-    const area = summarizeMeasures([el({ length: '40', width: '25' })], '', 'area')
+    const area = summarizeMeasures([el({ elementType: 'Piso', length: '40', width: '25' })], '', 'area')
     const r = quote([line('p-polido', { quantityMode: 'area', unit: 'm²', category: 'piso' })], { area })
     expect(r.floorArea).toBe(1000)
     expect(r.totalCents).toBe(6_800_000)

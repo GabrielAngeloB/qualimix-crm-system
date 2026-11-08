@@ -20,11 +20,11 @@ export const Route = createFileRoute('/agenda')({
 const statuses: ScheduleStatus[] = ['Planejada', 'Confirmada', 'Em preparação', 'Em execução', 'Concluída', 'Reagendada', 'Cancelada']
 
 function Agenda() {
-  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast, currentRole } = useStore()
-  const canEditSchedule = currentRole === 'administrador' || currentRole === 'operacao'
+  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast } = useStore()
   const [orderId, setOrderId] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
+  const [truck, setTruck] = useState('')
   const [notes, setNotes] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [dateEdits, setDateEdits] = useState<Record<string, string>>({})
@@ -33,7 +33,7 @@ function Agenda() {
   const plannedOrders = useMemo(() => workOrders.filter((order) => order.status !== 'Cancelada'), [workOrders])
   const sortedEvents = useMemo(() => [...scheduleEvents].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [scheduleEvents])
 
-  const saveSchedule = async () => {
+  const saveSchedule = () => {
     const order = workOrders.find((item) => item.id === orderId)
     const quote = order ? quotes.find((item) => item.id === order.quoteId) : undefined
     if (!order || !quote) {
@@ -54,16 +54,18 @@ function Agenda() {
       volumeM3: quote.result.concreteVolume,
       fck: quote.fck,
       pump: quote.extras.pumping.mode !== 'nao',
+      truck: truck.trim(),
       status: 'Planejada',
       notes: [client?.name, site?.name, notes.trim()].filter(Boolean).join(' · '),
       demo: false,
     }
     try {
-      await addScheduleEvent(event)
+      addScheduleEvent(event)
       toast({ tone: 'ok', title: 'Serviço agendado', body: `${dateBR(date)} às ${time}` })
       setOrderId('')
       setDate('')
       setTime('')
+      setTruck('')
       setNotes('')
       setShowForm(false)
     } catch (error) {
@@ -71,22 +73,22 @@ function Agenda() {
     }
   }
 
-  const saveReschedule = async (event: ScheduleEvent) => {
+  const saveReschedule = (event: ScheduleEvent) => {
     const nextDate = dateEdits[event.id] ?? event.date
     const nextTime = timeEdits[event.id] ?? event.time
     try {
-      await addScheduleEvent({ ...event, date: nextDate, time: nextTime, status: 'Reagendada' })
+      addScheduleEvent({ ...event, date: nextDate, time: nextTime, status: 'Reagendada' })
       toast({ tone: 'ok', title: 'Serviço reagendado', body: `${dateBR(nextDate)} às ${nextTime}` })
       setDateEdits((current) => ({ ...current, [event.id]: nextDate }))
       setTimeEdits((current) => ({ ...current, [event.id]: nextTime }))
     } catch (error) {
-      toast({ tone: 'erro', title: 'Não foi possível reagendar', body: error instanceof Error ? error.message : 'Revise a data e o horário.' })
+      toast({ tone: 'erro', title: 'Não foi possível reagendar', body: error instanceof Error ? error.message : 'Revise a data, o horário e o recurso.' })
     }
   }
 
-  const changeStatus = async (event: ScheduleEvent, status: ScheduleStatus) => {
+  const changeStatus = (event: ScheduleEvent, status: ScheduleStatus) => {
     try {
-      await addScheduleEvent({ ...event, status })
+      addScheduleEvent({ ...event, status })
       toast({ tone: 'ok', title: 'Status operacional atualizado', body: `${dateBR(event.date)} · ${status}` })
     } catch (error) {
       toast({ tone: 'erro', title: 'Não foi possível atualizar', body: error instanceof Error ? error.message : 'Revise os dados.' })
@@ -102,12 +104,12 @@ function Agenda() {
         actions={
           <>
             <Link to="/pedidos" className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-4 font-semibold hover:bg-surface-2"><ClipboardList className="h-4 w-4" /> Pedidos</Link>
-            {canEditSchedule && <Button variant="primary" onClick={() => setShowForm((value) => !value)}><Plus className="h-4 w-4" /> Agendar serviço</Button>}
+            <Button variant="primary" onClick={() => setShowForm((value) => !value)}><Plus className="h-4 w-4" /> Agendar serviço</Button>
           </>
         }
       />
 
-      {canEditSchedule && showForm && (
+      {showForm && (
         <Card className="mb-6">
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-xl font-bold uppercase">Nova programação</h2>
@@ -132,13 +134,16 @@ function Agenda() {
             <Field label="Horário" required>
               {(id) => <input id={id} type="time" className={inputCls()} value={time} onChange={(event) => setTime(event.target.value)} />}
             </Field>
+            <Field label="Recurso operacional (opcional)">
+              {(id) => <input id={id} className={inputCls()} placeholder="Identificação livre do recurso" value={truck} onChange={(event) => setTruck(event.target.value)} />}
+            </Field>
             <Field label="Observações" className="sm:col-span-2 lg:col-span-3">
               {(id) => <textarea id={id} className={cx(inputCls(), 'h-auto py-2')} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />}
             </Field>
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
             <Button onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" disabled={!orderId || !date || !time} onClick={() => void saveSchedule()}>Salvar programação</Button>
+            <Button variant="primary" disabled={!orderId || !date || !time} onClick={saveSchedule}>Salvar programação</Button>
           </div>
         </Card>
       )}
@@ -155,7 +160,7 @@ function Agenda() {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px] text-left text-sm">
+            <table className="w-full min-w-[1000px] text-left text-sm">
               <thead className="border-b border-line bg-surface-2 text-xs text-muted">
                 <tr>
                   <th className="px-4 py-3">Data / horário</th>
@@ -163,7 +168,8 @@ function Agenda() {
                   <th className="px-4 py-3">Serviço</th>
                   <th className="px-4 py-3">Volume / FCK</th>
                   <th className="px-4 py-3">Pedido / orçamento</th>
-                      <th className="px-4 py-3">Status</th>
+                  <th className="px-4 py-3">Recurso operacional</th>
+                  <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -174,24 +180,21 @@ function Agenda() {
                   return (
                     <tr key={event.id} className="border-b border-line last:border-0 align-top">
                       <td className="px-4 py-3">
-                        {canEditSchedule ? (
-                          <div className="grid min-w-[150px] gap-1">
-                            <input aria-label={`Data de ${event.service}`} type="date" className={cx(inputCls(), 'h-8 text-xs')} value={dateEdits[event.id] ?? event.date} onChange={(change) => setDateEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
-                            <input aria-label={`Horário de ${event.service}`} type="time" className={cx(inputCls(), 'h-8 text-xs')} value={timeEdits[event.id] ?? event.time} onChange={(change) => setTimeEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
-                            {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => void saveReschedule(event)}>Salvar reagendamento</Button>}
-                          </div>
-                        ) : <div className="min-w-[150px] py-2 font-medium tabular">{dateBR(event.date)} · {event.time}</div>}
+                        <div className="grid min-w-[150px] gap-1">
+                          <input aria-label={`Data de ${event.service}`} type="date" className={cx(inputCls(), 'h-8 text-xs')} value={dateEdits[event.id] ?? event.date} onChange={(change) => setDateEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
+                          <input aria-label={`Horário de ${event.service}`} type="time" className={cx(inputCls(), 'h-8 text-xs')} value={timeEdits[event.id] ?? event.time} onChange={(change) => setTimeEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
+                          {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => saveReschedule(event)}>Salvar reagendamento</Button>}
+                        </div>
                       </td>
                       <td className="px-4 py-3"><strong className="block">{client?.name ?? '—'}</strong><span className="text-xs text-muted">{site?.name ?? '—'}</span></td>
                       <td className="px-4 py-3">{event.service}<span className="block text-xs text-muted">{event.pump ? 'Com bombeamento' : 'Sem bombeamento'}</span>{event.notes && <span className="mt-1 block max-w-[220px] text-xs text-muted">{event.notes}</span>}</td>
                       <td className="px-4 py-3 tabular">{event.volumeM3 > 0 ? `${event.volumeM3.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m³` : '—'}<span className="block text-xs text-muted">{event.fck ? `FCK ${event.fck}` : '—'}</span></td>
                       <td className="px-4 py-3"><strong>{order?.number ?? '—'}</strong><span className="block text-xs text-muted">{event.quoteId}</span></td>
-                              <td className="px-4 py-3">
-                        {canEditSchedule
-                          ? <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
-                              {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                            </select>
-                          : <span className="inline-flex rounded-md border border-line px-2 py-1 text-xs font-medium">{event.status}</span>}
+                      <td className="px-4 py-3">{event.truck || 'Não informado'}</td>
+                      <td className="px-4 py-3">
+                        <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => changeStatus(event, change.target.value as ScheduleStatus)}>
+                          {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                        </select>
                       </td>
                     </tr>
                   )

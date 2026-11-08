@@ -1,7 +1,7 @@
 import type { MeasureSummary, QuoteLine, QuoteResult } from '../lib/quote'
 import { brlCents, dateBR, num } from '../lib/format'
 import { formatDocument, formatPhone } from '../lib/documents'
-import { company } from '../data/settings'
+import { useStore } from '../data/store'
 import type { Client, Site } from '../data/fixtures'
 import { cx } from './ui'
 
@@ -32,6 +32,8 @@ const Pending = ({ children }: { children: string }) => (
 
 /** Documento A4 da proposta. Impressão via navegador → “Salvar como PDF”. */
 export function ProposalDocument({ d }: { d: ProposalData }) {
+  const { settings } = useStore()
+  const company = settings.company
   const r = d.result
   return (
     <article className="print-area relative mx-auto w-full max-w-[820px] overflow-hidden bg-white text-[13px] leading-relaxed text-[#111] shadow-sm ring-1 ring-black/10">
@@ -45,11 +47,7 @@ export function ProposalDocument({ d }: { d: ProposalData }) {
       <div className="h-2 bg-[#e10f1f]" />
       <header className="flex flex-wrap items-start justify-between gap-4 border-b border-black/10 px-8 py-6">
         <div className="flex items-center gap-4">
-          {company.logoUrl ? (
-            <img src={company.logoUrl} alt="Qualimix" className="h-14 w-auto" />
-          ) : (
-            <div className="grid h-14 w-14 place-items-center rounded border-2 border-dashed border-black/20 text-[9px] font-bold uppercase text-black/40">Logo</div>
-          )}
+          {company.logoUrl && <img src={company.logoUrl} alt={company.tradeName} className="h-14 w-auto object-contain" />}
           <div>
             <div className="font-display text-3xl font-extrabold uppercase leading-none">{company.tradeName}</div>
             <div className="mt-1 text-[11px] text-black/60">

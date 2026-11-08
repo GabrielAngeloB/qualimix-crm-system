@@ -43,6 +43,7 @@ export interface ScheduleEvent {
   volumeM3: number
   fck: number | null
   pump: boolean
+  truck: string
   status: ScheduleStatus
   notes: string
   demo: false
@@ -56,7 +57,7 @@ export interface Professional {
   document: string
   phone: string
   serviceType: string
-  rateCents: number
+  rateCents: number | null
   rateUnit: ProfessionalRateUnit
   paymentMethod: string
   active: boolean
@@ -225,6 +226,19 @@ export function validateMoneyCents(value: number): boolean {
   return Number.isSafeInteger(value) && value > 0
 }
 
+export function canDeleteDraftQuote(
+  status: string,
+  hasWorkOrder: boolean,
+  hasFinancialEntries: boolean,
+  hasScheduleEvents: boolean,
+): boolean {
+  return status === 'Rascunho' && !hasWorkOrder && !hasFinancialEntries && !hasScheduleEvents
+}
+
+export function validateProfessionalProfile(name: string, rateCents: number | null): boolean {
+  return name.trim().length >= 3 && (rateCents === null || validateMoneyCents(rateCents))
+}
+
 export function calculateUnitCostCents(unitRateCents: number, quantity: number): number | null {
   if (!validateMoneyCents(unitRateCents) || !Number.isFinite(quantity) || quantity <= 0) return null
   const total = Math.round(unitRateCents * quantity)
@@ -269,7 +283,7 @@ export function validateCommercialTask(task: CommercialTask): boolean {
     task.title.trim().length >= 3 &&
     task.title.trim().length <= 120 &&
     task.notes.length <= 2000 &&
-    validateDate(task.dueDate) &&
+    (!task.dueDate || validateDate(task.dueDate)) &&
     (task.dueTime === null || validateTime(task.dueTime)) &&
     validPriority &&
     validStatus &&
@@ -282,9 +296,10 @@ export function validateCommercialTask(task: CommercialTask): boolean {
 export function commercialTaskTiming(
   task: CommercialTask,
   today: string,
-): 'Atrasada' | 'Hoje' | 'Futura' | 'Concluída' | 'Cancelada' {
+): 'Atrasada' | 'Hoje' | 'Futura' | 'Sem prazo' | 'Concluída' | 'Cancelada' {
   if (task.status === 'Concluída') return 'Concluída'
   if (task.status === 'Cancelada') return 'Cancelada'
+  if (!task.dueDate) return 'Sem prazo'
   if (task.dueDate < today) return 'Atrasada'
   if (task.dueDate === today) return 'Hoje'
   return 'Futura'
