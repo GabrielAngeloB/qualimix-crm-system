@@ -23,7 +23,7 @@ function Painel() {
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
   }
   const upcoming = (demoMode ? schedule : []).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  const hasData = quotes.length > 0 || opportunities.length > 0
+  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0
 
   return (
     <>
