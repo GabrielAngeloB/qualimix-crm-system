@@ -391,7 +391,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 const canArea = l.unit === 'm²'
                 const ref = item?.basePrice ?? (demoMode ? item?.demoPrice : null)
                 return (
-                  <div key={l.id} className={cx('grid grid-cols-2 gap-3 border-b border-line py-3 md:grid-cols-[minmax(0,2.2fr)_1.4fr_1.1fr_0.7fr_1fr_auto] md:items-start', c?.errors.length && 'bg-brand-soft/30')}>
+                  <div key={l.id} className={cx('grid grid-cols-2 gap-3 border-b border-line py-3 md:grid-cols-[minmax(0,2.2fr)_1.4fr_1.1fr_0.7fr_1fr_auto] md:items-start', c?.errors.length ? 'bg-brand-soft/30' : false)}>
                     <div className="col-span-2 min-w-0 md:col-span-1">
                       {l.catalogId ? (
                         <>
