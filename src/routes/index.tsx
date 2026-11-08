@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { CalendarDays, CircleAlert, FileText, Plus, Settings, Truck, Wallet } from 'lucide-react'
+import { CalendarDays, CircleAlert, FileText, Plus, Settings, Wallet } from 'lucide-react'
 import { useStore } from '../data/store'
 import { computeDashboard } from '../data/metrics'
 import { activities, schedule, today } from '../data/fixtures'
@@ -23,7 +23,7 @@ function Painel() {
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
   }
   const upcoming = (demoMode
-    ? schedule.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volume, fck: e.fck, pump: e.pump, truck: e.truck, status: e.status }))
+    ? schedule.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volume, fck: e.fck, pump: e.pump, status: e.status }))
     : scheduleEvents.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volumeM3, fck: e.fck, pump: e.pump, truck: e.truck, status: e.status }))
   ).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada')
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
@@ -69,7 +69,6 @@ function Painel() {
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Card><CardHeader title="Clientes" subtitle="vw_clientes_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.clients.length}</p></Card>
           <Card><CardHeader title="Orçamentos" subtitle="vw_orcamentos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.quotes.length}</p></Card>
-          <Card><CardHeader title="Veículos" subtitle="vw_frota_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.fleet.length}</p></Card>
           <Card><CardHeader title="Oportunidades" subtitle="vw_funil_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.funnel.reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
           <Card><CardHeader title="Pedidos" subtitle="vw_pedidos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.orders.length}</p></Card>
           <Card><CardHeader title="Contas financeiras" subtitle="vw_financeiro_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.finance.length}</p></Card>
@@ -116,17 +115,6 @@ function Painel() {
                 <table className="w-full min-w-[440px] text-left text-sm">
                   <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Número / cliente</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Total</th></tr></thead>
                   <tbody>{views.quotes.slice(0, 6).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2"><span className="block font-semibold tabular">{row.numero}</span><span className="block max-w-[220px] truncate text-xs text-muted">{row.cliente_nome}</span></td><td className="px-4 py-2">{row.status}</td><td className="px-4 py-2 text-right tabular">{row.total_centavos == null ? '—' : brl(Number(row.total_centavos) / 100)}</td></tr>)}</tbody>
-                </table>
-              </div>
-            )}
-          </Card>
-          <Card className="xl:col-span-2">
-            <CardHeader title="Frota — visão resumida" subtitle="vw_frota_resumo · situação dos veículos" />
-            {views.fleet.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum veículo cadastrado na view.</p> : (
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[480px] text-left text-sm">
-                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Placa</th><th className="px-4 py-2">Veículo</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Hodômetro</th><th className="px-4 py-2 text-right">Viagens</th></tr></thead>
-                  <tbody>{views.fleet.slice(0, 8).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2 font-semibold tabular">{row.placa}</td><td className="px-4 py-2">{row.modelo || row.tipo}</td><td className="px-4 py-2">{row.status}</td><td className="px-4 py-2 text-right tabular">{num(Number(row.hodometro_km ?? 0), 1)} km</td><td className="px-4 py-2 text-right tabular">{row.total_viagens}</td></tr>)}</tbody>
                 </table>
               </div>
             )}
@@ -226,7 +214,6 @@ function Painel() {
                           <p className="mt-1 flex flex-wrap gap-1">
                             <Badge>{num(e.volume, 1)} m³{e.fck && ` · FCK ${e.fck}`}</Badge>
                             {e.pump && <Badge tone="info">Bomba</Badge>}
-                            {e.truck ? <Badge><Truck className="h-3 w-3" /> {e.truck}</Badge> : <Badge tone="warn">Sem caminhão</Badge>}
                             <Badge tone={e.status === 'Confirmada' ? 'ok' : 'neutral'}>{e.status}</Badge>
                           </p>
                         </div>
