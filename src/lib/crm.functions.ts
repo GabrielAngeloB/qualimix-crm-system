@@ -195,6 +195,7 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
+    assertSameOrigin()
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const allowed: Record<string, string> = {
@@ -272,6 +273,7 @@ export const createOpportunity = createServerFn({ method: 'POST' })
     }
   })
   .handler(async ({ data }) => {
+    assertSameOrigin()
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const db = getPool()
@@ -431,6 +433,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
     }
   })
   .handler(async ({ data }) => {
+    assertSameOrigin()
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const db = getPool()
