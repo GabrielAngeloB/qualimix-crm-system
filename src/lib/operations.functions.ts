@@ -58,7 +58,7 @@ function mapSchedule(r: any): ScheduleEvent {
     id: String(r.id), workOrderId: String(r.pedido_id), quoteId: String(r.orcamento_id),
     clientId: String(r.cliente_id), siteId: String(r.obra_id), date: isoDate(r.data),
     time: String(r.hora).slice(0, 5), service: String(r.servico), volumeM3: Number(r.volume_m3 ?? 0),
-    fck: r.fck == null ? null : Number(r.fck), pump: Boolean(r.bomba), truck: r.caminhao ?? '',
+    fck: r.fck == null ? null : Number(r.fck), pump: Boolean(r.bomba),
     status: r.status, notes: r.observacoes ?? '', demo: false,
   }
 }
@@ -437,7 +437,7 @@ export const saveScheduleEventOnServer = createServerFn({ method: 'POST' })
       id:idText(x.id,'Programação'),workOrderId:idText(x.workOrderId,'Pedido'),
       quoteId:idText(x.quoteId,'Orçamento'),clientId:idText(x.clientId,'Cliente'),
       siteId:idText(x.siteId,'Obra'),date,time,service:text(x.service,'Serviço',160,true),
-      volumeM3,fck,pump:x.pump,truck:text(x.truck,'Caminhão',100),
+      volumeM3,fck,pump:x.pump,
       status:String(x.status),notes:text(x.notes,'Observações',1000),
     }
   })
@@ -454,12 +454,12 @@ export const saveScheduleEventOnServer = createServerFn({ method: 'POST' })
       }
       await tx.query(
         `insert into public.agenda_eventos
-          (id,pedido_id,orcamento_id,cliente_id,obra_id,data,hora,servico,volume_m3,fck,bomba,caminhao,status,observacoes,created_by,is_demo)
+          (id,pedido_id,orcamento_id,cliente_id,obra_id,data,hora,servico,volume_m3,fck,bomba,status,observacoes,created_by,is_demo)
          values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,false)
          on conflict(id) do update set data=excluded.data,hora=excluded.hora,
-           caminhao=excluded.caminhao,status=excluded.status,observacoes=excluded.observacoes`,
+           status=excluded.status,observacoes=excluded.observacoes`,
         [data.id,data.workOrderId,data.quoteId,data.clientId,data.siteId,data.date,data.time,
-         data.service,data.volumeM3,data.fck,data.pump,data.truck,data.status,data.notes,profile.id])
+         data.service,data.volumeM3,data.fck,data.pump,data.status,data.notes,profile.id])
     })
   })
 
