@@ -21,7 +21,7 @@ interface Store {
 const StoreCtx=createContext<Store|null>(null)
 
 export function StoreProvider({children}:{children:ReactNode}) {
-  const [demoMode,setDemoModeState]=useState(true)
+  const [demoMode,setDemoModeState]=useState(false)
   const [dbData,setDbData]=useState<{clients:Client[];sites:Site[];opportunities:Opportunity[];quotes:QuoteRecord[]}>({clients:[],sites:[],opportunities:[],quotes:[]})
   const [opps,setOpps]=useState<Opportunity[]>(seedOpps)
   const [loading,setLoading]=useState(true)
@@ -34,7 +34,7 @@ export function StoreProvider({children}:{children:ReactNode}) {
   },[])
 
   useEffect(()=>{
-    try { if(localStorage.getItem('qmx-demo')==='0') setDemoModeState(false) } catch {}
+    try { if(localStorage.getItem('qmx-demo')==='1') setDemoModeState(true) } catch {}
     void refresh().catch((error)=> {
       const id=Date.now()
       setToasts((xs)=>[...xs,{id,tone:'erro',title:'Falha ao carregar o CRM',body:error instanceof Error?error.message:'Verifique a conexão com o banco.'}])
