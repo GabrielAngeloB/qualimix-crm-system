@@ -90,7 +90,7 @@ Verificação realizada no banco: as 7 tabelas operacionais têm RLS ativado; as
 
 ### Papel PostgreSQL restrito
 
-O papel qualimix_app já foi criado no Supabase com login habilitado e permissões/policies concedidas. A senha ainda **não foi configurada**. A verificação do PostgreSQL confirmou:
+O papel qualimix_app já foi criado no Supabase com login habilitado e permissões/policies concedidas. A senha ainda **não foi configurada**; o catálogo confirma que `rolpassword` está vazio. A verificação do PostgreSQL confirmou:
 
 - rolsuper=false
 - rolcreatedb=false
