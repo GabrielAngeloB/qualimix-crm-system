@@ -155,7 +155,7 @@ Esses itens não são falhas de conexão do banco; são funcionalidades/telas qu
 
 ## 8. Pendências de qualidade e riscos conhecidos
 
-- O CI do commit anterior estava verde, mas as últimas alterações precisam passar pela execução mais recente do GitHub Actions antes de considerar esta rodada validada.
+- `pnpm lint` foi executado, mas o lint global do repositório não está limpo: **1.755 problemas em 57 arquivos**, majoritariamente regras de formatação `prettier/prettier`, incluindo arquivos fora desta integração. Essa dívida foi registrada sem aplicar formatação em massa e sem alterar componentes não relacionados. O workflow existente continua verificando typecheck/build e testes unitários.
 - O teste ponta a ponta com registros reais (cliente → obra → oportunidade → orçamento → pedido → lançamento → viagem) não foi executado: o banco de produção contém dados e não foi inserida uma cadeia de dados de teste que pudesse sujar o ambiente. Também não há rota de Frota para completar a última etapa.
 - O advisor de segurança do Supabase reportou: funções `has_role` e `is_active_user` SECURITY DEFINER executáveis por `authenticated` (utilizadas pelas policies existentes); proteção de senha vazada desativada no Supabase Auth; e `private.tabelas_exclusao` com RLS sem policy.
 - O advisor de performance reportou 24 FKs sem índice de cobertura e 31 índices sem uso observado. Nenhum índice foi removido. A criação de índices adicionais exige análise de workload e janela de escrita.
