@@ -64,6 +64,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const path = useRouterState({ select: (s) => s.location.pathname })
   const { demoMode, setDemoMode, loading } = useStore()
+  const showDemoToggle = import.meta.env.DEV
   const { theme, toggle } = useTheme()
   const navigate = useNavigate()
   const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
@@ -119,7 +120,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10 p-4">
+      {showDemoToggle && <div className="border-t border-white/10 p-4">
         <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
           <span>
             <span className="block font-semibold">Dados de demonstração</span>
@@ -128,7 +129,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <input type="checkbox" className="peer sr-only" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} />
           <span className="relative h-6 w-11 shrink-0 rounded-full bg-white/20 transition peer-checked:bg-brand after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-brand" />
         </label>
-      </div>
+      </div>}
     </nav>
   )
 
@@ -142,7 +143,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="min-w-0">
-        {demoMode && (
+        {showDemoToggle && demoMode && (
           <div className="no-print flex items-center gap-3 bg-ink px-4 py-1.5 text-xs text-bg">
             <span className="stripe h-3 w-8 shrink-0 rounded-sm" />
             <span className="truncate">
