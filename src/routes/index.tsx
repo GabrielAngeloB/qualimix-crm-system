@@ -41,7 +41,7 @@ function Painel() {
             </select>
             <select aria-label="Responsável" className={cx(inputCls(), 'w-auto')} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
               <option value="">Todos os responsáveis</option>
-              {team.filter((u) => u.role === 'Comercial').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
             <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
               <Plus className="h-4 w-4" /> Novo orçamento
@@ -81,6 +81,41 @@ function Painel() {
             </table>
           </div>
         </Card>
+        <div className="grid gap-3 xl:grid-cols-2">
+          <Card>
+            <CardHeader title="Clientes — visão resumida" subtitle="vw_clientes_resumo · registros recentes" />
+            {views.clients.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum cliente na view.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[420px] text-left text-sm">
+                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Cliente</th><th className="px-4 py-2 text-right">Obras</th><th className="px-4 py-2 text-right">Leads</th><th className="px-4 py-2 text-right">Orçamentos</th></tr></thead>
+                  <tbody>{views.clients.slice(0, 6).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2"><span className="block max-w-[220px] truncate font-medium">{row.nome}</span><span className="text-xs text-muted">{row.cidade || row.regiao || '—'}</span></td><td className="px-4 py-2 text-right tabular">{row.total_obras}</td><td className="px-4 py-2 text-right tabular">{row.total_oportunidades}</td><td className="px-4 py-2 text-right tabular">{row.total_orcamentos}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+          <Card>
+            <CardHeader title="Orçamentos — visão resumida" subtitle="vw_orcamentos_resumo · registros recentes" />
+            {views.quotes.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum orçamento na view.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[440px] text-left text-sm">
+                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Número / cliente</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Total</th></tr></thead>
+                  <tbody>{views.quotes.slice(0, 6).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2"><span className="block font-semibold tabular">{row.numero}</span><span className="block max-w-[220px] truncate text-xs text-muted">{row.cliente_nome}</span></td><td className="px-4 py-2">{row.status}</td><td className="px-4 py-2 text-right tabular">{row.total_centavos == null ? '—' : brl(Number(row.total_centavos) / 100)}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+          <Card className="xl:col-span-2">
+            <CardHeader title="Frota — visão resumida" subtitle="vw_frota_resumo · situação dos veículos" />
+            {views.fleet.length === 0 ? <p className="p-4 text-sm text-muted">Nenhum veículo cadastrado na view.</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[480px] text-left text-sm">
+                  <thead className="border-b border-line bg-surface-2 text-xs uppercase text-muted"><tr><th className="px-4 py-2">Placa</th><th className="px-4 py-2">Veículo</th><th className="px-4 py-2">Status</th><th className="px-4 py-2 text-right">Hodômetro</th><th className="px-4 py-2 text-right">Viagens</th></tr></thead>
+                  <tbody>{views.fleet.slice(0, 8).map((row) => <tr key={row.id} className="border-b border-line last:border-0"><td className="px-4 py-2 font-semibold tabular">{row.placa}</td><td className="px-4 py-2">{row.modelo || row.tipo}</td><td className="px-4 py-2">{row.status}</td><td className="px-4 py-2 text-right tabular">{num(Number(row.hodometro_km ?? 0), 1)} km</td><td className="px-4 py-2 text-right tabular">{row.total_viagens}</td></tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+        </div>
       </section>
 
       {pend.length > 0 &&
