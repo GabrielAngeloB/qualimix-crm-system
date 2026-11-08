@@ -132,7 +132,11 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
   const [saving, setSaving] = useState(false)
   const [showWa, setShowWa] = useState(false)
 
-  useEffect(() => {\n    if (currentUserId) setDraft((current) => ({ ...current, ownerId: currentUserId }))\n  }, [currentUserId])\n\n  // Carrega duplicação ou rascunho guardado neste navegador
+  useEffect(() => {
+    if (currentUserId) setDraft((current) => ({ ...current, ownerId: currentUserId }))
+  }, [currentUserId])
+
+  // Carrega duplicação ou rascunho guardado neste navegador
   useEffect(() => {
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
     if (src) {
