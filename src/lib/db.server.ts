@@ -5,10 +5,6 @@ type Queryable = {
   query<T = Record<string, unknown>>(text: string, values?: unknown[]): Promise<QueryResult<T>>
 }
 
-type UnsafeSql = {
-  unsafe<T extends readonly unknown[]>(query: string, parameters?: unknown[]): Promise<T>
-}
-
 let sql: ReturnType<typeof postgres> | undefined
 
 function getSql(): ReturnType<typeof postgres> {
@@ -44,21 +40,26 @@ function getSql(): ReturnType<typeof postgres> {
   return sql
 }
 
-function wrap(executor: UnsafeSql): Queryable {
+/**
+ * Mantém a API de consultas pequena e sempre parametrizada.
+ * O executor é o cliente postgres ou uma transação postgres.js.
+ */
+function wrap(executor: any): Queryable {
   return {
     async query<T = Record<string, unknown>>(text: string, values: unknown[] = []) {
-      const rows = await executor.unsafe<T[]>(text, values)
-      const result = rows as T[] & { count?: number }
-      return { rows: result, rowCount: typeof result.count === 'number' ? result.count : result.length }
+      const result = await executor.unsafe(text, values) as T[] & { count?: number }
+      return {
+        rows: result,
+        rowCount: typeof result.count === 'number' ? result.count : result.length,
+      }
     },
   }
 }
 
 export function getPool(): Queryable {
-  return wrap(getSql() as unknown as UnsafeSql)
+  return wrap(getSql())
 }
 
 export async function withTransaction<T>(work: (client: Queryable) => Promise<T>): Promise<T> {
-  const result = await getSql().begin(async (transaction) => work(wrap(transaction as unknown as UnsafeSql)))
-  return result as unknown as T
+  return getSql().begin(async (transaction) => work(wrap(transaction)))
 }
