@@ -12,12 +12,12 @@ import { BarChart, ChartCard } from '../components/Charts'
 export const Route = createFileRoute('/')({ component: Painel })
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
   const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId])
-  const pend = pendingSettings()
+  const pend = pendingSettings(ctx.catalog)
   const clientOf = (quoteId: string) => {
     const q = quotes.find((x) => x.id === quoteId)
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
