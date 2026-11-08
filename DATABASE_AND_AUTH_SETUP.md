@@ -20,7 +20,7 @@ Este repositório nasceu sem banco ou autenticação. O projeto usa TanStack Sta
 3. Execute a migration `supabase/migrations/20261108000100_username_auth_roles.sql`.
 4. Instale as dependências:
    ```bash
-   pnpm add @supabase/supabase-js @supabase/ssr
+   pnpm install
    ```
 5. Copie `.env.example` para `.env` e preencha as variáveis no ambiente local e no provedor de hospedagem.
 6. Reinicie o servidor de desenvolvimento.
@@ -29,7 +29,7 @@ Este repositório nasceu sem banco ou autenticação. O projeto usa TanStack Sta
 
 1. Gere um segredo aleatório com pelo menos 32 caracteres.
 2. Defina-o como `BOOTSTRAP_ADMIN_SECRET` somente no ambiente do servidor.
-3. Abra a página de inicialização e informe nome, username, senha e o segredo de bootstrap.
+3. Abra `https://SEU-DOMINIO/bootstrap` (ou `http://localhost:3000/bootstrap` localmente) e informe nome, username, senha e o segredo de bootstrap.
 4. A criação só funciona enquanto não existir nenhum perfil `admin`. O endpoint cria a conta no Supabase Auth e promove o perfil. Se a criação do perfil falhar, tenta excluir a conta Auth criada.
 5. Depois do bootstrap, remova `BOOTSTRAP_ADMIN_SECRET` do ambiente e faça novo deploy/restart.
 
@@ -61,5 +61,5 @@ A UI não é uma fronteira de segurança. As funções do servidor e as polític
 - O SQL base deve corresponder à versão de 9 tabelas usada como referência. Não execute o SQL base em banco que já tenha tabelas ou dados sem revisar a migração.
 - O banco atual não possui tabelas de agenda, pedidos ou contas a receber. Esses módulos estão marcados como “Em breve” no projeto e não devem ser simulados como dados persistidos.
 - A migration de autenticação converte os papéis antigos para ADMIN/USER. Revise usuários já existentes antes de aplicá-la em produção.
-- Configure proteção adicional de tentativas de login no gateway/hosting. Limites em memória do processo não são suficientes em deploy serverless/multirréplica.
-- Após configurar as chaves, execute typecheck, testes e testes reais de login/RLS em um projeto Supabase de homologação.
+- O endpoint aplica bloqueio temporário por username após cinco falhas no mesmo processo. Isso é defesa adicional, não substitui rate limiting distribuído no gateway/hosting; em deploy serverless/multirréplica, configure também limite por IP no provedor.
+- O `pnpm-lock.yaml` precisa ser regenerado com `pnpm install` após a inclusão das dependências.\n- Após configurar as chaves, execute typecheck, testes e testes reais de login/RLS em um projeto Supabase de homologação.
