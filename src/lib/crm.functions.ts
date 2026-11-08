@@ -118,10 +118,10 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
         JOIN public.usuarios u ON u.id = p.id
         WHERE p.ativo = true
       ) x), '[]'::json) AS profiles,
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_clientes_resumo) x), '[]'::json) AS client_view,
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.ordem) FROM (SELECT * FROM public.vw_funil_resumo) x), '[]'::json) AS funnel_view,
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS quote_view,
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.placa) FROM (SELECT * FROM public.vw_frota_resumo) x), '[]'::json) AS fleet_view
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_clientes_resumo) x), '[]'::json) AS "clientView",
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.ordem) FROM (SELECT * FROM public.vw_funil_resumo) x), '[]'::json) AS "funnelView",
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS "quoteView",
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.placa) FROM (SELECT * FROM public.vw_frota_resumo) x), '[]'::json) AS "fleetView"
   `)
   const data = result.rows[0]
   if (!data) throw new Error('O banco não retornou os dados do CRM.')
