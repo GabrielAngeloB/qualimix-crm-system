@@ -54,6 +54,7 @@ function Financeiro() {
     jobBalance,
     toast,
     currentRole,
+    views,
   } = useStore()
   const canEditFinance = currentRole === 'administrador' || currentRole === 'financeiro'
   const [kind, setKind] = useState<'todos' | FinancialKind>('todos')
@@ -63,10 +64,11 @@ function Financeiro() {
   const [paymentFor, setPaymentFor] = useState<string | null>(null)
   const [payment, setPayment] = useState({ amount: '', paidAt: today, method: '', note: '' })
 
+  const financeSummaryById = useMemo(() => new Map(views.finance.map((row) => [String(row.id), row])), [views.finance])
   const entries = useMemo(() => financialEntries
     .map((entry) => ({
       ...entry,
-      status: financialStatus(
+      status: financeSummaryById.get(entry.id)?.status_calculado ?? financialStatus(
         entry.amountCents,
         entry.payments.reduce((sum, item) => sum + item.amountCents, 0),
         entry.dueDate,
@@ -75,18 +77,29 @@ function Financeiro() {
       ),
     }))
     .filter((entry) => (kind === 'todos' || entry.kind === kind) && (statusFilter === 'todos' || entry.status === statusFilter))
-    .sort((a, b) => (a.dueDate + a.createdAt).localeCompare(b.dueDate + b.createdAt)), [financialEntries, kind, statusFilter])
+    .sort((a, b) => (a.dueDate + a.createdAt).localeCompare(b.dueDate + b.createdAt)), [financialEntries, financeSummaryById, kind, statusFilter])
 
   const receivables = financialEntries.filter((entry) => entry.kind === 'receber')
   const payables = financialEntries.filter((entry) => entry.kind === 'pagar')
   const activeReceivables = receivables.filter((entry) => entry.status !== 'Cancelado')
   const activePayables = payables.filter((entry) => entry.status !== 'Cancelado')
-  // Cancelar uma conta encerra o saldo restante, mas não apaga dinheiro já baixado.
-  const receivedCents = receivables.reduce((sum, entry) => sum + entry.payments.reduce((paid, item) => paid + item.amountCents, 0), 0)
-  const payablePaidCents = payables.reduce((sum, entry) => sum + entry.payments.reduce((paid, item) => paid + item.amountCents, 0), 0)
-  const receivableOpenCents = activeReceivables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
-  const payableOpenCents = activePayables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
-  const overdueCents = [...activeReceivables, ...activePayables].filter((entry) => entry.dueDate < today && openAmountCents(entry) > 0).reduce((sum, entry) => sum + openAmountCents(entry), 0)
+  // Os totais e saldos vêm da view; os lançamentos base continuam carregando o histórico de baixas.
+  const hasFinanceView = views.finance.length > 0 || financialEntries.length === 0
+  const receivedCents = hasFinanceView
+    ? views.finance.filter((row) => row.tipo === 'receber').reduce((sum, row) => sum + Number(row.total_pago_centavos ?? 0), 0)
+    : receivables.reduce((sum, entry) => sum + entry.payments.reduce((paid, item) => paid + item.amountCents, 0), 0)
+  const payablePaidCents = hasFinanceView
+    ? views.finance.filter((row) => row.tipo === 'pagar').reduce((sum, row) => sum + Number(row.total_pago_centavos ?? 0), 0)
+    : payables.reduce((sum, entry) => sum + entry.payments.reduce((paid, item) => paid + item.amountCents, 0), 0)
+  const receivableOpenCents = hasFinanceView
+    ? views.finance.filter((row) => row.tipo === 'receber' && row.status_calculado !== 'Cancelado').reduce((sum, row) => sum + Number(row.saldo_centavos ?? 0), 0)
+    : activeReceivables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
+  const payableOpenCents = hasFinanceView
+    ? views.finance.filter((row) => row.tipo === 'pagar' && row.status_calculado !== 'Cancelado').reduce((sum, row) => sum + Number(row.saldo_centavos ?? 0), 0)
+    : activePayables.reduce((sum, entry) => sum + openAmountCents(entry), 0)
+  const overdueCents = hasFinanceView
+    ? views.finance.filter((row) => row.status_calculado === 'Vencido').reduce((sum, row) => sum + Number(row.saldo_centavos ?? 0), 0)
+    : [...activeReceivables, ...activePayables].filter((entry) => entry.dueDate < today && openAmountCents(entry) > 0).reduce((sum, entry) => sum + openAmountCents(entry), 0)
 
   const submitExpense = async () => {
     const parsed = parseDecimal(expense.amount)
@@ -302,7 +315,10 @@ function Financeiro() {
               const professional = professionals.find((item) => item.id === entry.professionalId)
               const orderClient = order ? clients.find((item) => item.id === order.clientId) : undefined
               const orderSite = order ? sites.find((item) => item.id === order.siteId) : undefined
-              const openCents = entry.status === 'Cancelado' ? 0 : openAmountCents(entry)
+              const financeSummary = financeSummaryById.get(entry.id)
+              const openCents = entry.status === 'Cancelado' ? 0 : financeSummary
+                ? Number(financeSummary.saldo_centavos ?? 0)
+                : openAmountCents(entry)
               const isPaymentOpen = paymentFor === entry.id
               return (
                 <article key={entry.id} className="p-4 sm:p-5">
