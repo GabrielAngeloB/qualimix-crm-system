@@ -5,6 +5,7 @@ import {
   type Client, type Opportunity, type QuoteRecord, type Site, type TeamUser,
 } from './fixtures'
 import { buildReceivables, evaluateAll, quoteContext, type EvaluatedQuote, type ReceivableRow } from './derived'
+import { sortNewestFirst } from './ordering'
 import type { QuoteContext } from '../lib/quote'
 import {
   loadCrmData, persistClient, persistOpportunity, persistQuote,
@@ -109,7 +110,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const clients = demoMode ? [...dbData.clients, ...seedClients] : dbData.clients
     const sites = demoMode ? [...dbData.sites, ...seedSites] : dbData.sites
     const quoteRecords = demoMode ? [...dbData.quotes, ...(seedQuotes as QuoteRecord[])] : dbData.quotes
-    const opportunities = demoMode ? [...dbData.opportunities, ...opps.filter((item) => item.demo)] : dbData.opportunities
+    const opportunities = sortNewestFirst(demoMode ? [...dbData.opportunities, ...opps.filter((item) => item.demo)] : dbData.opportunities)
     return {
       demoMode, setDemoMode, ctx, clients, sites,
       quotes: evaluateAll(quoteRecords, ctx), opportunities,
