@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
 import {
   Building2,
+  Bell,
   CalendarDays,
   ClipboardList,
   FileText,
@@ -18,7 +19,6 @@ import {
   X,
 } from 'lucide-react'
 import { useStore } from '../data/store'
-import { currentUser } from '../data/fixtures'
 import { formatDocument, onlyDigits } from '../lib/documents'
 import { LogoSlot, Toaster, cx } from './ui'
 
@@ -30,18 +30,20 @@ const nav: { group: string; items: NavItem[] }[] = [
     items: [
       { label: 'Clientes e obras', icon: Users, to: '/clientes' },
       { label: 'Funil comercial', icon: SquareKanban, to: '/funil' },
+      { label: 'Tarefas e retornos', icon: Bell, to: '/tarefas' },
       { label: 'Orçamentos', icon: FileText, to: '/orcamentos' },
     ],
   },
   {
     group: 'Operação',
     items: [
-      { label: 'Pedidos', icon: ClipboardList, soon: 'Em breve' },
-      { label: 'Agenda de concretagens', icon: CalendarDays, soon: 'Em breve' },
+      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos' },
+      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda' },
+      { label: 'Profissionais', icon: Users, to: '/profissionais' },
       { label: 'Caminhões', icon: Truck, soon: 'Em breve' },
     ],
   },
-  { group: 'Financeiro', items: [{ label: 'Contas a receber', icon: Wallet, soon: 'Em breve' }] },
+  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro' }] },
   { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }] },
 ]
 
@@ -62,7 +64,7 @@ function useTheme() {
 export function AppShell({ children }: { children: ReactNode }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const path = useRouterState({ select: (s) => s.location.pathname })
-  const { demoMode, setDemoMode } = useStore()
+  const { storageMode } = useStore()
   const { theme, toggle } = useTheme()
 
   useEffect(() => setMenuOpen(false), [path])
@@ -114,16 +116,6 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         ))}
       </div>
-      <div className="border-t border-white/10 p-4">
-        <label className="flex cursor-pointer items-center justify-between gap-3 text-sm">
-          <span>
-            <span className="block font-semibold">Dados de demonstração</span>
-            <span className="block text-xs text-white/45">{demoMode ? 'Fictícios visíveis' : 'Ocultos'}</span>
-          </span>
-          <input type="checkbox" className="peer sr-only" checked={demoMode} onChange={(e) => setDemoMode(e.target.checked)} />
-          <span className="relative h-6 w-11 shrink-0 rounded-full bg-white/20 transition peer-checked:bg-brand after:absolute after:left-0.5 after:top-0.5 after:h-5 after:w-5 after:rounded-full after:bg-white after:transition peer-checked:after:translate-x-5 peer-focus-visible:outline-2 peer-focus-visible:outline-brand" />
-        </label>
-      </div>
     </nav>
   )
 
@@ -137,12 +129,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
       )}
       <div className="min-w-0">
-        {demoMode && (
-          <div className="no-print flex items-center gap-3 bg-ink px-4 py-1.5 text-xs text-bg">
-            <span className="stripe h-3 w-8 shrink-0 rounded-sm" />
-            <span className="truncate">
-              <strong className="uppercase tracking-wider">Ambiente de demonstração</strong> — clientes, obras e valores exibidos são fictícios.
-            </span>
+        {storageMode === 'browser-local' && (
+          <div className="no-print border-b border-warn/30 bg-warn-soft px-4 py-2 text-xs text-warn">
+            <strong>Armazenamento local:</strong> os registros novos ficam neste navegador. A integração/sincronização com o Supabase ainda precisa ser conectada antes do uso multiusuário em produção.
           </div>
         )}
         <header className="no-print sticky top-0 z-40 flex h-16 items-center gap-3 border-b border-line bg-surface/90 px-4 backdrop-blur md:px-6">
@@ -154,10 +143,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           </button>
           <div className="hidden items-center gap-2 sm:flex">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">AD</div>
+            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">QL</div>
             <div className="leading-tight">
-              <div className="text-sm font-semibold">{currentUser.name}</div>
-              <div className="text-xs text-muted">{currentUser.role}</div>
+              <div className="text-sm font-semibold">Sessão local</div>
+              <div className="text-xs text-muted">Sem autenticação</div>
             </div>
           </div>
         </header>

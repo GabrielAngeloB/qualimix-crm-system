@@ -66,8 +66,8 @@ export function BarChart({
           tooltip: { callbacks: { label: (c) => `${c.dataset.label}: ${format(Number(c.raw))}` } },
         },
         scales: {
-          x: { grid: { display: !!horizontal, color: 'rgba(140,140,140,.18)' }, ticks: { color: GREY, font: { family: 'Barlow' }, callback: horizontal ? (v) => format(Number(v)) : undefined }, beginAtZero: true },
-          y: { grid: { display: !horizontal, color: 'rgba(140,140,140,.18)' }, ticks: { color: GREY, font: { family: 'Barlow' }, callback: horizontal ? undefined : (v) => format(Number(v)) }, beginAtZero: true },
+          x: { grid: { display: !!horizontal, color: 'rgba(140,140,140,.18)' }, ticks: { color: GREY, font: { family: 'Barlow' }, callback: horizontal ? (v) => format(Number(v)) : function (v) { return this.getLabelForValue(Number(v)) } }, beginAtZero: true },
+          y: { grid: { display: !horizontal, color: 'rgba(140,140,140,.18)' }, ticks: { color: GREY, font: { family: 'Barlow' }, callback: horizontal ? function (v) { return this.getLabelForValue(Number(v)) } : (v) => format(Number(v)) }, beginAtZero: true },
         },
       }}
     />

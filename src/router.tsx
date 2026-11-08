@@ -1,15 +1,18 @@
-import { createRouter } from '@tanstack/react-router'
+import { QueryClient } from "@tanstack/react-query";
+import { createRouter } from "@tanstack/react-router";
+import { routeTree } from "./routeTree.gen";
 
-// Import the generated route tree
-import { routeTree } from './routeTree.gen'
-
-// Create a new router instance
 export const getRouter = () => {
+  // One client per request: a module-level QueryClient leaks cached data between SSR requests.
+  const queryClient = new QueryClient();
+
   const router = createRouter({
     routeTree,
+    context: { queryClient },
     scrollRestoration: true,
+    // Lets Query own freshness; set caching defaults on the QueryClient, not the router.
     defaultPreloadStaleTime: 0,
-  })
+  });
 
-  return router
-}
+  return router;
+};

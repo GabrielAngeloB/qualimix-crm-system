@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Copy, Eye, FileText, MessageCircle, Plus, Search } from 'lucide-react'
+import { Copy, Eye, FileText, MessageCircle, Pencil, Plus, Search } from 'lucide-react'
 import { useStore } from '../data/store'
 import { paymentMethods, quoteStatuses } from '../data/settings'
-import { today, userName } from '../data/fixtures'
+import { today } from '../lib/clock'
+import { displayUserName } from '../data/session'
 import type { EvaluatedQuote } from '../data/derived'
 import { summarizeMeasures } from '../lib/quote'
 import { brlCents, dateBR, daysBetween, num } from '../lib/format'
@@ -15,13 +16,20 @@ import type { ProposalData } from '../components/ProposalDocument'
 
 export const Route = createFileRoute('/orcamentos/')({
   validateSearch: (s: Record<string, unknown>): { q?: string } => ({ q: typeof s.q === 'string' ? s.q : undefined }),
-  head: () => ({ meta: [{ title: 'Orçamentos — Qualimix CRM' }] }),
+  head: () => ({
+    meta: [
+      { title: 'Orçamentos — Qualimix CRM' },
+      { name: 'description', content: 'Pesquise, filtre e duplique orçamentos de concreto usinado e pisos e veja cada proposta.' },
+      { property: 'og:title', content: 'Orçamentos — Qualimix CRM' },
+      { property: 'og:description', content: 'Lista de orçamentos da Qualimix com filtros e propostas.' },
+    ],
+  }),
   component: Orcamentos,
 })
 
 function Orcamentos() {
   const { q: initialQ } = Route.useSearch()
-  const { quotes, clients, sites, demoMode } = useStore()
+  const { quotes, clients, sites, updateQuoteStatus, toast } = useStore()
   const [q, setQ] = useState(initialQ ?? '')
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
@@ -51,7 +59,7 @@ function Orcamentos() {
     validUntil: x.validUntil,
     client: clients.find((c) => c.id === x.clientId),
     site: sites.find((s) => s.id === x.siteId),
-    ownerName: userName(x.ownerId),
+    ownerName: displayUserName(x.ownerId),
     lines: x.lines,
     result: x.result,
     volume: summarizeMeasures(x.volumeElements, x.volumeMargin, 'volume'),
@@ -108,7 +116,7 @@ function Orcamentos() {
 
         {t.total === 0 ? (
           <EmptyState icon={<FileText className="h-6 w-6" />} title={quotes.length ? 'Nenhum orçamento encontrado' : 'Nenhum orçamento ainda'} action={<Link to="/orcamentos/novo" className="font-semibold text-brand hover:underline">Criar o primeiro orçamento</Link>}>
-            {quotes.length ? 'Ajuste a pesquisa ou os filtros.' : demoMode ? '' : 'Os dados de demonstração estão ocultos. Crie um orçamento para começar.'}
+            {quotes.length ? 'Ajuste a pesquisa ou os filtros.' : 'Crie um orçamento para começar.'}
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
@@ -147,12 +155,31 @@ function Orcamentos() {
                       </td>
                       <td className={cx('px-4 py-3 text-right font-display text-lg font-bold tabular', x.result.totalCents === null && 'text-warn')}>{brlCents(x.result.totalCents)}</td>
                       <td className="px-4 py-3">
-                        <Badge tone={statusTone(x.status)}>{x.status}</Badge>
+                        {x.demo ? (
+                          <Badge tone={statusTone(x.status)}>{x.status}</Badge>
+                        ) : (
+                          <select
+                            aria-label={`Atualizar status de ${x.number}`}
+                            className={cx(inputCls(), 'h-9 min-w-[170px] text-xs')}
+                            value={x.status}
+                            onChange={(event) => {
+                              updateQuoteStatus(x.id, event.target.value as (typeof quoteStatuses)[number])
+                              toast({ tone: 'info', title: 'Status do orçamento atualizado', body: x.number })
+                            }}
+                          >
+                            {quoteStatuses.map((option) => <option key={option} value={option}>{option}</option>)}
+                          </select>
+                        )}
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex justify-end gap-1">
                           <IconBtn label="Ver proposta" onClick={() => setPreview(p)}><Eye className="h-4 w-4" /></IconBtn>
                           <IconBtn label="Compartilhar no WhatsApp" onClick={() => setWa(p)}><MessageCircle className="h-4 w-4" /></IconBtn>
+                          {!x.demo && x.status === 'Rascunho' && (
+                            <Link to="/orcamentos/novo" search={{ editar: x.id }} title="Editar rascunho" aria-label="Editar rascunho" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
+                              <Pencil className="h-4 w-4" />
+                            </Link>
+                          )}
                           <Link to="/orcamentos/novo" search={{ origem: x.id }} title="Duplicar com preços atuais" aria-label="Duplicar com preços atuais" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
                             <Copy className="h-4 w-4" />
                           </Link>

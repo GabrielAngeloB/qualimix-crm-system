@@ -2,17 +2,27 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarDays, CircleAlert, FileText, Plus, Settings, Truck, Wallet } from 'lucide-react'
 import { useStore } from '../data/store'
-import { computeDashboard } from '../data/metrics'
-import { activities, schedule, team, today, userName } from '../data/fixtures'
+import { computeDashboard, computeOperationalDashboard } from '../data/metrics'
+import { today } from '../lib/clock'
 import { pendingSettings } from '../data/settings'
 import { brl, brlCents, dateBR, daysBetween, num, pct } from '../lib/format'
 import { Badge, Card, CardHeader, EmptyState, PageHeader, cx, inputCls } from '../components/ui'
 import { BarChart, ChartCard } from '../components/Charts'
 
-export const Route = createFileRoute('/')({ component: Painel })
+export const Route = createFileRoute('/')({
+  head: () => ({
+    meta: [
+      { title: 'Painel gerencial — Qualimix CRM' },
+      { name: 'description', content: 'Leads, orçamentos, conversão, m³ e m² vendidos, próximas concretagens e contas a receber da Qualimix.' },
+      { property: 'og:title', content: 'Painel gerencial — Qualimix CRM' },
+      { property: 'og:description', content: 'Indicadores comerciais e operacionais da Qualimix em um só painel.' },
+    ],
+  }),
+  component: Painel,
+})
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, scheduleEvents, workOrders, expenses, financialEntries, tasks } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
   const d = useMemo(() => computeDashboard(quotes, opportunities, receivables, { today, days, ownerId }), [quotes, opportunities, receivables, days, ownerId])
@@ -21,15 +31,42 @@ function Painel() {
     const q = quotes.find((x) => x.id === quoteId)
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
   }
-  const upcoming = (demoMode ? schedule : []).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  const hasData = quotes.length > 0 || opportunities.length > 0
+  const realSchedule = scheduleEvents
+    .filter((event) => daysBetween(today, event.date) >= 0 && !['Cancelada', 'Concluída'].includes(event.status))
+    .map((event) => ({
+      id: event.id, date: event.date, time: event.time, volume: event.volumeM3, fck: event.fck, pump: event.pump, truck: event.truck, status: event.status,
+      clientName: clients.find((client) => client.id === event.clientId)?.name ?? '—',
+      siteName: sites.find((site) => site.id === event.siteId)?.name ?? event.service,
+    }))
+  const upcoming = [...realSchedule].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+  const pendingTasks = tasks
+    .filter((task) => task.status === 'Pendente')
+    .sort((a, b) => (a.dueDate + (a.dueTime ?? '23:59')).localeCompare(b.dueDate + (b.dueTime ?? '23:59')))
+  const overdueTasks = pendingTasks.filter((task) => task.dueDate < today)
+  const todayTasks = pendingTasks.filter((task) => task.dueDate === today)
+  const ownerOptions = [...new Set(opportunities.map((opportunity) => opportunity.ownerId))].sort()
+  const recentActivities = opportunities
+    .flatMap((opportunity) => opportunity.history.map((event) => ({
+      id: `${opportunity.id}-${event.at}-${event.text}`,
+      text: event.text,
+      ref: opportunity.title,
+      by: event.by,
+      at: event.at.slice(0, 10),
+    })))
+    .sort((a, b) => b.at.localeCompare(a.at))
+    .slice(0, 6)
+  const operational = useMemo(
+    () => computeOperationalDashboard(workOrders, expenses, financialEntries, scheduleEvents, today),
+    [workOrders, expenses, financialEntries, scheduleEvents],
+  )
+  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0 || financialEntries.length > 0 || tasks.length > 0
 
   return (
     <>
       <PageHeader
         eyebrow={`Hoje, ${dateBR(today)}`}
         title="Painel gerencial"
-        description="Indicadores calculados a partir dos registros de orçamentos, funil e contas a receber."
+        description="Indicadores comerciais e operacionais calculados a partir dos orçamentos, pedidos, agenda, despesas e lançamentos financeiros."
         actions={
           <>
             <select aria-label="Período" className={cx(inputCls(), 'w-auto')} value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -40,7 +77,7 @@ function Painel() {
             </select>
             <select aria-label="Responsável" className={cx(inputCls(), 'w-auto')} value={ownerId} onChange={(e) => setOwnerId(e.target.value)}>
               <option value="">Todos os responsáveis</option>
-              {team.filter((u) => u.role === 'Comercial').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+              {ownerOptions.map((ownerId) => <option key={ownerId} value={ownerId}>{ownerId === 'u-local' ? 'Sessão local' : ownerId}</option>)}
             </select>
             <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
               <Plus className="h-4 w-4" /> Novo orçamento
@@ -73,10 +110,41 @@ function Painel() {
             <Kpi label="Aceitos" value={String(d.acceptedCount)} def={`Conversão ${pct(d.conversion)} (aceitos ÷ enviados)`} />
             <Kpi label="Valor orçado" value={brlCents(d.quotedCents)} def="Total das propostas criadas no período" />
             <Kpi accent label="Valor contratado" value={brlCents(d.contractedCents)} def="Orçamentos aceitos — pedidos fechados" />
+            <Kpi label="Pipeline em aberto" value={brlCents(d.pipelineCents)} def={d.opportunitiesWithoutQuote + ' sem orçamento · ' + d.opportunitiesWithQuote + ' com orçamento vinculado'} />
             <Kpi label="Concreto vendido" value={`${num(d.volumeM3, 1)} m³`} def="Volume dos orçamentos aceitos" />
             <Kpi label="Pisos vendidos" value={`${num(d.areaM2, 0)} m²`} def="Área dos orçamentos aceitos" />
             <Kpi label="Contas vencidas" value={brlCents(d.overdueCents)} def={`${d.overdue.length} parcela(s) em atraso`} tone={d.overdueCents > 0 ? 'red' : undefined} />
           </dl>
+
+          <Card className="mt-6">
+            <CardHeader
+              title="Tarefas e retornos comerciais"
+              subtitle={overdueTasks.length + ' atrasada(s) · ' + todayTasks.length + ' para hoje'}
+              action={<Link to="/tarefas" search={{ oportunidade: undefined }} className="text-sm font-semibold text-brand hover:underline">Abrir tarefas</Link>}
+            />
+            {pendingTasks.length === 0 ? (
+              <p className="p-5 text-sm text-muted">Nenhuma tarefa pendente. Registre o próximo passo de uma oportunidade para acompanhar os retornos.</p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {pendingTasks.slice(0, 5).map((task) => {
+                  const opportunity = opportunities.find((item) => item.id === task.opportunityId)
+                  const client = clients.find((item) => item.id === opportunity?.clientId)
+                  return (
+                    <li key={task.id} className="flex flex-wrap items-center gap-3 px-5 py-3 text-sm">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold">{task.title}</p>
+                        <p className="truncate text-xs text-muted">{opportunity?.title ?? 'Tarefa geral'}{client ? ' · ' + client.name : ''}</p>
+                      </div>
+                      <span className="text-xs text-muted">{dateBR(task.dueDate)}{task.dueTime ? ' · ' + task.dueTime : ''}</span>
+                      <Badge tone={task.dueDate < today ? 'red' : task.dueDate === today ? 'warn' : 'neutral'}>
+                        {task.dueDate < today ? 'Atrasada' : task.dueDate === today ? 'Hoje' : 'Agendada'}
+                      </Badge>
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </Card>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
             <ChartCard className="xl:col-span-2" title="Histórico de vendas" definition="Valor orçado × valor contratado por mês de criação do orçamento (últimos 6 meses)." columns={['Mês', 'Orçado', 'Contratado']} rows={d.months.map((m) => [m.label, brl(m.quoted), brl(m.contracted)])}>
@@ -122,13 +190,12 @@ function Painel() {
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             <Card>
-              <CardHeader title="Próximas concretagens" action={<CalendarDays className="h-5 w-5 text-brand" />} />
+              <CardHeader title="Próximas concretagens" subtitle={`${operational.scheduledCount} serviço(s) futuro(s)`} action={<Link to="/agenda" className="text-sm font-semibold text-brand hover:underline">Abrir agenda</Link>} />
               {upcoming.length === 0 ? (
                 <p className="p-5 text-sm text-muted">Nenhuma concretagem programada.</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {upcoming.map((e) => {
-                    const { client, site } = clientOf(e.quoteId)
                     return (
                       <li key={e.id} className="flex gap-3 px-5 py-3 text-sm">
                         <div className="w-14 shrink-0 rounded bg-ink py-1 text-center text-bg">
@@ -136,8 +203,8 @@ function Painel() {
                           <div className="text-[11px]">{e.time}</div>
                         </div>
                         <div className="min-w-0 flex-1">
-                          <p className="truncate font-semibold">{site?.name}</p>
-                          <p className="truncate text-xs text-muted">{client?.name}</p>
+                          <p className="truncate font-semibold">{e.siteName}</p>
+                          <p className="truncate text-xs text-muted">{e.clientName}</p>
                           <p className="mt-1 flex flex-wrap gap-1">
                             <Badge>{num(e.volume, 1)} m³{e.fck && ` · FCK ${e.fck}`}</Badge>
                             {e.pump && <Badge tone="info">Bomba</Badge>}
@@ -176,17 +243,31 @@ function Painel() {
             </Card>
 
             <Card>
+              <CardHeader title="Contas a pagar" action={<Link to="/financeiro" className="text-sm font-semibold text-brand hover:underline">Abrir financeiro</Link>} />
+              <div className="space-y-3 p-5">
+                <Flow label="Em aberto" value={operational.payableOpenCents} max={operational.payableOpenCents + operational.payablePaidCents} tone="grey" />
+                <Flow label="Pago" value={operational.payablePaidCents} max={operational.payableOpenCents + operational.payablePaidCents} tone="ok" />
+                <Flow label="Custos lançados nas obras" value={operational.costsCents} max={operational.contractedCents} tone="red" />
+                <div className="border-t border-line pt-3">
+                  <p className="text-xs text-muted">Contratado nas obras</p>
+                  <p className="font-display text-xl font-bold tabular">{brlCents(operational.contractedCents)}</p>
+                  <p className="mt-1 text-xs text-muted">Saldo após despesas: <strong className="tabular">{brlCents(operational.balanceCents)}</strong></p>
+                </div>
+              </div>
+            </Card>
+
+            <Card>
               <CardHeader title="Atividades recentes" />
-              {(demoMode ? activities : []).length === 0 ? (
+              {recentActivities.length === 0 ? (
                 <p className="p-5 text-sm text-muted">Nenhuma atividade registrada.</p>
               ) : (
                 <ol className="space-y-3 p-5 text-sm">
-                  {activities.map((a, i) => (
-                    <li key={i} className="flex gap-3">
+                  {recentActivities.map((activity) => (
+                    <li key={activity.id} className="flex gap-3">
                       <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-brand" />
                       <div className="min-w-0">
-                        <p className="font-medium">{a.text}</p>
-                        <p className="text-xs text-muted">{a.ref} · {userName(a.by)} · {dateBR(a.at)}</p>
+                        <p className="font-medium">{activity.text}</p>
+                        <p className="text-xs text-muted">{activity.ref} · {activity.by === 'u-local' ? 'Sessão local' : activity.by} · {dateBR(activity.at)}</p>
                       </div>
                     </li>
                   ))}
