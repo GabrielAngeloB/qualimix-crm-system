@@ -37,7 +37,7 @@ const nav: { group: string; items: NavItem[] }[] = [
   {
     group: 'Operação',
     items: [
-      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos', roles: ['comercial', 'operacao', 'financeiro', 'consulta'] },
+      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos', roles: ['comercial', 'operacao', 'consulta'] },
       { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda', roles: ['operacao', 'consulta'] },
       { label: 'Profissionais', icon: Users, to: '/profissionais', roles: ['operacao', 'financeiro', 'consulta'] },
     ],
