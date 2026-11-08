@@ -168,7 +168,7 @@ export const deleteUser = createServerFn({ method: 'POST' })
     const admin = createAdminSupabase()
     const { data: target } = await admin.from('perfis').select('perfil,ativo').eq('id', data.id).maybeSingle()
     if (!target) throw new Error('Usuário não encontrado.')
-    if (target.perfil === 'admin' && target.ativo) {
+    const [clientRefs, opportunityRefs, quoteRefs] = await Promise.all([\n      admin.from('clientes').select('id', { count:'exact', head:true }).eq('responsavel_id',data.id),\n      admin.from('oportunidades').select('id', { count:'exact', head:true }).eq('responsavel_id',data.id),\n      admin.from('orcamentos').select('id', { count:'exact', head:true }).eq('responsavel_id',data.id),\n    ])\n    if ((clientRefs.count ?? 0) + (opportunityRefs.count ?? 0) + (quoteRefs.count ?? 0) > 0) throw new Error('Este usuário possui registros vinculados. Desative a conta em vez de excluí-la.')\n    if (target.perfil === 'admin' && target.ativo) {
       const { count } = await admin.from('perfis').select('id', { count: 'exact', head: true }).eq('perfil', 'admin').eq('ativo', true)
       if ((count ?? 0) <= 1) throw new Error('Não é possível excluir o último administrador ativo.')
     }
