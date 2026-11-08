@@ -191,7 +191,7 @@ function Agenda() {
                           ? <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
                               {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                             </select>
-                          : <span className="inline-flex py-2"><Badge>{event.status}</Badge></span>}
+                          : <span className="inline-flex rounded-md border border-line px-2 py-1 text-xs font-medium">{event.status}</span>}
                       </td>
                     </tr>
                   )
