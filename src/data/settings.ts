@@ -165,9 +165,9 @@ export const quoteStatuses = [
 export type QuoteStatus = (typeof quoteStatuses)[number]
 
 /** Itens de configuração que precisam ser confirmados com a Qualimix. */
-export function pendingSettings(): string[] {
+export function pendingSettings(catalogItems: CatalogItem[] = catalog): string[] {
   const p: string[] = []
-  const missingPrices = catalog.filter((c) => c.basePrice === null).length
+  const missingPrices = catalogItems.filter((c) => c.basePrice === null).length
   if (missingPrices) p.push(`${missingPrices} preços do catálogo`)
   if (company.cnpj === null || company.legalName === null)
     p.push('Dados institucionais (razão social, CNPJ, endereço)')
