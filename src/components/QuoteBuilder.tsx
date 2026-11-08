@@ -418,7 +418,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                       )}
                     </div>
                     <div>
-                      <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Preço unitário</label>
+                      <label className="mb-1 block text-xs font-semibold text-muted">Preço unitário (R$ / ${l.unit})</label>
                       <input aria-label={`Preço unitário de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.unitPriceInput} placeholder={ref != null ? num(ref, 2) : 'Ex.: 420,00'} onChange={(e) => patchLine(l.id, { unitPriceInput: e.target.value })} />
                       <div className="mt-1">
                         {c?.priceSource === 'tabela' && <Badge tone="ok">Tabela oficial</Badge>}
