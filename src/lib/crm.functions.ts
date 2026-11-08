@@ -102,7 +102,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
   const db = getPool()
   const [clients, sites, opportunities, quotes, products, profiles, clientView, funnelView, quoteView, fleetView] = await Promise.all([
     db.query('SELECT * FROM public.clientes WHERE is_demo = false ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.obras WHERE is_demo = false ORDER BY created_at DESC'),
+    db.query('SELECT * FROM public.obras WHERE is_demo = false AND ativa = true ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.oportunidades WHERE is_demo = false ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.orcamentos WHERE is_demo = false ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.produtos WHERE ativo = true ORDER BY categoria, nome'),
