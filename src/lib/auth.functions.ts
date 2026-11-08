@@ -65,24 +65,21 @@ async function assertLoginAllowed(username: string, ipHash: string) {
 }
 
 async function recordLoginFailure(username: string, ipHash: string) {
-  await getPool().query(
-    \`INSERT INTO public.login_tentativas (username, ip_hash, falhas, bloqueado_ate)
-     VALUES ($1, $2, 1, NULL)
-     ON CONFLICT (username, ip_hash) DO UPDATE SET
-       falhas = CASE
-         WHEN public.login_tentativas.bloqueado_ate IS NOT NULL
-          AND public.login_tentativas.bloqueado_ate <= now()
-         THEN 1 ELSE public.login_tentativas.falhas + 1 END,
-       bloqueado_ate = CASE
-         WHEN (CASE
-           WHEN public.login_tentativas.bloqueado_ate IS NOT NULL
-            AND public.login_tentativas.bloqueado_ate <= now()
-           THEN 1 ELSE public.login_tentativas.falhas + 1 END) >= 5
-         THEN now() + interval '15 minutes'
-         ELSE NULL END,
-       updated_at = now()\`,
-    [username, ipHash],
-  )
+  const query = [
+    'INSERT INTO public.login_tentativas (username, ip_hash, falhas, bloqueado_ate)',
+    'VALUES ($1, $2, 1, NULL)',
+    'ON CONFLICT (username, ip_hash) DO UPDATE SET',
+    'falhas = CASE WHEN public.login_tentativas.bloqueado_ate IS NOT NULL',
+    'AND public.login_tentativas.bloqueado_ate <= now() THEN 1',
+    'ELSE public.login_tentativas.falhas + 1 END,',
+    'bloqueado_ate = CASE WHEN (CASE',
+    'WHEN public.login_tentativas.bloqueado_ate IS NOT NULL',
+    'AND public.login_tentativas.bloqueado_ate <= now() THEN 1',
+    'ELSE public.login_tentativas.falhas + 1 END) >= 5',
+    "THEN now() + interval '15 minutes' ELSE NULL END,",
+    'updated_at = now()',
+  ].join(' ')
+  await getPool().query(query, [username, ipHash])
 }
 
 async function clearLoginFailures(username: string, ipHash: string) {
@@ -325,12 +322,12 @@ export const bootstrapAdmin = createServerFn({ method: 'POST' })
         if (existing.rowCount) throw new Error('O administrador inicial já foi criado.')
 
         await client.query(
-          'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
-          [id, data.username, passwordHash],
-        )
-        await client.query(
           'INSERT INTO public.perfis (id, nome, perfil, ativo) VALUES ($1, $2, $3, true)',
           [id, data.name, 'administrador'],
+        )
+        await client.query(
+          'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
+          [id, data.username, passwordHash],
         )
       })
     } catch (error) {
