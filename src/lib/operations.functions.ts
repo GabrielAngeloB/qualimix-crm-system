@@ -127,7 +127,11 @@ export type OperationalRecords = {
 
 export const loadOperationalRecords = createServerFn({ method: 'GET' })
   .handler(async (): Promise<OperationalRecords> => {
-    await requireCurrentProfile()
+    const profile = await requireCurrentProfile()
+    const isAdmin = profile.perfil === 'admin' || profile.role === 'administrador'
+    const canViewSales = isAdmin || profile.role === 'comercial' || profile.role === 'consulta'
+    const canViewOperations = isAdmin || profile.role === 'operacao' || profile.role === 'consulta'
+    const canViewFinance = isAdmin || profile.role === 'financeiro' || profile.role === 'consulta'
     const result = await getPool().query<{
       orders: any[]; schedule: any[]; professionals: any[]; expenses: any[];
       financial: any[]; tasks: any[]; financeView: any[]; ordersView: any[];
@@ -168,12 +172,18 @@ export const loadOperationalRecords = createServerFn({ method: 'GET' })
     const row = result.rows[0]
     if (!row) throw new Error('O banco não retornou os registros operacionais.')
     return {
-      workOrders: row.orders.map(mapWorkOrder), scheduleEvents: row.schedule.map(mapSchedule),
-      professionals: row.professionals.map(mapProfessional), expenses: row.expenses.map(mapExpense),
-      financialEntries: row.financial.map(mapFinancial), tasks: row.tasks.map(mapTask),
+      workOrders: row.orders.map(mapWorkOrder),
+      scheduleEvents: canViewOperations ? row.schedule.map(mapSchedule) : [],
+      professionals: canViewOperations || canViewFinance ? row.professionals.map(mapProfessional) : [],
+      expenses: canViewOperations || canViewFinance ? row.expenses.map(mapExpense) : [],
+      financialEntries: canViewFinance ? row.financial.map(mapFinancial) : [],
+      tasks: canViewSales ? row.tasks.map(mapTask) : [],
       views: {
-        finance: row.financeView, orders: row.ordersView, professionals: row.professionalsView,
-        schedule: row.scheduleView, tasks: row.tasksView,
+        finance: canViewFinance ? row.financeView : [],
+        orders: row.ordersView,
+        professionals: canViewOperations || canViewFinance ? row.professionalsView : [],
+        schedule: canViewOperations ? row.scheduleView : [],
+        tasks: canViewSales ? row.tasksView : [],
       },
     }
   })
