@@ -9,7 +9,6 @@ import {
   type MeasureElement,
   type QuoteExtras,
   type QuoteLine,
-  type QuoteType,
 } from './quote'
 import { assertSameOrigin, requireCurrentProfile, type AuthProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
