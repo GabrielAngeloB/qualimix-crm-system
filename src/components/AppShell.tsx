@@ -22,27 +22,27 @@ import { getAuthSession, logout } from '../lib/auth.functions'
 import { formatDocument, onlyDigits } from '../lib/documents'
 import { LogoSlot, Toaster, cx } from './ui'
 
-type NavItem = { label: string; icon: typeof Users; to?: string; soon?: string }
+type NavItem = { label: string; icon: typeof Users; to?: string; soon?: string; roles?: string[] }
 const nav: { group: string; items: NavItem[] }[] = [
   { group: 'Visão geral', items: [{ label: 'Painel', icon: LayoutDashboard, to: '/' }] },
   {
     group: 'Comercial',
     items: [
-      { label: 'Clientes e obras', icon: Users, to: '/clientes' },
-      { label: 'Funil comercial', icon: SquareKanban, to: '/funil' },
-      { label: 'Tarefas e retornos', icon: ClipboardList, to: '/tarefas' },
-      { label: 'Orçamentos', icon: FileText, to: '/orcamentos' },
+      { label: 'Clientes e obras', icon: Users, to: '/clientes', roles: ['comercial', 'consulta'] },
+      { label: 'Funil comercial', icon: SquareKanban, to: '/funil', roles: ['comercial', 'consulta'] },
+      { label: 'Tarefas e retornos', icon: ClipboardList, to: '/tarefas', roles: ['comercial', 'consulta'] },
+      { label: 'Orçamentos', icon: FileText, to: '/orcamentos', roles: ['comercial', 'consulta'] },
     ],
   },
   {
     group: 'Operação',
     items: [
-      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos' },
-      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda' },
-      { label: 'Profissionais', icon: Users, to: '/profissionais' },
+      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos', roles: ['comercial', 'operacao', 'financeiro', 'consulta'] },
+      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda', roles: ['operacao', 'consulta'] },
+      { label: 'Profissionais', icon: Users, to: '/profissionais', roles: ['operacao', 'financeiro', 'consulta'] },
     ],
   },
-  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro' }] },
+  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro', roles: ['financeiro', 'consulta'] }] },
   { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }, { label: 'Usuários', icon: Users, to: '/usuarios' }] },
 ]
 
@@ -67,9 +67,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   const showDemoToggle = import.meta.env.DEV
   const { theme, toggle } = useTheme()
   const navigate = useNavigate()
-  const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
+  const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string; role: string } | null>(null)
   useEffect(() => {
-    void getAuthSession().then((session: { profile: { nome: string; perfil: 'admin' | 'user'; username: string } | null }) => {
+    void getAuthSession().then((session: { profile: { nome: string; perfil: 'admin' | 'user'; username: string; role: string } | null }) => {
       setProfile(session.profile ?? null)
     })
   }, [])
@@ -90,7 +90,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <div key={g.group} className="mb-5">
             <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{g.group}</p>
             <ul className="space-y-0.5">
-              {g.items.filter((it) => it.to !== '/usuarios' || profile?.perfil === 'admin').map((it) => {
+              {g.items.filter((it) => profile?.perfil === 'admin' || (it.roles ? it.roles.includes(profile?.role ?? '') : it.to === '/usuarios' && profile?.perfil === 'admin')).map((it) => {
                 const active = it.to && (it.to === '/' ? path === '/' : path.startsWith(it.to))
                 const inner = (
                   <>
