@@ -21,6 +21,7 @@ import { Route as PedidosRouteImport } from './routes/pedidos'
 import { Route as ProfissionaisRouteImport } from './routes/profissionais'
 import { Route as TarefasRouteImport } from './routes/tarefas'
 import { Route as UsuariosRouteImport } from './routes/usuarios'
+import { Route as ClientesNovoRouteImport } from './routes/clientes.novo'
 import { Route as OrcamentosIndexRouteImport } from './routes/orcamentos.index'
 import { Route as OrcamentosNovoRouteImport } from './routes/orcamentos.novo'
 
@@ -84,6 +85,11 @@ const UsuariosRoute = UsuariosRouteImport.update({
   path: '/usuarios',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClientesNovoRoute = ClientesNovoRouteImport.update({
+  id: '/novo',
+  path: '/novo',
+  getParentRoute: () => ClientesRoute,
+} as any)
 const OrcamentosIndexRoute = OrcamentosIndexRouteImport.update({
   id: '/orcamentos/',
   path: '/orcamentos/',
@@ -99,7 +105,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/bootstrap': typeof BootstrapRoute
-  '/clientes': typeof ClientesRoute
+  '/clientes': typeof ClientesRouteWithChildren
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
@@ -108,6 +114,7 @@ export interface FileRoutesByFullPath {
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
   '/usuarios': typeof UsuariosRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos/': typeof OrcamentosIndexRoute
 }
@@ -115,7 +122,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/bootstrap': typeof BootstrapRoute
-  '/clientes': typeof ClientesRoute
+  '/clientes': typeof ClientesRouteWithChildren
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
   '/usuarios': typeof UsuariosRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos': typeof OrcamentosIndexRoute
 }
@@ -132,7 +140,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/agenda': typeof AgendaRoute
   '/bootstrap': typeof BootstrapRoute
-  '/clientes': typeof ClientesRoute
+  '/clientes': typeof ClientesRouteWithChildren
   '/configuracoes': typeof ConfiguracoesRoute
   '/financeiro': typeof FinanceiroRoute
   '/funil': typeof FunilRoute
@@ -141,6 +149,7 @@ export interface FileRoutesById {
   '/profissionais': typeof ProfissionaisRoute
   '/tarefas': typeof TarefasRoute
   '/usuarios': typeof UsuariosRoute
+  '/clientes/novo': typeof ClientesNovoRoute
   '/orcamentos/novo': typeof OrcamentosNovoRoute
   '/orcamentos/': typeof OrcamentosIndexRoute
 }
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/profissionais'
     | '/tarefas'
     | '/usuarios'
+    | '/clientes/novo'
     | '/orcamentos/novo'
     | '/orcamentos/'
   fileRoutesByTo: FileRoutesByTo
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/profissionais'
     | '/tarefas'
     | '/usuarios'
+    | '/clientes/novo'
     | '/orcamentos/novo'
     | '/orcamentos'
   id:
@@ -191,6 +202,7 @@ export interface FileRouteTypes {
     | '/profissionais'
     | '/tarefas'
     | '/usuarios'
+    | '/clientes/novo'
     | '/orcamentos/novo'
     | '/orcamentos/'
   fileRoutesById: FileRoutesById
@@ -199,7 +211,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AgendaRoute: typeof AgendaRoute
   BootstrapRoute: typeof BootstrapRoute
-  ClientesRoute: typeof ClientesRoute
+  ClientesRoute: typeof ClientesRouteWithChildren
   ConfiguracoesRoute: typeof ConfiguracoesRoute
   FinanceiroRoute: typeof FinanceiroRoute
   FunilRoute: typeof FunilRoute
@@ -298,6 +310,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UsuariosRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/clientes/novo': {
+      id: '/clientes/novo'
+      path: '/novo'
+      fullPath: '/clientes/novo'
+      preLoaderRoute: typeof ClientesNovoRouteImport
+      parentRoute: typeof ClientesRoute
+    }
     '/orcamentos/': {
       id: '/orcamentos/'
       path: '/orcamentos'
@@ -315,11 +334,23 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface ClientesRouteChildren {
+  ClientesNovoRoute: typeof ClientesNovoRoute
+}
+
+const ClientesRouteChildren: ClientesRouteChildren = {
+  ClientesNovoRoute: ClientesNovoRoute,
+}
+
+const ClientesRouteWithChildren = ClientesRoute._addFileChildren(
+  ClientesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AgendaRoute: AgendaRoute,
   BootstrapRoute: BootstrapRoute,
-  ClientesRoute: ClientesRoute,
+  ClientesRoute: ClientesRouteWithChildren,
   ConfiguracoesRoute: ConfiguracoesRoute,
   FinanceiroRoute: FinanceiroRoute,
   FunilRoute: FunilRoute,
