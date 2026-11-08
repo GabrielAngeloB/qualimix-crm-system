@@ -52,7 +52,7 @@ type StoreData = Omit<CrmData, 'views'> & Omit<OperationalRecords, 'views'> & {
   views: CrmViews & OperationalRecords['views']
 }
 const emptyViews: CrmViews & OperationalRecords['views'] = {
-  clients: [], funnel: [], quotes: [], fleet: [],
+  clients: [], funnel: [], quotes: [],
   finance: [], orders: [], professionals: [], schedule: [], tasks: [],
 }
 const emptyData: StoreData = {
