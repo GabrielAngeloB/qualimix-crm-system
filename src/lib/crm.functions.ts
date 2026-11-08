@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import type { Client, Opportunity, QuoteRecord, Site, TeamUser } from '../data/fixtures'
+import type { Client, Opportunity, QuoteRecord, Site, TeamUser, QuoteType } from '../data/fixtures'
 import { quoteContext } from '../data/derived'
 import {
   computeQuote,
