@@ -1,15 +1,24 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { Bell, Clock, KanbanSquare, List, SquareKanban, TriangleAlert } from 'lucide-react'
+import { Bell, Clock, KanbanSquare, List, Plus, SquareKanban, TriangleAlert } from 'lucide-react'
 import { useStore } from '../data/store'
 import { funnelStages, leadSources, lossReasons, type StageId } from '../data/settings'
-import { team, today, userName, type Opportunity } from '../data/fixtures'
-import { brl, dateBR, daysBetween } from '../lib/format'
+import type { Opportunity } from '../data/fixtures'
+import { today } from '../lib/clock'
+import { displayUserName, localUserId } from '../data/session'
+import { brl, dateBR, daysBetween, parseDecimal } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, Modal, PageHeader, SegTabs, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
 
 export const Route = createFileRoute('/funil')({
-  head: () => ({ meta: [{ title: 'Funil comercial — Qualimix CRM' }] }),
+  head: () => ({
+    meta: [
+      { title: 'Funil comercial — Qualimix CRM' },
+      { name: 'description', content: 'Oportunidades por etapa, follow-ups atrasados e do dia, motivos de perda e histórico.' },
+      { property: 'og:title', content: 'Funil comercial — Qualimix CRM' },
+      { property: 'og:description', content: 'Acompanhe as oportunidades comerciais da Qualimix etapa por etapa.' },
+    ],
+  }),
   component: Funil,
 })
 
@@ -26,7 +35,7 @@ function followUp(o: Opportunity) {
 }
 
 function Funil() {
-  const { opportunities, clients, updateOpportunity, toast } = useStore()
+  const { opportunities, clients, sites, addOpportunity, updateOpportunity, toast } = useStore()
   const [view, setView] = useState<'kanban' | 'tabela'>('kanban')
   const [owner, setOwner] = useState('')
   const [source, setSource] = useState('')
@@ -35,6 +44,8 @@ function Funil() {
   const [losing, setLosing] = useState<{ id: string; reason: string; note: string } | null>(null)
   const [closing, setClosing] = useState<string | null>(null)
   const [detail, setDetail] = useState<string | null>(null)
+  const [creating, setCreating] = useState(false)
+  const [newLead, setNewLead] = useState({ title: '', clientId: '', siteId: '', value: '', source: leadSources[0], nextContact: today, nextAction: 'Realizar primeiro contato' })
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
 
@@ -67,7 +78,12 @@ function Funil() {
         eyebrow="Comercial"
         title="Funil comercial"
         description="Acompanhe cada oportunidade do primeiro contato ao fechamento. O fechamento é sempre uma ação explícita."
-        actions={<SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} />}
+        actions={
+          <>
+            <SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} />
+            <Button variant="primary" onClick={() => setCreating(true)}><Plus className="h-4 w-4" /> Novo lead</Button>
+          </>
+        }
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
@@ -79,7 +95,7 @@ function Funil() {
       <div className="mb-4 flex flex-wrap gap-2">
         <select aria-label="Responsável" className={cx(inputCls(), 'w-auto')} value={owner} onChange={(e) => setOwner(e.target.value)}>
           <option value="">Responsável: todos</option>
-          {team.filter((u) => u.role === 'Comercial').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {[...new Set([localUserId, ...opportunities.map((opportunity) => opportunity.ownerId)])].map((ownerId) => <option key={ownerId} value={ownerId}>{displayUserName(ownerId)}</option>)}
         </select>
         <select aria-label="Origem" className={cx(inputCls(), 'w-auto')} value={source} onChange={(e) => setSource(e.target.value)}>
           <option value="">Origem: todas</option>
@@ -133,7 +149,7 @@ function Funil() {
                             {f && <Badge tone={f.tone} className="ml-auto">{f.text}</Badge>}
                           </div>
                           <p className="mt-1 text-xs text-muted">
-                            {o.source} · {userName(o.ownerId).split(' ')[0]}
+                            {o.source} · {displayUserName(o.ownerId).split(' ')[0]}
                           </p>
                           {isOpen(o) && <p className="mt-1 text-xs"><span className="font-semibold">Próx.:</span> {o.nextAction} {o.nextContact && `(${dateBR(o.nextContact)})`}</p>}
                           {o.lossReason && <p className="mt-1 text-xs text-brand">Motivo: {o.lossReason}</p>}
@@ -171,7 +187,7 @@ function Funil() {
                     <tr key={o.id} className="border-b border-line last:border-0 hover:bg-surface-2/60">
                       <td className="px-4 py-3">
                         <button onClick={() => setDetail(o.id)} className="text-left font-semibold hover:text-brand">{o.title}</button>
-                        <span className="block text-xs text-muted">{clientName(o.clientId)} · {o.source} · {userName(o.ownerId)}</span>
+                        <span className="block text-xs text-muted">{clientName(o.clientId)} · {o.source} · {displayUserName(o.ownerId)}</span>
                       </td>
                       <td className="px-4 py-3"><Badge tone={o.stage === 'fechado' ? 'ok' : o.stage === 'perdido' ? 'red' : 'neutral'}>{stageLabel(o.stage)}</Badge></td>
                       <td className="px-4 py-3 text-right font-semibold tabular">{o.estimatedValue === null ? '—' : brl(o.estimatedValue)}</td>
@@ -189,6 +205,90 @@ function Funil() {
           <Pagination {...t} />
         </Card>
       )}
+
+      <Modal
+        open={creating}
+        onClose={() => setCreating(false)}
+        title="Nova oportunidade"
+        footer={
+          <>
+            <Button onClick={() => setCreating(false)}>Cancelar</Button>
+            <Button
+              variant="primary"
+              disabled={!newLead.title.trim() || !newLead.clientId}
+              onClick={() => {
+                const parsed = newLead.value.trim() ? parseDecimal(newLead.value) : null
+                if (parsed && (!parsed.ok || parsed.value === null || parsed.value <= 0)) {
+                  toast({ tone: 'erro', title: 'Valor estimado inválido', body: 'Informe um valor maior que zero ou deixe o campo vazio.' })
+                  return
+                }
+                const opportunity: Opportunity = {
+                  id: `lead-${crypto.randomUUID()}`,
+                  title: newLead.title.trim(),
+                  clientId: newLead.clientId,
+                  siteId: newLead.siteId || null,
+                  stage: 'novo',
+                  estimatedValue: parsed?.value === null || parsed === null ? null : parsed.value,
+                  ownerId: localUserId,
+                  source: newLead.source,
+                  enteredAt: today,
+                  lastContact: null,
+                  nextContact: newLead.nextContact || null,
+                  nextAction: newLead.nextAction.trim() || 'Realizar primeiro contato',
+                  lossReason: null,
+                  quoteId: null,
+                  history: [{ at: new Date().toISOString(), by: localUserId, text: 'Oportunidade criada' }],
+                  demo: false,
+                }
+                try {
+                  addOpportunity(opportunity)
+                  toast({ tone: 'ok', title: 'Oportunidade cadastrada', body: opportunity.title })
+                  setNewLead({ title: '', clientId: '', siteId: '', value: '', source: leadSources[0], nextContact: today, nextAction: 'Realizar primeiro contato' })
+                  setCreating(false)
+                  setDetail(opportunity.id)
+                } catch (error) {
+                  toast({ tone: 'erro', title: 'Não foi possível cadastrar', body: error instanceof Error ? error.message : 'Revise os dados.' })
+                }
+              }}
+            >
+              Salvar oportunidade
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Nome da oportunidade" required>
+            {(id) => <input id={id} className={inputCls()} value={newLead.title} onChange={(event) => setNewLead((current) => ({ ...current, title: event.target.value }))} placeholder="Ex.: Concretagem da laje — etapa 2" />}
+          </Field>
+          <Field label="Cliente" required hint={<Link to="/clientes" search={{ novo: '1' }} className="font-semibold text-brand hover:underline">Cadastrar cliente real</Link>}>
+            {(id) => <select id={id} className={inputCls()} value={newLead.clientId} onChange={(event) => setNewLead((current) => ({ ...current, clientId: event.target.value, siteId: '' }))}>
+              <option value="">Selecione um cliente real…</option>
+              {clients.filter((client) => !client.demo).map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}
+            </select>}
+          </Field>
+          <Field label="Obra (opcional)">
+            {(id) => <select id={id} className={inputCls()} value={newLead.siteId} onChange={(event) => setNewLead((current) => ({ ...current, siteId: event.target.value }))}>
+              <option value="">Sem obra definida</option>
+              {sites.filter((site) => site.clientId === newLead.clientId && !site.demo).map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}
+            </select>}
+          </Field>
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field label="Valor estimado (R$)">
+              {(id) => <input id={id} inputMode="decimal" className={inputCls()} placeholder="Opcional" value={newLead.value} onChange={(event) => setNewLead((current) => ({ ...current, value: event.target.value }))} />}
+            </Field>
+            <Field label="Origem do lead">
+              {(id) => <select id={id} className={inputCls()} value={newLead.source} onChange={(event) => setNewLead((current) => ({ ...current, source: event.target.value as typeof newLead.source }))}>{leadSources.map((source) => <option key={source}>{source}</option>)}</select>}
+            </Field>
+            <Field label="Próxima ação">
+              {(id) => <input id={id} className={inputCls()} value={newLead.nextAction} onChange={(event) => setNewLead((current) => ({ ...current, nextAction: event.target.value }))} />}
+            </Field>
+            <Field label="Próximo contato">
+              {(id) => <input id={id} type="date" min={today} className={inputCls()} value={newLead.nextContact} onChange={(event) => setNewLead((current) => ({ ...current, nextContact: event.target.value }))} />}
+            </Field>
+          </div>
+          {clients.filter((client) => !client.demo).length === 0 && <p className="rounded-md bg-warn-soft p-3 text-sm text-warn">Cadastre pelo menos um cliente antes de criar uma oportunidade.</p>}
+        </div>
+      </Modal>
 
       <Modal
         open={!!losing}
@@ -293,11 +393,15 @@ function OpportunityDrawer({ o, onClose, clientName, onMove }: { o: Opportunity;
       <div className="space-y-5">
         <div>
           <h3 className="text-3xl font-extrabold uppercase leading-none">{o.title}</h3>
-          <p className="mt-1 text-sm text-muted">{clientName} · {o.source} · {userName(o.ownerId)}</p>
+          <p className="mt-1 text-sm text-muted">{clientName} · {o.source} · {displayUserName(o.ownerId)}</p>
           <div className="mt-2 flex flex-wrap gap-2">
             <Badge tone={o.stage === 'fechado' ? 'ok' : o.stage === 'perdido' ? 'red' : 'dark'}>{stageLabel(o.stage)}</Badge>
             <Badge>{o.estimatedValue === null ? 'Valor a definir' : brl(o.estimatedValue)}</Badge>
             {quoteNumber && <Link to="/orcamentos" search={{ q: quoteNumber }} className="text-xs font-semibold text-brand hover:underline">Ver orçamento {quoteNumber}</Link>}
+            {!quoteNumber && <Link to="/orcamentos/novo" search={{ oportunidade: o.id }} className="inline-flex items-center gap-1 rounded bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-strong">Criar rascunho de orçamento</Link>}
+          </div>
+          <div className="mt-3">
+            <Link to="/tarefas" search={{ oportunidade: o.id }} className="text-sm font-semibold text-brand hover:underline">Agendar tarefa ou retorno para esta oportunidade</Link>
           </div>
         </div>
         <Field label="Etapa">
@@ -332,7 +436,7 @@ function OpportunityDrawer({ o, onClose, clientName, onMove }: { o: Opportunity;
             {o.history.map((h, i) => (
               <li key={i}>
                 <p className="font-medium">{h.text}</p>
-                <p className="text-xs text-muted">{dateBR(h.at)} · {userName(h.by)}</p>
+                <p className="text-xs text-muted">{dateBR(h.at)} · {displayUserName(h.by)}</p>
               </li>
             ))}
           </ol>
