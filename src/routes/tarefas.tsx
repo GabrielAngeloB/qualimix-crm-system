@@ -89,7 +89,7 @@ function Tarefas() {
     setShowForm(true)
   }
 
-  const submitTask = () => {
+  const submitTask = async () => {
     const existing = tasks.find((task) => task.id === editingId)
     const task: CommercialTask = {
       id: editingId ?? 'task-' + crypto.randomUUID(),
@@ -105,7 +105,7 @@ function Tarefas() {
       demo: false,
     }
     try {
-      saveTask(task)
+      await saveTask(task)
       toast({ tone: 'ok', title: editingId ? 'Tarefa atualizada' : 'Tarefa agendada', body: task.title })
       resetForm()
     } catch (error) {
@@ -113,9 +113,9 @@ function Tarefas() {
     }
   }
 
-  const changeStatus = (task: CommercialTask, status: CommercialTaskStatus) => {
+  const changeStatus = async (task: CommercialTask, status: CommercialTaskStatus) => {
     try {
-      saveTask({
+      await saveTask({
         ...task,
         status,
         completedAt: status === 'Concluída' ? new Date().toISOString() : null,
@@ -209,7 +209,7 @@ function Tarefas() {
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
             <Button onClick={resetForm}>Cancelar</Button>
-            <Button variant="primary" disabled={form.title.trim().length < 3 || !form.dueDate} onClick={submitTask}>Salvar tarefa</Button>
+            <Button variant="primary" disabled={form.title.trim().length < 3 || !form.dueDate} onClick={() => void submitTask()}>Salvar tarefa</Button>
           </div>
         </Card>
       )}
@@ -256,11 +256,11 @@ function Tarefas() {
                     {task.status === 'Pendente' && (
                       <>
                         <Button size="sm" onClick={() => editTask(task)}>Editar</Button>
-                        <Button size="sm" variant="primary" onClick={() => changeStatus(task, 'Concluída')}><Check className="h-4 w-4" /> Concluir</Button>
-                        <Button size="sm" variant="danger" onClick={() => changeStatus(task, 'Cancelada')}><XCircle className="h-4 w-4" /> Cancelar</Button>
+                        <Button size="sm" variant="primary" onClick={() => void changeStatus(task, 'Concluída')}><Check className="h-4 w-4" /> Concluir</Button>
+                        <Button size="sm" variant="danger" onClick={() => void changeStatus(task, 'Cancelada')}><XCircle className="h-4 w-4" /> Cancelar</Button>
                       </>
                     )}
-                    {task.status === 'Concluída' && <Button size="sm" onClick={() => changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
+                    {task.status === 'Concluída' && <Button size="sm" onClick={() => void changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
                     {opportunity && <Link to="/funil" className="inline-flex h-8 items-center px-2 text-sm font-semibold text-brand hover:underline">Ver funil</Link>}
                   </div>
                 </article>
