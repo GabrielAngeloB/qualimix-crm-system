@@ -102,6 +102,9 @@ export type CrmData = {
 
 export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): Promise<CrmData> => {
   const currentProfile = await requireCurrentProfile()
+  const isAdmin = currentProfile.perfil === 'admin' || currentProfile.role === 'administrador'
+  const canViewSales = isAdmin || currentProfile.role === 'comercial' || currentProfile.role === 'consulta'
+  const canViewQuoteDetails = canViewSales || currentProfile.role === 'operacao'
   const db = getPool()
   // Uma única ida ao PostgreSQL evita dez round-trips sequenciais no pool
   // (max=1 é intencional para não multiplicar conexões em ambientes serverless).
@@ -135,19 +138,19 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
   return {
     clients: data.clients.map(mapClient),
     sites: data.sites.map(mapSite),
-    opportunities: data.opportunities.map((row: any) => ({
+    opportunities: canViewSales ? data.opportunities.map((row: any) => ({
       ...mapOpportunity(row),
       quoteId: quoteByOpportunity.get(row.id) ?? null,
-    })),
-    quotes: quoteRows.map(mapQuote),
-    products: data.products.map(mapCatalog),
-    team: data.profiles.map((row: any) => ({
+    })) : [],
+    quotes: canViewQuoteDetails ? quoteRows.map(mapQuote) : [],
+    products: canViewSales ? data.products.map(mapCatalog) : [],
+    team: canViewSales ? data.profiles.map((row: any) => ({
       id: String(row.id), name: row.nome, role: roleName(row.perfil),
-    })),
+    })) : [],
     views: {
       clients: data.clientView,
-      funnel: data.funnelView,
-      quotes: data.quoteView,
+      funnel: canViewSales ? data.funnelView : [],
+      quotes: canViewQuoteDetails ? data.quoteView : [],
     },
     currentUserId: currentProfile.id,
   }
