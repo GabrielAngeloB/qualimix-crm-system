@@ -20,8 +20,6 @@
     "react": "19.3.1",
     "react-chartjs-2": "5.3.1",
     "react-dom": "19.3.1",
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.86.0",
     "postgres": "3.4.9"
   },
   "devDependencies": {
