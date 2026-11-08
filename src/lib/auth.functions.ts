@@ -3,6 +3,21 @@ import { createAdminSupabase, createRequestSupabase, usernameEmail } from './sup
 
 type Profile = { id: string; nome: string; username: string; perfil: 'admin' | 'user'; ativo: boolean }
 
+const loginFailures = new Map<string, { count: number; blockedUntil: number }>()
+function assertLoginAllowed(username: string) {
+  const state = loginFailures.get(username)
+  if (state && state.blockedUntil > Date.now()) throw new Error('Muitas tentativas. Aguarde alguns minutos e tente novamente.')
+}
+function recordLoginFailure(username: string) {
+  const current = loginFailures.get(username) ?? { count: 0, blockedUntil: 0 }
+  current.count += 1
+  if (current.count >= 5) {
+    current.blockedUntil = Date.now() + 15 * 60 * 1000
+    current.count = 0
+  }
+  loginFailures.set(username, current)
+}
+
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,29}$/
 
 function normalizeUsername(value: unknown) {
@@ -65,7 +80,7 @@ export const login = createServerFn({ method: 'POST' })
       .select('id,ativo')
       .eq('username', data.username)
       .maybeSingle()
-    if (lookupError || !profile || !profile.ativo) throw new Error('Usuário ou senha inválidos.')
+    if (lookupError || !profile || !profile.ativo) { recordLoginFailure(data.username); throw new Error('Usuário ou senha inválidos.') }
 
     const supabase = createRequestSupabase()
     const { error } = await supabase.auth.signInWithPassword({
