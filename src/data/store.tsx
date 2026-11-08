@@ -29,6 +29,7 @@ interface Store {
   demoMode: boolean; setDemoMode: (v: boolean) => void; ctx: QuoteContext
   clients: Client[]; sites: Site[]; quotes: EvaluatedQuote[]; opportunities: Opportunity[]
   team: TeamUser[]; currentUserId: string; currentRole: string; views: CrmViews & OperationalRecords['views']
+  products: CrmData['products']
   receivables: ReceivableRow[]; loading: boolean
   workOrders: WorkOrder[]; scheduleEvents: ScheduleEvent[]; professionals: Professional[]
   expenses: JobExpense[]; financialEntries: FinancialEntry[]; tasks: CommercialTask[]
@@ -188,6 +189,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       quotes: evaluateAll(quoteRecords, ctx), opportunities,
       team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
       currentUserId: dbData.currentUserId, currentRole: dbData.currentRole, views: dbData.views,
+      products: dbData.products,
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
       workOrders: dbData.workOrders, scheduleEvents: dbData.scheduleEvents,
       professionals: dbData.professionals, expenses: dbData.expenses,
