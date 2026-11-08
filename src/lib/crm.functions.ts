@@ -290,11 +290,11 @@ export const createOpportunity = createServerFn({ method: 'POST' })
 
     const history = JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: 'Oportunidade criada.' }])
     const saved = await db.query<{ id: string }>(
-      \`INSERT INTO public.oportunidades
+      `INSERT INTO public.oportunidades
         (titulo,cliente_id,obra_id,etapa,valor_estimado,responsavel_id,origem,entrou_em,
          historico,relatorios,is_demo,created_by)
        VALUES ($1,$2,$3,'novo',$4,$5,$6,current_date,$7::jsonb,'[]'::jsonb,false,$5)
-       RETURNING id\`,
+       RETURNING id`,
       [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,history],
     )
     const row = saved.rows[0]
