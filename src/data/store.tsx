@@ -8,7 +8,8 @@ import { buildReceivables, evaluateAll, quoteContext, type EvaluatedQuote, type 
 import type { QuoteContext } from '../lib/quote'
 import {
   loadCrmData, persistClient, persistOpportunity, persistQuote,
-  type QuoteSaveInput, type CrmData, type CrmViews,
+  createOpportunity as createOpportunityOnServer,
+  type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
 
 export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string; body?: string }
@@ -19,6 +20,7 @@ interface Store {
   receivables: ReceivableRow[]; loading: boolean
   addClient: (c: Client, site?: Site) => Promise<void>
   updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
+  createOpportunity: (input: OpportunityCreateInput) => Promise<void>
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
   refresh: () => Promise<void>
   toasts: Toast[]; toast: (t: Omit<Toast, 'id'>) => void; dismissToast: (id: number) => void
@@ -89,6 +91,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     } else if (demoMode) setOpps(update)
   }, [dbData.currentUserId, dbData.opportunities, demoMode, refresh, toast])
 
+  const createOpportunity = useCallback(async (input: OpportunityCreateInput) => {
+    await createOpportunityOnServer({ data: input })
+    await refresh()
+    toast({ tone: 'ok', title: 'Lead cadastrado', body: 'Oportunidade salva no banco de dados.' })
+  }, [refresh, toast])
+
   const saveQuote = useCallback(async (input: QuoteSaveInput) => {
     const saved = await persistQuote({ data: input })
     await refresh()
@@ -109,10 +117,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       currentUserId: dbData.currentUserId, views: dbData.views,
       // Contas a receber ainda não têm tabela de produção no esquema atual.
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
-      loading, addClient, updateOpportunity, saveQuote, refresh,
+      loading, addClient, updateOpportunity, createOpportunity, saveQuote, refresh,
       toasts, toast, dismissToast,
     }
-  }, [demoMode, setDemoMode, dbData, opps, loading, addClient, updateOpportunity, saveQuote, refresh, toasts, toast, dismissToast])
+  }, [demoMode, setDemoMode, dbData, opps, loading, addClient, updateOpportunity, createOpportunity, saveQuote, refresh, toasts, toast, dismissToast])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
