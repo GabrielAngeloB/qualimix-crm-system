@@ -73,28 +73,41 @@ Após configurar DATABASE_URL e executar a migration, rode pnpm install, pnpm ty
 
 ## Módulos operacionais e financeiros
 
-A branch também inclui persistência server-side para Pedidos, Financeiro, Profissionais, Agenda e Tarefas. O esquema de nove tabelas do arquivo base continua sendo apenas o ponto de partida e **não deve ser executado novamente** em um banco já inicializado.
+A integração inclui persistência real para Pedidos, Financeiro, Profissionais, Agenda e Tarefas. O SQL base de nove tabelas é apenas o ponto inicial e **não deve ser executado novamente** em um banco já inicializado.
 
-Depois da migration de autenticação (20261108000200_custom_server_auth.sql) e antes de habilitar a versão desta branch, confira e aplique as migrations operacionais versionadas no repositório:
+### Estado do banco Supabase desta integração
 
-- create_financial_and_operational_tables: cria pedidos, profissionais, despesas, lançamentos financeiros, pagamentos, agenda e tarefas, com chaves estrangeiras, checks, índices e RLS.
-- crm_operational_reporting_views_and_financial_guards: cria as views vw_financeiro_resumo, vw_pedidos_resumo, vw_profissionais_resumo, vw_agenda_resumo e vw_tarefas_resumo, além das travas de saldo e atualização de status das baixas.
+As alterações abaixo já foram aplicadas diretamente ao projeto Supabase conectado e aparecem no histórico de migrations. Não reaplique manualmente o mesmo SQL:
 
-> As migrations acima foram aplicadas diretamente no projeto Qualimix Cimentos durante a integração desta branch. Confira o histórico de migrations do projeto antes de reaplicar qualquer SQL. Não rode novamente uma migration que já conste no histórico.
+- 20261108194901 — create_financial_and_operational_tables: pedidos, profissionais, despesas, lançamentos financeiros, pagamentos, agenda e tarefas, com chaves estrangeiras, checks, índices e RLS.
+- 20261108200023 — crm_operational_reporting_views_and_financial_guards: views vw_financeiro_resumo, vw_pedidos_resumo, vw_profissionais_resumo, vw_agenda_resumo e vw_tarefas_resumo; bloqueio de baixas acima do saldo e atualização automática do status.
+- 20261108200050 — fix_financial_payment_status_trigger: correção do cálculo do status depois de INSERT/UPDATE/DELETE de pagamento.
+- 20261108202132 — grant_custom_server_role_access_for_crm_operations: permissões e policies para a conexão técnica do servidor.
 
-### Papel restrito da aplicação
+Verificação realizada no banco: as 7 tabelas operacionais têm RLS ativado; as 5 views novas executam sem erro; e as 9 views totais do CRM estão disponíveis. As views novas retornam zero linhas porque ainda não existem dados operacionais reais cadastrados — nenhum valor de demonstração foi inserido como se fosse produção.
 
-Depois das migrations, execute uma cópia de supabase/security/001_create_app_role.sql no SQL Editor conectado como postgres. Substitua o placeholder de senha apenas nessa cópia local. O script concede os acessos usados pelas Server Functions, incluindo as novas tabelas e views. Não dê service_role, postgres ou a chave secreta ao navegador.
+### Papel PostgreSQL restrito
 
-A conexão da aplicação deve utilizar qualimix_app na variável server-only DATABASE_URL. Confirme o resultado do SELECT final: rolsuper=false, rolcreatedb=false, rolcreaterole=false, rolbypassrls=false e rolcanlogin=true.
+O papel qualimix_app já foi criado no Supabase com login habilitado e permissões/policies concedidas. A senha ainda **não foi configurada**. A verificação do PostgreSQL confirmou:
+
+- rolsuper=false
+- rolcreatedb=false
+- rolcreaterole=false
+- rolbypassrls=false
+- rolcanlogin=true
+
+Para definir a senha, abra uma cópia de supabase/security/001_create_app_role.sql no SQL Editor do Supabase, substitua o placeholder por uma senha aleatória forte e execute como postgres. O script é idempotente quanto a grants e policies; executá-lo novamente troca a senha do papel. Não salve a senha no repositório.
+
+Depois, configure no ambiente **server-only** da hospedagem a DATABASE_URL usando o usuário qualimix_app e a senha escolhida. Mantenha também SUPABASE_CA_CERT_BASE64 configurada conforme a seção de SSL deste documento. Não use VITE_DATABASE_URL, não envie essa conexão ao navegador e não coloque a chave service_role no frontend.
+
+**Atenção:** a assinatura dos cookies de sessão e o token do primeiro administrador são derivados da DATABASE_URL atual. Ao trocar a URL de conexão, sessões já emitidas deixam de validar e todos precisarão entrar novamente. Se o bootstrap do primeiro administrador ainda não foi feito, gere o token novamente depois de definir a DATABASE_URL definitiva.
 
 ### Fluxos e integridade
 
-- Converter orçamento aceito em pedido e primeira conta a receber ocorre numa única transação. Um orçamento não pode gerar pedidos duplicados.
-- Registrar despesa e criar conta a pagar ocorre numa única transação.
-- Pagamentos são lançamentos imutáveis pelo fluxo normal do CRM. O banco bloqueia baixas maiores que o saldo, inclusive em requisições simultâneas.
-- Cancelar uma conta não apaga baixas nem despesas; a ação preserva o histórico.
-- Valores monetários são guardados em centavos inteiros; os formulários e Server Functions validam novamente os dados enviados pelo navegador.
-- As views novas usam security_invoker=true; o papel técnico recebe SELECT nas tabelas-base e nas próprias views.
-
-O login continua sendo o login próprio da aplicação (public.usuarios + public.perfis + cookie de sessão). Não misture esse fluxo com políticas que dependam de auth.uid() para autenticar usuários finais. O papel PostgreSQL restrito é apenas a identidade técnica do servidor; cada ação continua verificando o perfil do usuário autenticado na Server Function.
+- Converter um orçamento aceito em pedido e criar a primeira conta a receber ocorre numa única transação. O mesmo orçamento não pode gerar pedidos duplicados.
+- Registrar uma despesa e criar a conta a pagar correspondente ocorre numa única transação.
+- Pagamentos são inserções imutáveis pelo fluxo normal do CRM. O banco bloqueia baixas acima do saldo, inclusive em requisições simultâneas.
+- Cancelar uma conta não apaga baixas nem despesas; o histórico permanece.
+- Valores monetários são armazenados em centavos inteiros; as Server Functions validam novamente os dados recebidos do navegador.
+- As views novas usam security_invoker=true. O papel técnico recebeu SELECT nas tabelas-base e nas próprias views.
+- O login de cada pessoa permanece próprio da aplicação (public.usuarios + public.perfis + cookie HTTP-only). O papel qualimix_app é somente a identidade técnica do servidor e não representa um usuário humano. Cada Server Function verifica a sessão e o perfil antes de gravar.
