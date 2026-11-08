@@ -280,9 +280,9 @@ export const deleteUser = createServerFn({ method: 'POST' })
           throw new Error('Não é possível desativar o último administrador ativo.')
         }
       }
-      await client.query('UPDATE public.perfis SET ativo = false, updated_at = now() WHERE id = $1', [data.id])
+      await client.query('UPDATE public.perfis SET ativo = false WHERE id = $1', [data.id])
       await client.query(
-        'UPDATE public.usuarios SET session_version = session_version + 1, updated_at = now() WHERE id = $1',
+        'UPDATE public.usuarios SET session_version = session_version + 1 WHERE id = $1',
         [data.id],
       )
     })
