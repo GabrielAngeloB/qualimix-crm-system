@@ -1,54 +1,32 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  clients as seedClients,
-  opportunities as seedOpps,
-  quotes as seedQuotes,
-  sites as seedSites,
-  team as seedTeam,
-  type Client,
-  type Opportunity,
-  type QuoteRecord,
-  type Site,
-  type TeamUser,
+  clients as seedClients, opportunities as seedOpps, quotes as seedQuotes,
+  sites as seedSites, team as seedTeam,
+  type Client, type Opportunity, type QuoteRecord, type Site, type TeamUser,
 } from './fixtures'
 import { buildReceivables, evaluateAll, quoteContext, type EvaluatedQuote, type ReceivableRow } from './derived'
 import type { QuoteContext } from '../lib/quote'
 import {
-  loadCrmData,
-  persistClient,
-  persistOpportunity,
-  persistQuote,
-  type QuoteSaveInput,
-  type CrmData,
-  type CrmViews,
+  loadCrmData, persistClient, persistOpportunity, persistQuote,
+  type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
 
 export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string; body?: string }
 interface Store {
-  demoMode: boolean
-  setDemoMode: (v: boolean) => void
-  ctx: QuoteContext
-  clients: Client[]
-  sites: Site[]
-  quotes: EvaluatedQuote[]
-  opportunities: Opportunity[]
-  team: TeamUser[]
-  currentUserId: string
-  views: CrmViews
-  receivables: ReceivableRow[]
-  loading: boolean
+  demoMode: boolean; setDemoMode: (v: boolean) => void; ctx: QuoteContext
+  clients: Client[]; sites: Site[]; quotes: EvaluatedQuote[]; opportunities: Opportunity[]
+  team: TeamUser[]; currentUserId: string; views: CrmViews
+  receivables: ReceivableRow[]; loading: boolean
   addClient: (c: Client, site?: Site) => Promise<void>
   updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
   refresh: () => Promise<void>
-  toasts: Toast[]
-  toast: (t: Omit<Toast, 'id'>) => void
-  dismissToast: (id: number) => void
+  toasts: Toast[]; toast: (t: Omit<Toast, 'id'>) => void; dismissToast: (id: number) => void
 }
-
 const emptyViews: CrmViews = { clients: [], funnel: [], quotes: [], fleet: [] }
 const emptyData: CrmData = {
-  clients: [], sites: [], opportunities: [], quotes: [], products: [], team: [], currentUserId: '', views: emptyViews,
+  clients: [], sites: [], opportunities: [], quotes: [], products: [], team: [],
+  currentUserId: '', views: emptyViews,
 }
 const StoreCtx = createContext<Store | null>(null)
 
@@ -61,15 +39,11 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true)
-    try {
-      setDbData(await loadCrmData())
-    } finally {
-      setLoading(false)
-    }
+    try { setDbData(await loadCrmData()) }
+    finally { setLoading(false) }
   }, [])
 
   useEffect(() => {
-    // Fixtures só podem ser exibidas durante desenvolvimento local.
     if (import.meta.env.DEV) {
       try { if (localStorage.getItem('qmx-demo') === '1') setDemoModeState(true) } catch { /* storage opcional */ }
     }
@@ -112,9 +86,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         toast({ tone: 'erro', title: 'Não foi possível atualizar a oportunidade', body: error instanceof Error ? error.message : 'Erro de gravação.' })
         void refresh()
       })
-    } else if (demoMode) {
-      setOpps(update)
-    }
+    } else if (demoMode) setOpps(update)
   }, [dbData.currentUserId, dbData.opportunities, demoMode, refresh, toast])
 
   const saveQuote = useCallback(async (input: QuoteSaveInput) => {
@@ -132,11 +104,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     const opportunities = demoMode ? [...dbData.opportunities, ...opps.filter((item) => item.demo)] : dbData.opportunities
     return {
       demoMode, setDemoMode, ctx, clients, sites,
-      quotes: evaluateAll(quoteRecords, ctx),
-      opportunities,
+      quotes: evaluateAll(quoteRecords, ctx), opportunities,
       team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
-      currentUserId: dbData.currentUserId,
-      views: dbData.views,
+      currentUserId: dbData.currentUserId, views: dbData.views,
       // Contas a receber ainda não têm tabela de produção no esquema atual.
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
       loading, addClient, updateOpportunity, saveQuote, refresh,
@@ -146,7 +116,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
-
 export function useStore() {
   const store = useContext(StoreCtx)
   if (!store) throw new Error('useStore fora do StoreProvider')
