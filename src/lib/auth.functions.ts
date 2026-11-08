@@ -153,7 +153,7 @@ export const logout = createServerFn({ method: 'POST' }).handler(async () => {
   const profile = await getCurrentProfile()
   if (profile) {
     await getPool().query(
-      'UPDATE public.usuarios SET session_version = session_version + 1, updated_at = now() WHERE id = $1',
+      'UPDATE public.usuarios SET session_version = session_version + 1 WHERE id = $1',
       [profile.id],
     )
   }
@@ -243,9 +243,9 @@ export const setUserActive = createServerFn({ method: 'POST' })
         }
       }
 
-      await client.query('UPDATE public.perfis SET ativo = $2, updated_at = now() WHERE id = $1', [data.id, data.active])
+      await client.query('UPDATE public.perfis SET ativo = $2 WHERE id = $1', [data.id, data.active])
       await client.query(
-        'UPDATE public.usuarios SET session_version = session_version + 1, updated_at = now() WHERE id = $1',
+        'UPDATE public.usuarios SET session_version = session_version + 1 WHERE id = $1',
         [data.id],
       )
     })
