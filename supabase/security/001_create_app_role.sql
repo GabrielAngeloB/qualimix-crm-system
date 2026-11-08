@@ -19,7 +19,10 @@ begin
     execute 'alter role qualimix_app login password ''SUBSTITUA_POR_UMA_SENHA_ALEATORIA_FORTE''';
   end if;
 end
-$$;
+$;
+
+-- A role técnica não deve herdar privilégios de outros papéis.
+alter role qualimix_app noinherit;
 
 -- CREATE ROLE usa os padrões seguros do PostgreSQL: sem superuser,
 -- sem criar bancos/papéis e sem BYPASSRLS.
