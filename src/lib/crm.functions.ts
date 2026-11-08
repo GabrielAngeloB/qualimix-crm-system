@@ -2,7 +2,8 @@ import { createServerFn } from '@tanstack/react-start'
 import type { Client, Opportunity, QuoteRecord, Site } from '../data/fixtures'
 import { quoteContext } from '../data/derived'
 import { computeQuote, summarizeMeasures, type MeasureElement, type QuoteExtras, type QuoteLine } from './quote'
-import { createRequestSupabase } from './supabase/server'
+import { createAdminSupabase, createRequestSupabase } from './supabase/server'
+import { catalog } from '../data/settings'
 
 async function activeContext() {
   const supabase = createRequestSupabase()
@@ -77,6 +78,7 @@ export const persistClient = createServerFn({ method: 'POST' })
     const { supabase, profile } = await activeContext()
     const c = data.client
     const { data: inserted, error } = await supabase.from('clientes').insert({
+      id:c.id,
       nome:c.name.trim(), nome_fantasia:c.tradeName, documento:c.document || null,
       telefone:c.phone, whatsapp:c.whatsapp, email:c.email, endereco:c.address,
       cidade:c.city, regiao:c.region, tipo:c.type, origem:c.source,
@@ -86,6 +88,7 @@ export const persistClient = createServerFn({ method: 'POST' })
     if (data.site) {
       const s = data.site
       const { error: siteError } = await supabase.from('obras').insert({
+        id:s.id,
         cliente_id:inserted.id, nome:s.name.trim(), endereco:s.address, cidade:s.city,
         regiao:s.region, contato_nome:s.contactName, contato_telefone:s.contactPhone,
         tipo_servico:s.serviceType, observacoes_acesso:s.accessNotes, restricoes:s.restrictions,
@@ -93,7 +96,7 @@ export const persistClient = createServerFn({ method: 'POST' })
       })
       if (siteError) {
         // Compensação explícita: se a segunda gravação falhar, remove o cliente recém-criado.
-        await supabase.from('clientes').delete().eq('id', inserted.id)
+        await createAdminSupabase().from('clientes').delete().eq('id', inserted.id)
         throw new Error('Não foi possível salvar a obra. O cadastro do cliente foi revertido.')
       }
     }
@@ -168,7 +171,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
       responsavel_id:profile.id, validade:validUntil, status:'Rascunho',
       dados_orcamento:input, resultado_calculo:result, total_centavos:result.totalCents,
       volume_concreto:result.concreteVolume, area_piso:result.floorArea,
-      fck:concreteLine?.fck ?? null, pode_emitir:result.canIssue,
+      fck:concreteLine?.catalogId ? catalog.find((item) => item.id === concreteLine.catalogId)?.fck ?? null : null, pode_emitir:result.canIssue,
       precisa_aprovacao:result.needsApproval, versao_motor_calculo:'computeQuote-v1',
       calculado_em:new Date().toISOString(), is_demo:false,
     }).select('id,numero,versao,created_at').single()
