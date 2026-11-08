@@ -7,6 +7,7 @@ import { today, type Opportunity } from '../data/fixtures'
 import { brl, dateBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, Modal, PageHeader, SegTabs, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
+import { parseOptionalAmount, validateLeadFields } from '../lib/crm-validation'
 
 export const Route = createFileRoute('/funil')({
   head: () => ({ meta: [{ title: 'Funil comercial — Qualimix CRM' }] }),
@@ -42,10 +43,12 @@ function Funil() {
   const [leadSource, setLeadSource] = useState<string>(leadSources[0])
   const [leadValue, setLeadValue] = useState('')
   const [leadSaving, setLeadSaving] = useState(false)
+  const [leadTried, setLeadTried] = useState(false)
 
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
   const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const leadSites = sites.filter((site) => site.clientId === leadClientId)
+  const leadErrors = leadTried ? validateLeadFields({ title: leadTitle, clientId: leadClientId, siteId: leadSiteId, source: leadSource, estimatedValue: leadValue }) : {}
 
   const filtered = useMemo(
     () =>
@@ -60,15 +63,19 @@ function Funil() {
   const stale = filtered.filter((o) => isOpen(o) && (!o.lastContact || daysBetween(o.lastContact, today) >= STALE_DAYS))
 
   const submitLead = async () => {
-    if (!leadClientId) {
-      toast({ tone: 'erro', title: 'Selecione um cliente', body: 'Cadastre o cliente antes de criar a oportunidade.' })
+    setLeadTried(true)
+    const errors = validateLeadFields({ title: leadTitle, clientId: leadClientId, siteId: leadSiteId, source: leadSource, estimatedValue: leadValue })
+    if (!clients.some((client) => client.id === leadClientId && client.active)) {
+      errors.clientId = 'Selecione um cliente ativo.'
+    }
+    if (leadSiteId && !leadSites.some((site) => site.id === leadSiteId)) {
+      errors.siteId = 'A obra selecionada não pertence ao cliente.'
+    }
+    if (Object.keys(errors).length) {
+      toast({ tone: 'erro', title: 'Revise os campos destacados', body: Object.values(errors).join(' ') })
       return
     }
-    const estimatedValue = leadValue.trim() ? Number(leadValue) : null
-    if (estimatedValue !== null && (!Number.isFinite(estimatedValue) || estimatedValue < 0)) {
-      toast({ tone: 'erro', title: 'Valor estimado inválido' })
-      return
-    }
+    const estimatedValue = parseOptionalAmount(leadValue)
     setLeadSaving(true)
     try {
       await createOpportunity({
@@ -81,6 +88,7 @@ function Funil() {
       setNewLeadOpen(false)
       setLeadTitle('')
       setLeadSiteId('')
+      setLeadTried(false)
       setLeadValue('')
       setLeadSource(leadSources[0])
     } catch (error) {
@@ -296,14 +304,14 @@ function Funil() {
         open={newLeadOpen}
         onClose={() => setNewLeadOpen(false)}
         title="Cadastrar novo lead"
-        footer={<><Button variant="ghost" onClick={() => setNewLeadOpen(false)}>Cancelar</Button><Button variant="primary" disabled={leadSaving || !leadTitle.trim() || !leadClientId} onClick={() => void submitLead()}>{leadSaving ? 'Salvando…' : 'Salvar oportunidade'}</Button></>}
+        footer={<><Button variant="ghost" onClick={() => { setNewLeadOpen(false); setLeadTried(false) }}>Cancelar</Button><Button variant="primary" disabled={leadSaving} onClick={() => void submitLead()}>{leadSaving ? 'Salvando…' : 'Salvar oportunidade'}</Button></>}
       >
         {clients.length === 0 ? <EmptyState icon={<KanbanSquare className="h-6 w-6" />} title="Cadastre um cliente primeiro">Uma oportunidade precisa estar vinculada a um cliente real.</EmptyState> : <div className="grid gap-3 sm:grid-cols-2">
-          <Field label="Título da oportunidade" className="sm:col-span-2">{(id) => <input id={id} autoFocus maxLength={180} className={inputCls()} value={leadTitle} onChange={(e) => setLeadTitle(e.target.value)} placeholder="Ex.: Concretagem da laje — obra nova" />}</Field>
-          <Field label="Cliente">{(id) => <select id={id} className={inputCls()} value={leadClientId} onChange={(e) => { setLeadClientId(e.target.value); setLeadSiteId('') }}><option value="">Selecione…</option>{clients.filter((client) => client.active).map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>}</Field>
-          <Field label="Obra (opcional)">{(id) => <select id={id} className={inputCls()} value={leadSiteId} onChange={(e) => setLeadSiteId(e.target.value)}><option value="">Sem obra definida</option>{leadSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>}</Field>
-          <Field label="Origem do lead">{(id) => <select id={id} className={inputCls()} value={leadSource} onChange={(e) => setLeadSource(e.target.value)}>{leadSources.map((source) => <option key={source} value={source}>{source}</option>)}</select>}</Field>
-          <Field label="Valor estimado (opcional)">{(id) => <input id={id} type="number" min="0" step="0.01" className={inputCls()} value={leadValue} onChange={(e) => setLeadValue(e.target.value)} placeholder="0,00" />}</Field>
+          <Field label="Título da oportunidade" required error={leadErrors.title} hint="Descreva o serviço ou a necessidade que está sendo negociada. Ex.: Concretagem da laje — obra nova." className="sm:col-span-2">{(id) => <input id={id} autoFocus required minLength={3} maxLength={180} className={inputCls(!!leadErrors.title)} value={leadTitle} onChange={(e) => setLeadTitle(e.target.value)} placeholder="Ex.: Concretagem da laje — obra nova" />}</Field>
+          <Field label="Cliente" required error={leadErrors.clientId} hint="Oportunidade sempre pertence a um cliente já cadastrado.">{(id) => <select id={id} required className={inputCls(!!leadErrors.clientId)} value={leadClientId} onChange={(e) => { setLeadClientId(e.target.value); setLeadSiteId('') }}><option value="">Selecione…</option>{clients.filter((client) => client.active).map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>}</Field>
+          <Field label="Obra (opcional)" error={leadErrors.siteId} hint="Escolha uma obra do cliente selecionado. Deixe em branco quando ainda não souber.">{(id) => <select id={id} className={inputCls(!!leadErrors.siteId)} value={leadSiteId} onChange={(e) => setLeadSiteId(e.target.value)}><option value="">Sem obra definida</option>{leadSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>}</Field>
+          <Field label="Origem do lead" required error={leadErrors.source} hint="Selecione de onde veio o primeiro contato.">{(id) => <select id={id} required className={inputCls(!!leadErrors.source)} value={leadSource} onChange={(e) => setLeadSource(e.target.value)}>{leadSources.map((source) => <option key={source} value={source}>{source}</option>)}</select>}</Field>
+          <Field label="Valor estimado (opcional)" error={leadErrors.estimatedValue} hint="Valor aproximado da oportunidade em reais. Aceita 25000 ou 25.000,00. Deixe em branco se ainda não souber.">{(id) => <input id={id} type="text" inputMode="decimal" maxLength={18} className={inputCls(!!leadErrors.estimatedValue)} value={leadValue} onChange={(e) => setLeadValue(e.target.value)} placeholder="Ex.: 25.000,00" />}</Field>
           <p className="text-xs text-muted sm:col-span-2">O lead será criado na etapa “Novo”, vinculado ao usuário autenticado e salvo diretamente no PostgreSQL.</p>
         </div>}
       </Modal>
