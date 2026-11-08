@@ -123,8 +123,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
       ) x), '[]'::json) AS profiles,
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_clientes_resumo) x), '[]'::json) AS "clientView",
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.ordem) FROM (SELECT * FROM public.vw_funil_resumo) x), '[]'::json) AS "funnelView",
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS "quoteView",
-  `)
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS "quoteView"`)
   const data = result.rows[0]
   if (!data) throw new Error('O banco não retornou os dados do CRM.')
 
