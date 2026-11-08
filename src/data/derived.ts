@@ -8,6 +8,7 @@ import {
   summarizeMeasures,
   type QuoteContext,
   type QuoteResult,
+  type CatalogItem,
 } from '../lib/quote'
 import { daysBetween } from '../lib/format'
 import {
@@ -22,9 +23,9 @@ import {
   type QuoteRecord,
 } from './fixtures'
 
-export function quoteContext(demoMode: boolean): QuoteContext {
+export function quoteContext(demoMode: boolean, catalogOverride?: CatalogItem[]): QuoteContext {
   return {
-    catalog,
+    catalog: catalogOverride ?? (demoMode ? catalog : []),
     rules: demoMode ? demoRules : officialRules,
     demoPrices: demoMode,
     enabledPaymentMethodIds: paymentMethods
@@ -58,7 +59,7 @@ export interface EvaluatedQuote extends QuoteRecord {
 export function evaluateAll(records: QuoteRecord[], ctx: QuoteContext): EvaluatedQuote[] {
   return records.map((r) => {
     const concrete = r.lines.find((l) => l.category === 'concreto')
-    const fck = concrete ? (catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
+    const fck = concrete ? (ctx.catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
     return { ...r, result: evaluateRecord(r, ctx), fck }
   })
 }
