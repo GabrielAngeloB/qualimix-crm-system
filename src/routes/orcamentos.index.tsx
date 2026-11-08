@@ -21,7 +21,7 @@ export const Route = createFileRoute('/orcamentos/')({
 
 function Orcamentos() {
   const { q: initialQ } = Route.useSearch()
-  const { quotes, clients, sites, demoMode, team, currentRole } = useStore()
+  const { quotes, clients, sites, demoMode, team, currentRole, views } = useStore()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [q, setQ] = useState(initialQ ?? '')
   const [status, setStatus] = useState<string>('')
@@ -30,6 +30,11 @@ function Orcamentos() {
   const [wa, setWa] = useState<ProposalData | null>(null)
   useEffect(() => setQ(initialQ ?? ''), [initialQ])
 
+  const quoteSummaryById = useMemo(() => new Map(views.quotes.map((row) => [String(row.id), row])), [views.quotes])
+  const quoteTotalCents = (quote: EvaluatedQuote) => {
+    const summary = quoteSummaryById.get(quote.id)
+    return summary?.total_centavos == null ? quote.result.totalCents : Number(summary.total_centavos)
+  }
   const clientName = (id: string) => clients.find((c) => c.id === id)?.name ?? '—'
   const ownerName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
   const siteName = (id: string) => sites.find((s) => s.id === id)?.name ?? '—'
@@ -44,7 +49,7 @@ function Orcamentos() {
     )
   }, [quotes, q, status, type]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const t = useSortPage(filtered, { number: (x) => x.number, date: (x) => x.createdAt, client: (x) => clientName(x.clientId), total: (x) => x.result.totalCents ?? -1, status: (x) => x.status }, { key: 'number', dir: 'desc' })
+  const t = useSortPage(filtered, { number: (x) => x.number, date: (x) => x.createdAt, client: (x) => clientName(x.clientId), total: (x) => quoteTotalCents(x) ?? -1, status: (x) => x.status }, { key: 'number', dir: 'desc' })
 
   const toProposal = (x: EvaluatedQuote): ProposalData => ({
     number: x.number,
@@ -67,7 +72,7 @@ function Orcamentos() {
   })
 
   const open = quotes.filter((x) => x.status === 'Enviado ao cliente' || x.status === 'Em negociação')
-  const openCents = open.reduce((s, x) => s + (x.result.totalCents ?? 0), 0)
+  const openCents = open.reduce((s, x) => s + (quoteTotalCents(x) ?? 0), 0)
   const waiting = quotes.filter((x) => x.status === 'Aguardando aprovação').length
   const expiring = quotes.filter((x) => (x.status === 'Enviado ao cliente' || x.status === 'Em negociação') && daysBetween(today, x.validUntil) <= 3).length
 
@@ -147,7 +152,7 @@ function Orcamentos() {
                         {x.result.concreteVolume > 0 && <span className="block">{num(x.result.concreteVolume, 2)} m³{x.fck ? ` · FCK ${x.fck}` : ''}</span>}
                         {x.result.floorArea > 0 && <span className="block">{num(x.result.floorArea, 2)} m²</span>}
                       </td>
-                      <td className={cx('px-4 py-3 text-right font-display text-lg font-bold tabular', x.result.totalCents === null && 'text-warn')}>{brlCents(x.result.totalCents)}</td>
+                      <td className={cx('px-4 py-3 text-right font-display text-lg font-bold tabular', x.result.totalCents === null && 'text-warn')}>{brlCents(quoteTotalCents(x))}</td>
                       <td className="px-4 py-3">
                         <Badge tone={statusTone(x.status)}>{x.status}</Badge>
                       </td>
