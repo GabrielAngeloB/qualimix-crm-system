@@ -3,7 +3,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Building2, FileText, MapPin, MessageCircle, Phone, Plus, Search, Users } from 'lucide-react'
 import { useStore } from '../data/store'
 import { clientTypes, leadSources, regions } from '../data/settings'
-import { team, today, userName, type Client, type Site } from '../data/fixtures'
+import { today, userName, type Client, type Site } from '../data/fixtures'
 import { formatDocument, formatPhone, onlyDigits, whatsappUrl } from '../lib/documents'
 import { normalizeBrazilPhone, validateClientFields } from '../lib/crm-validation'
 import { brlCents, dateBR, daysBetween } from '../lib/format'
@@ -156,12 +156,12 @@ function Sel({ label, value, onChange, options }: { label: string; value: string
 }
 
 const emptyForm = {
-  name: '', tradeName: '', type: '', document: '', phone: '', whatsapp: '', sameWa: true, email: '', address: '', city: '', region: '', source: '', ownerId: 'u-carla', notes: '',
+  name: '', tradeName: '', type: '', document: '', phone: '', whatsapp: '', sameWa: true, email: '', address: '', city: '', region: '', source: '', notes: '',
   siteName: '', siteAddress: '', siteContact: '', sitePhone: '', siteRestrictions: '',
 }
 
 function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const { clients, addClient, toast } = useStore()
+  const { clients, addClient, toast, team, currentUserId } = useStore()
   const [f, setF] = useState(emptyForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [tried, setTried] = useState(false)
@@ -197,7 +197,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
     }
     const id = newId()
     const client: Client = {
-      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : normalizeBrazilPhone(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: f.ownerId, notes: f.notes.trim(), createdAt: today, active: true, demo: false,
+      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : normalizeBrazilPhone(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: currentUserId, notes: f.notes.trim(), createdAt: today, active: true, demo: false,
     }
     const site: Site | undefined = f.siteName.trim()
       ? { id: newId(), clientId: id, name: f.siteName.trim(), address: f.siteAddress.trim(), city: f.city.trim(), region: f.region, contactName: f.siteContact.trim(), contactPhone: normalizeBrazilPhone(f.sitePhone), serviceType: '', accessNotes: '', restrictions: f.siteRestrictions.trim(), demo: false }
@@ -263,13 +263,10 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
               </select>
             )}
           </Field>
-          <Field label="Responsável comercial">
-            {(id) => (
-              <select id={id} className={inputCls()} value={f.ownerId} onChange={(e) => up('ownerId', e.target.value)}>
-                {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-            )}
-          </Field>
+          <div className="sm:col-span-2 rounded-md border border-line bg-surface-2 p-3 text-sm">
+            <p className="font-semibold">Responsável comercial</p>
+            <p className="mt-1 text-muted">{team.find((member) => member.id === currentUserId)?.name ?? 'Usuário autenticado'} — atribuído automaticamente à conta que está cadastrando este cliente.</p>
+          </div>
           <Field label="Observações" error={liveErrors.notes} hint="Ex.: prefere contato pela manhã; falar com o setor de compras." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={2000} className={cx(inputCls(!!liveErrors.notes), 'h-auto py-2')} value={f.notes} placeholder="Ex.: Prefere contato pela manhã; falar com compras." onChange={(e) => up('notes', e.target.value)} />}</Field>
         </div>
 
