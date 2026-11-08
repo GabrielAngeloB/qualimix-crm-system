@@ -255,7 +255,7 @@ export const updateWorkOrderAmountOnServer = createServerFn({ method: 'POST' })
   .handler(async ({ data }) => {
     assertSameOrigin()
     const profile = await requireCurrentProfile()
-    assertRole(profile, ['comercial','operacao','financeiro'])
+    assertRole(profile, ['comercial'])
     await withTransaction(async (tx) => {
       const r = await tx.query<any>('select * from public.pedidos where id=$1 for update',[data.id])
       const order = r.rows[0]
