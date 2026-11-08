@@ -212,6 +212,7 @@ export interface Opportunity {
   ownerId: string
   source: string
   enteredAt: string
+  createdAt: string
   lastContact: string | null
   nextContact: string | null
   nextAction: string
@@ -238,6 +239,7 @@ const op = (
 ): Opportunity => ({
   id, title, clientId, siteId, stage, estimatedValue, ownerId, source,
   enteredAt: rel(-enteredDaysAgo),
+  createdAt: rel(-enteredDaysAgo),
   lastContact: lastContactDaysAgo === null ? null : rel(-lastContactDaysAgo),
   nextContact: nextInDays === null ? null : rel(nextInDays),
   nextAction, lossReason: null, quoteId,
