@@ -113,3 +113,10 @@ Depois, configure no ambiente **server-only** da hospedagem a DATABASE_URL usand
 - Valores monetários são armazenados em centavos inteiros; as Server Functions validam novamente os dados recebidos do navegador.
 - As views novas usam security_invoker=true. O papel técnico recebeu SELECT nas tabelas-base e nas próprias views.
 - O login de cada pessoa permanece próprio da aplicação (public.usuarios + public.perfis + cookie HTTP-only). O papel qualimix_app é somente a identidade técnica do servidor e não representa um usuário humano. Cada Server Function verifica a sessão e o perfil antes de gravar.
+
+
+## Validação contínua e pendências técnicas
+
+- O workflow principal `.github/workflows/ci.yml` valida instalação congelada, geração de rotas, TypeScript, build de produção e testes unitários.
+- O ESLint global não faz parte do gate até reduzir o débito técnico existente: a execução atual acusa 55 erros de `@typescript-eslint/no-explicit-any` em módulos antigos e no backend operacional. Não marcar esse lint como aprovado.
+- A branch deve ser mantida como candidata a merge enquanto o papel `qualimix_app` ainda não tiver senha e a hospedagem não tiver sido atualizada com a DATABASE_URL server-only correspondente.
