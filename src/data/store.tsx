@@ -28,7 +28,7 @@ export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string
 interface Store {
   demoMode: boolean; setDemoMode: (v: boolean) => void; ctx: QuoteContext
   clients: Client[]; sites: Site[]; quotes: EvaluatedQuote[]; opportunities: Opportunity[]
-  team: TeamUser[]; currentUserId: string; views: CrmViews
+  team: TeamUser[]; currentUserId: string; views: CrmViews & OperationalRecords['views']
   receivables: ReceivableRow[]; loading: boolean
   workOrders: WorkOrder[]; scheduleEvents: ScheduleEvent[]; professionals: Professional[]
   expenses: JobExpense[]; financialEntries: FinancialEntry[]; tasks: CommercialTask[]
