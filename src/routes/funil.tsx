@@ -366,7 +366,9 @@ function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Op
           <div className="mt-2 flex flex-wrap gap-2">
             <Badge tone={o.stage === 'fechado' ? 'ok' : o.stage === 'perdido' ? 'red' : 'dark'}>{stageLabel(o.stage)}</Badge>
             <Badge>{o.estimatedValue === null ? 'Valor a definir' : brl(o.estimatedValue)}</Badge>
-            {quoteNumber && <Link to="/orcamentos" search={{ q: quoteNumber }} className="text-xs font-semibold text-brand hover:underline">Ver orçamento {quoteNumber}</Link>}
+            {quoteNumber
+              ? <Link to="/orcamentos" search={{ q: quoteNumber }} className="text-xs font-semibold text-brand hover:underline">Ver orçamento {quoteNumber}</Link>
+              : o.stage !== 'perdido' && <Link to="/orcamentos/novo" search={{ oportunidade: o.id }} className="text-xs font-semibold text-brand hover:underline">Criar orçamento vinculado</Link>}
           </div>
         </div>
         <Field label="Etapa">
