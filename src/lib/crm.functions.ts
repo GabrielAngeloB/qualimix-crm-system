@@ -98,6 +98,7 @@ export type CrmData = {
   team: TeamUser[]
   views: CrmViews
   currentUserId: string
+  currentRole: string
 }
 
 export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): Promise<CrmData> => {
@@ -153,6 +154,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
       quotes: canViewQuoteDetails ? data.quoteView : [],
     },
     currentUserId: currentProfile.id,
+    currentRole: currentProfile.role,
   }
 })
 
