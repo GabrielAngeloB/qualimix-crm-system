@@ -24,11 +24,12 @@ import {
   type MeasureElement,
   type QuoteExtras,
   type QuoteLine,
+  type CatalogItem,
 } from '../lib/quote'
 import { addDays, brl, brlCents, dateBR, num, parseDecimal } from '../lib/format'
 import { formatPhone } from '../lib/documents'
 import { useStore } from '../data/store'
-import { catalog, categoryLabel, paymentMethods } from '../data/settings'
+import { categoryLabel, paymentMethods } from '../data/settings'
 import { today, type QuoteRecord, type QuoteType } from '../data/fixtures'
 import { MeasureCalculator, blankElement, newId } from './MeasureCalculator'
 import { ProposalModal, WhatsAppDialog } from './QuoteShare'
@@ -56,8 +57,8 @@ export interface Draft {
 
 const DRAFT_KEY = 'qmx-orcamento-rascunho-v1'
 
-function makeLine(catalogId: string | null, quantityMode: QuoteLine['quantityMode'] = 'manual'): QuoteLine {
-  const c = catalog.find((x) => x.id === catalogId)
+function makeLine(catalogId: string | null, quantityMode: QuoteLine['quantityMode'] = 'manual', catalogItems: CatalogItem[] = []): QuoteLine {
+  const c = catalogItems.find((x) => x.id === catalogId)
   return {
     id: newId(),
     catalogId,
@@ -71,10 +72,10 @@ function makeLine(catalogId: string | null, quantityMode: QuoteLine['quantityMod
   }
 }
 
-function templateFor(type: QuoteType): Pick<Draft, 'lines' | 'volumeElements' | 'areaElements'> {
+function templateFor(type: QuoteType, catalogItems: CatalogItem[] = []): Pick<Draft, 'lines' | 'volumeElements' | 'areaElements'> {
   const lines: QuoteLine[] = []
-  if (type !== 'piso') lines.push(makeLine('c-fck25', 'volume'))
-  if (type !== 'concreto') lines.push(makeLine('p-polido', 'area'))
+  if (type !== 'piso') lines.push(makeLine('c-fck25', 'volume', catalogItems))
+  if (type !== 'concreto') lines.push(makeLine('p-polido', 'area', catalogItems))
   return {
     lines,
     volumeElements: type !== 'piso' ? [blankElement('volume')] : [],
@@ -82,7 +83,7 @@ function templateFor(type: QuoteType): Pick<Draft, 'lines' | 'volumeElements' | 
   }
 }
 
-function emptyDraft(validityDays: number | null, ownerId = ''): Draft {
+function emptyDraft(validityDays: number | null, ownerId = '', catalogItems: CatalogItem[] = []): Draft {
   return {
     type: 'concreto',
     clientId: '',
@@ -97,7 +98,7 @@ function emptyDraft(validityDays: number | null, ownerId = ''): Draft {
     executionDeadline: '',
     notes: '',
     origin: null,
-    ...templateFor('concreto'),
+    ...templateFor('concreto', catalogItems),
   }
 }
 
@@ -125,7 +126,7 @@ function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
 
 export function QuoteBuilder({ origin }: { origin?: string }) {
   const { clients, sites, quotes, ctx, demoMode, toast, saveQuote, team, currentUserId } = useStore()
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, currentUserId))
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [showProposal, setShowProposal] = useState(false)
@@ -147,7 +148,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
         const raw = localStorage.getItem(DRAFT_KEY)
         if (raw) {
           const savedDraft = JSON.parse(raw) as Draft
-          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId), ...savedDraft, ownerId: currentUserId || savedDraft.ownerId })
+          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog), ...savedDraft, ownerId: currentUserId || savedDraft.ownerId })
           toast({ tone: 'info', title: 'Rascunho recuperado', body: 'Continuamos de onde você parou.' })
         }
       } catch {
@@ -226,7 +227,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
   const changeType = (type: QuoteType) => {
     setDraft((d) => {
       const pristine = d.lines.every((l) => l.quantity === '' && l.unitPriceInput === '') && [...d.volumeElements, ...d.areaElements].every((e) => !e.length && !e.width && !e.informed)
-      if (pristine) return { ...d, type, ...templateFor(type) }
+      if (pristine) return { ...d, type, ...templateFor(type, ctx.catalog) }
       return {
         ...d,
         type,
@@ -239,7 +240,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
   const discard = () => {
     if (!confirm('Descartar este rascunho? Os dados preenchidos serão apagados.')) return
     localStorage.removeItem(DRAFT_KEY)
-    setDraft(emptyDraft(ctx.rules.validityDays))
+    setDraft(emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog))
     toast({ tone: 'ok', title: 'Rascunho descartado' })
   }
 
@@ -371,7 +372,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
               {draft.lines.length === 0 && <p className="py-6 text-center text-sm text-muted">Nenhum item. Adicione produtos ou serviços abaixo.</p>}
               {draft.lines.map((l, i) => {
                 const c = result.lines[i]
-                const item = catalog.find((x) => x.id === l.catalogId)
+                const item = ctx.catalog.find((x) => x.id === l.catalogId)
                 const canVolume = l.unit === 'm³'
                 const canArea = l.unit === 'm²'
                 const ref = item?.basePrice ?? (demoMode ? item?.demoPrice : null)
@@ -439,14 +440,14 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                   onChange={(e) => {
                     const v = e.target.value
                     if (!v) return
-                    const it = catalog.find((x) => x.id === v)
+                    const it = ctx.catalog.find((x) => x.id === v)
                     const mode = it?.unit === 'm³' && it.category === 'concreto' ? 'volume' : it?.unit === 'm²' ? 'area' : 'manual'
-                    set('lines', [...draft.lines, makeLine(v === 'livre' ? null : v, mode)])
+                    set('lines', [...draft.lines, makeLine(v === 'livre' ? null : v, mode, ctx.catalog)])
                   }}
                 >
                   <option value="">Adicionar produto ou serviço…</option>
                   {(Object.keys(categoryLabel) as (keyof typeof categoryLabel)[]).map((cat) => {
-                    const items = catalog.filter((x) => x.category === cat && x.active)
+                    const items = ctx.catalog.filter((x) => x.category === cat && x.active)
                     return items.length ? (
                       <optgroup key={cat} label={categoryLabel[cat]}>
                         {items.map((x) => (
