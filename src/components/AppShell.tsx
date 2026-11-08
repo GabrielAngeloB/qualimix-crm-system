@@ -7,12 +7,15 @@ import {
   ClipboardList,
   FileText,
   LayoutDashboard,
+  LogOut,
   Menu,
   Moon,
   Search,
   Settings,
   SquareKanban,
   Sun,
+  UserCog,
+  UserPlus,
   Users,
   Wallet,
   X,
@@ -20,6 +23,7 @@ import {
 import { useStore } from '../data/store'
 import { formatDocument, onlyDigits } from '../lib/documents'
 import { LogoSlot, Toaster, cx } from './ui'
+import { logout } from '../lib/auth.functions'
 
 type NavItem = { label: string; icon: typeof Users; to?: string; soon?: string }
 const nav: { group: string; items: NavItem[] }[] = [
@@ -59,12 +63,54 @@ function useTheme() {
   return { theme, toggle }
 }
 
-export function AppShell({ children }: { children: ReactNode }) {
+type SessionProfile = {
+  nome: string
+  username: string
+  perfil: 'admin' | 'user'
+  role: string
+}
+
+function profileRoleLabel(role: string) {
+  if (role === 'admin' || role === 'administrador') return 'Administrador'
+  if (role === 'operacao') return 'Operação'
+  if (role === 'financeiro') return 'Financeiro'
+  if (role === 'consulta') return 'Consulta'
+  return 'Comercial'
+}
+
+export function AppShell({ children, profile }: { children: ReactNode; profile: SessionProfile }) {
   const [menuOpen, setMenuOpen] = useState(false)
   const path = useRouterState({ select: (s) => s.location.pathname })
+  const { toast } = useStore()
   const { theme, toggle } = useTheme()
+  const isAdmin = profile.perfil === 'admin'
+  const visibleNav = isAdmin
+    ? nav.map((group) => group.group === 'Administração'
+      ? {
+          ...group,
+          items: [
+            { label: 'Cadastrar cliente', icon: UserPlus, to: '/clientes/novo' },
+            { label: 'Usuários', icon: UserCog, to: '/usuarios' },
+            ...group.items,
+          ],
+        }
+      : group)
+    : nav
 
   useEffect(() => setMenuOpen(false), [path])
+
+  async function handleLogout() {
+    try {
+      await logout()
+      window.location.assign('/login')
+    } catch (error) {
+      toast({
+        tone: 'erro',
+        title: 'Não foi possível encerrar a sessão',
+        body: error instanceof Error ? error.message : 'Tente novamente.',
+      })
+    }
+  }
 
   const sidebar = (
     <nav aria-label="Módulos" className="flex h-full flex-col bg-[#0b0b0b] text-white">
@@ -75,7 +121,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-3 pb-4">
-        {nav.map((g) => (
+        {visibleNav.map((g) => (
           <div key={g.group} className="mb-5">
             <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">{g.group}</p>
             <ul className="space-y-0.5">
@@ -134,13 +180,25 @@ export function AppShell({ children }: { children: ReactNode }) {
           <button onClick={toggle} className="grid h-10 w-10 place-items-center rounded-md border border-line hover:bg-surface-2" aria-label={theme === 'dark' ? 'Usar tema claro' : 'Usar tema escuro'}>
             {theme === 'dark' ? <Sun className="h-[18px] w-[18px]" /> : <Moon className="h-[18px] w-[18px]" />}
           </button>
-          <div className="hidden items-center gap-2 sm:flex">
-            <div className="grid h-9 w-9 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">QL</div>
-            <div className="leading-tight">
-              <div className="text-sm font-semibold">Sessão local</div>
-              <div className="text-xs text-muted">Sem autenticação</div>
+          <div className="hidden min-w-0 items-center gap-2 sm:flex">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-ink font-display text-sm font-bold text-bg">
+              {profile.nome.trim().slice(0, 2).toUpperCase()}
+            </div>
+            <div className="min-w-0 leading-tight">
+              <div className="max-w-[160px] truncate text-sm font-semibold">{profile.nome}</div>
+              <div className="text-xs text-muted">{profileRoleLabel(profile.role)} · @{profile.username}</div>
             </div>
           </div>
+          <button
+            type="button"
+            onClick={() => void handleLogout()}
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-line px-3 text-sm font-semibold hover:bg-surface-2"
+            aria-label="Sair do CRM"
+            title="Sair"
+          >
+            <LogOut className="h-[18px] w-[18px]" />
+            <span className="hidden md:inline">Sair</span>
+          </button>
         </header>
         <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-6 md:py-8">{children}</main>
       </div>
