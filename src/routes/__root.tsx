@@ -15,7 +15,7 @@ export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
     if (location.pathname === '/login' || location.pathname === '/bootstrap') return
     const session = await getAuthSession()
-    if (!session.authenticated) throw redirect({ to: '/login' })
+    if (!session.authenticated) throw redirect({ to: '/login' })\n    if (location.pathname === '/usuarios' && session.profile?.perfil !== 'admin') throw redirect({ to: '/' })
   },
   head: () => ({
     meta: [
