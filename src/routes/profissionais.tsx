@@ -32,12 +32,13 @@ const blank = {
 }
 
 function Profissionais() {
-  const { professionals, financialEntries, saveProfessional, toast, currentRole } = useStore()
+  const { professionals, financialEntries, saveProfessional, toast, currentRole, views } = useStore()
   const canEditProfessionals = ['administrador', 'operacao', 'financeiro'].includes(currentRole)
   const [form, setForm] = useState(blank)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'ativos' | 'todos' | 'inativos'>('ativos')
 
+  const professionalSummaryById = useMemo(() => new Map(views.professionals.map((row) => [String(row.id), row])), [views.professionals])
   const rows = useMemo(
     () => professionals.filter((professional) => filter === 'todos' || (filter === 'ativos' ? professional.active : !professional.active)),
     [professionals, filter],
@@ -157,7 +158,13 @@ function Profissionais() {
             {rows.map((professional) => {
               const entries = financialEntries.filter((entry) => entry.kind === 'pagar' && entry.professionalId === professional.id && entry.status !== 'Cancelado')
               const payments = paymentHistory(professional.id)
-              const openCents = entries.reduce((sum, entry) => sum + Math.max(0, entry.amountCents - entry.payments.reduce((paid, payment) => paid + payment.amountCents, 0)), 0)
+              const summary = professionalSummaryById.get(professional.id)
+              const openCents = summary
+                ? Number(summary.saldo_a_pagar_centavos ?? 0)
+                : entries.reduce((sum, entry) => sum + Math.max(0, entry.amountCents - entry.payments.reduce((paid, payment) => paid + payment.amountCents, 0)), 0)
+              const paidCents = summary
+                ? Number(summary.total_pago_centavos ?? 0)
+                : payments.reduce((sum, payment) => sum + payment.amountCents, 0)
               return (
                 <article key={professional.id} className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
@@ -170,7 +177,7 @@ function Profissionais() {
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-md bg-surface-2 p-3 text-sm"><p className="text-xs font-semibold uppercase text-muted">Em aberto a pagar</p><p className="font-display text-2xl font-bold tabular">{brlCents(openCents)}</p></div>
-                    <div className="rounded-md bg-surface-2 p-3 text-sm"><p className="text-xs font-semibold uppercase text-muted">Pagamentos baixados</p><p className="font-display text-2xl font-bold tabular">{brlCents(payments.reduce((sum, payment) => sum + payment.amountCents, 0))}</p></div>
+                    <div className="rounded-md bg-surface-2 p-3 text-sm"><p className="text-xs font-semibold uppercase text-muted">Pagamentos baixados</p><p className="font-display text-2xl font-bold tabular">{brlCents(paidCents)}</p></div>
                   </div>
                   {payments.length > 0 && (
                     <div className="mt-3">
