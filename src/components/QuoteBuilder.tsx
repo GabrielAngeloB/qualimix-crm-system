@@ -40,6 +40,7 @@ export interface Draft {
   type: QuoteType
   clientId: string
   siteId: string
+  opportunityId: string | null
   ownerId: string
   volumeElements: MeasureElement[]
   volumeMargin: string
@@ -88,6 +89,7 @@ function emptyDraft(validityDays: number | null, ownerId = '', catalogItems: Cat
     type: 'concreto',
     clientId: '',
     siteId: '',
+    opportunityId: null,
     ownerId,
     volumeMargin: '',
     areaMargin: '',
@@ -107,6 +109,7 @@ function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
     type: q.type,
     clientId: q.clientId,
     siteId: q.siteId,
+    opportunityId: q.opportunityId,
     ownerId: q.ownerId,
     volumeElements: q.volumeElements.map((e) => ({ ...e, id: newId() })),
     volumeMargin: q.volumeMargin,
@@ -124,8 +127,8 @@ function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
   }
 }
 
-export function QuoteBuilder({ origin }: { origin?: string }) {
-  const { clients, sites, quotes, ctx, demoMode, toast, saveQuote, team, currentUserId } = useStore()
+export function QuoteBuilder({ origin, opportunityId }: { origin?: string; opportunityId?: string }) {
+  const { clients, sites, quotes, opportunities, loading, ctx, demoMode, toast, saveQuote, team, currentUserId } = useStore()
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
@@ -151,12 +154,33 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
     }))
   }, [ctx.catalog])
 
-  // Carrega duplicação ou rascunho guardado neste navegador
+  // Carrega duplicação, orçamento iniciado por uma oportunidade ou rascunho local.
   useEffect(() => {
+    if (loading) return
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
+    const linkedOpportunity = opportunityId
+      ? opportunities.find((item) => item.id === opportunityId)
+      : undefined
+
     if (src) {
-      setDraft({ ...fromRecord(src, ctx.rules.validityDays), ownerId: currentUserId })
+      setDraft({
+        ...fromRecord(src, ctx.rules.validityDays),
+        opportunityId: linkedOpportunity?.id ?? src.opportunityId,
+        ownerId: currentUserId,
+      })
       toast({ tone: 'info', title: `Cópia de ${src.number}`, body: 'Os preços foram atualizados para as condições atuais do catálogo. Revise antes de gerar a proposta.' })
+    } else if (opportunityId) {
+      if (!linkedOpportunity) {
+        toast({ tone: 'erro', title: 'Oportunidade não encontrada', body: 'Atualize o funil e tente iniciar o orçamento novamente.' })
+      } else {
+        setDraft({
+          ...emptyDraft(ctx.rules.validityDays, currentUserId, ctx.catalog),
+          clientId: linkedOpportunity.clientId,
+          siteId: linkedOpportunity.siteId ?? '',
+          opportunityId: linkedOpportunity.id,
+        })
+        toast({ tone: 'info', title: 'Orçamento vinculado ao lead', body: linkedOpportunity.title })
+      }
     } else {
       try {
         const raw = localStorage.getItem(DRAFT_KEY)
@@ -170,7 +194,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
       }
     }
     setLoaded(true)
-  }, [origin]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [origin, opportunityId, loading]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Autosalvamento local (prevenção de perda de dados)
   useEffect(() => {
@@ -638,6 +662,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                     try {
                       const saved = await saveQuote({
                         type: draft.type, clientId: draft.clientId, siteId: draft.siteId,
+                        opportunityId: draft.opportunityId,
                         volumeElements: draft.volumeElements, volumeMargin: draft.volumeMargin,
                         areaElements: draft.areaElements, areaMargin: draft.areaMargin,
                         lines: draft.lines, extras: draft.extras, paymentMethodIds: draft.paymentMethodIds,
