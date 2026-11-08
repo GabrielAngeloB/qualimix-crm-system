@@ -12,7 +12,7 @@ import { BarChart, ChartCard } from '../components/Charts'
 export const Route = createFileRoute('/')({ component: Painel })
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, financialEntries, workOrders, expenses, professionals } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, workOrders } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
   const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
@@ -34,7 +34,7 @@ function Painel() {
     open: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado !== 'Cancelado').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
     overdue: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado === 'Vencido').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
   }
-  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0
+  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0 || scheduleEvents.length > 0
 
   return (
     <>
@@ -64,7 +64,7 @@ function Painel() {
       <section className="mb-6 space-y-3">
         <div>
           <h2 className="font-display text-xl font-bold uppercase">Consultas do banco de dados</h2>
-          <p className="text-xs text-muted">Dados carregados das quatro views SQL configuradas no Supabase.</p>
+          <p className="text-xs text-muted">Dados carregados das views SQL comerciais, operacionais e financeiras do Supabase.</p>
         </div>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <Card><CardHeader title="Clientes" subtitle="vw_clientes_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.clients.length}</p></Card>
@@ -208,7 +208,7 @@ function Painel() {
             <Card>
               <CardHeader title="Próximas concretagens" action={<CalendarDays className="h-5 w-5 text-brand" />} />
               {upcoming.length === 0 ? (
-                <p className="p-5 text-sm text-muted">'Nenhuma concretagem programada.'</p>
+                <p className="p-5 text-sm text-muted">'Nenhuma concretagem programada.</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {upcoming.map((e) => {
@@ -238,7 +238,7 @@ function Painel() {
 
             <Card>
               <CardHeader title="Contas a receber" subtitle="Contratado, cobrado e efetivamente recebido são indicadores distintos." action={<Wallet className="h-5 w-5 text-brand" />} />
-              {<div className="space-y-3 p-5">
+              <div className="space-y-3 p-5">
                 <Flow label="Cobrado (parcelas emitidas)" value={demoMode ? d.billedCents : financeSummary.billed} max={demoMode ? d.billedCents : financeSummary.billed} />
                 <Flow label="Recebido (pagamentos confirmados)" value={demoMode ? d.receivedCents : financeSummary.received} max={demoMode ? d.billedCents : financeSummary.billed} tone="ok" />
                 <Flow label="Em aberto" value={demoMode ? d.openCents : financeSummary.open} max={demoMode ? d.billedCents : financeSummary.billed} tone="grey" />
@@ -256,7 +256,7 @@ function Painel() {
                     </ul>
                   </div>
                 )}
-              </div>}
+              </div>
             </Card>
 
             <Card>
