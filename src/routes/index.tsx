@@ -126,7 +126,7 @@ function Painel() {
           </p>
           <Link to="/configuracoes" className="font-semibold text-warn underline">Ver pendências</Link>
         </div>
-      )}
+      }
 
       {!hasData ? (
         <Card>
