@@ -155,6 +155,7 @@ Esses itens não são falhas de conexão do banco; são funcionalidades/telas qu
 
 ## 8. Pendências de qualidade e riscos conhecidos
 
+- Os testes Vitest existentes cobrem validação, documentos, cálculo de orçamento e regras de operações; não foi localizada suíte de integração para as Server Functions contra PostgreSQL. O script `test:browser` existe em `package.json`, mas o projeto não declara dependência Playwright nem configurações/specs de navegador; por isso não foi executado.
 - `pnpm lint` foi executado, mas o lint global do repositório não está limpo: **1.755 problemas em 57 arquivos**, majoritariamente regras de formatação `prettier/prettier`, incluindo arquivos fora desta integração. Essa dívida foi registrada sem aplicar formatação em massa e sem alterar componentes não relacionados. O workflow existente continua verificando typecheck/build e testes unitários.
 - O teste ponta a ponta com registros reais (cliente → obra → oportunidade → orçamento → pedido → lançamento → viagem) não foi executado: o banco de produção contém dados e não foi inserida uma cadeia de dados de teste que pudesse sujar o ambiente. Também não há rota de Frota para completar a última etapa.
 - O advisor de segurança do Supabase reportou: funções `has_role` e `is_active_user` SECURITY DEFINER executáveis por `authenticated` (utilizadas pelas policies existentes); proteção de senha vazada desativada no Supabase Auth; e `private.tabelas_exclusao` com RLS sem policy.
