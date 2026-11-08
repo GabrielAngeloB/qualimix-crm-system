@@ -140,13 +140,14 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
   useEffect(() => {
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
     if (src) {
-      setDraft(fromRecord(src, ctx.rules.validityDays))
+      setDraft({ ...fromRecord(src, ctx.rules.validityDays), ownerId: currentUserId })
       toast({ tone: 'info', title: `Cópia de ${src.number}`, body: 'Os preços foram atualizados para as condições atuais do catálogo. Revise antes de gerar a proposta.' })
     } else {
       try {
         const raw = localStorage.getItem(DRAFT_KEY)
         if (raw) {
-          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId), ...(JSON.parse(raw) as Draft) })
+          const savedDraft = JSON.parse(raw) as Draft
+          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId), ...savedDraft, ownerId: currentUserId || savedDraft.ownerId })
           toast({ tone: 'info', title: 'Rascunho recuperado', body: 'Continuamos de onde você parou.' })
         }
       } catch {
