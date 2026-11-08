@@ -38,7 +38,7 @@ const mapSite = (r: any): Site => ({
 })
 const mapOpportunity = (r: any): Opportunity => ({
   id: String(r.id), title: r.titulo, clientId: String(r.cliente_id), siteId: r.obra_id ?? null,
-  stage: r.etapa, estimatedValue: r.valor_estimado == null ? null : Number(r.valor_estimado),
+  createdAt: isoDateTime(r.created_at), stage: r.etapa, estimatedValue: r.valor_estimado == null ? null : Number(r.valor_estimado),
   ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em), createdAt: isoDateTime(r.created_at),
   lastContact: nullableDate(r.ultimo_contato), nextContact: nullableDate(r.proximo_contato),
   nextAction: r.proxima_acao ?? '', lossReason: r.motivo_perda ?? null,
@@ -100,41 +100,54 @@ export type CrmData = {
 export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): Promise<CrmData> => {
   const currentProfile = await requireCurrentProfile()
   const db = getPool()
-  const [clients, sites, opportunities, quotes, products, profiles, clientView, funnelView, quoteView, fleetView] = await Promise.all([
-    db.query('SELECT * FROM public.clientes WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
-    db.query('SELECT * FROM public.obras WHERE is_demo = false AND ativa = true ORDER BY created_at DESC, id DESC'),
-    db.query('SELECT * FROM public.oportunidades WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
-    db.query('SELECT * FROM public.orcamentos WHERE is_demo = false ORDER BY created_at DESC, id DESC'),
-    db.query('SELECT * FROM public.produtos WHERE ativo = true ORDER BY categoria, nome'),
-    db.query('SELECT p.id::text, p.nome, p.perfil FROM public.perfis p JOIN public.usuarios u ON u.id = p.id WHERE p.ativo = true ORDER BY p.nome'),
-    db.query('SELECT * FROM public.vw_clientes_resumo ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.vw_funil_resumo ORDER BY ordem'),
-    db.query('SELECT * FROM public.vw_orcamentos_resumo ORDER BY created_at DESC'),
-    db.query('SELECT * FROM public.vw_frota_resumo ORDER BY placa'),
-  ])
+  // Uma única ida ao PostgreSQL evita dez round-trips sequenciais no pool
+  // (max=1 é intencional para não multiplicar conexões em ambientes serverless).
+  const result = await db.query<{
+    clients: any[]; sites: any[]; opportunities: any[]; quotes: any[]; products: any[];
+    profiles: any[]; clientView: any[]; funnelView: any[]; quoteView: any[]; fleetView: any[];
+  }>(`
+    SELECT
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.clientes WHERE is_demo = false) x), '[]'::json) AS clients,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.obras WHERE is_demo = false AND ativa = true) x), '[]'::json) AS sites,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.oportunidades WHERE is_demo = false) x), '[]'::json) AS opportunities,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.orcamentos WHERE is_demo = false) x), '[]'::json) AS quotes,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.categoria, x.nome) FROM (SELECT * FROM public.produtos WHERE ativo = true) x), '[]'::json) AS products,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.nome) FROM (
+        SELECT p.id::text, p.nome, p.perfil
+        FROM public.perfis p
+        JOIN public.usuarios u ON u.id = p.id
+        WHERE p.ativo = true
+      ) x), '[]'::json) AS profiles,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_clientes_resumo) x), '[]'::json) AS client_view,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.ordem) FROM (SELECT * FROM public.vw_funil_resumo) x), '[]'::json) AS funnel_view,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.vw_orcamentos_resumo) x), '[]'::json) AS quote_view,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.placa) FROM (SELECT * FROM public.vw_frota_resumo) x), '[]'::json) AS fleet_view
+  `)
+  const data = result.rows[0]
+  if (!data) throw new Error('O banco não retornou os dados do CRM.')
 
-  const quoteRows = quotes.rows as any[]
+  const quoteRows = data.quotes
   const quoteByOpportunity = new Map(
     quoteRows.filter((row) => row.oportunidade_id).map((row) => [row.oportunidade_id, row.id]),
   )
 
   return {
-    clients: clients.rows.map(mapClient),
-    sites: sites.rows.map(mapSite),
-    opportunities: opportunities.rows.map((row: any) => ({
+    clients: data.clients.map(mapClient),
+    sites: data.sites.map(mapSite),
+    opportunities: data.opportunities.map((row: any) => ({
       ...mapOpportunity(row),
       quoteId: quoteByOpportunity.get(row.id) ?? null,
     })),
     quotes: quoteRows.map(mapQuote),
-    products: products.rows.map(mapCatalog),
-    team: profiles.rows.map((row: any) => ({
+    products: data.products.map(mapCatalog),
+    team: data.profiles.map((row: any) => ({
       id: String(row.id), name: row.nome, role: roleName(row.perfil),
     })),
     views: {
-      clients: clientView.rows,
-      funnel: funnelView.rows,
-      quotes: quoteView.rows,
-      fleet: fleetView.rows,
+      clients: data.clientView,
+      funnel: data.funnelView,
+      quotes: data.quoteView,
+      fleet: data.fleetView,
     },
     currentUserId: currentProfile.id,
   }
@@ -278,14 +291,14 @@ export const createOpportunity = createServerFn({ method: 'POST' })
     assertCommercial(profile)
     const db = getPool()
     const clientResult = await db.query(
-      'SELECT id FROM public.clientes WHERE id = $1 AND ativo = true LIMIT 1',
+      'SELECT id FROM public.clientes WHERE id = $1 AND ativo = true AND is_demo = false LIMIT 1',
       [data.clientId],
     )
     if (!clientResult.rows.length) throw new Error('Cliente não encontrado ou inativo.')
 
     if (data.siteId) {
       const siteResult = await db.query(
-        'SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true LIMIT 1',
+        'SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true AND is_demo = false LIMIT 1',
         [data.siteId, data.clientId],
       )
       if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado.')
