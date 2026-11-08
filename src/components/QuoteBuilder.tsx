@@ -124,11 +124,12 @@ function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
 }
 
 export function QuoteBuilder({ origin }: { origin?: string }) {
-  const { clients, sites, quotes, ctx, demoMode, toast } = useStore()
+  const { clients, sites, quotes, ctx, demoMode, toast, saveQuote } = useStore()
   const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [showProposal, setShowProposal] = useState(false)
+  const [saving, setSaving] = useState(false)
   const [showWa, setShowWa] = useState(false)
 
   // Carrega duplicação ou rascunho guardado neste navegador
@@ -607,7 +608,34 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 </div>
               </div>
               <div className="space-y-2 border-t border-line p-5">
-                <Button variant={canIssue ? 'primary' : 'secondary'} className="w-full" onClick={() => setShowProposal(true)}>
+                <Button
+                  variant="primary"
+                  className="w-full"
+                  disabled={saving || demoMode || !client || !site || !validDays}
+                  onClick={async () => {
+                    if (!validDays || !client || !site) return
+                    setSaving(true)
+                    try {
+                      const saved = await saveQuote({
+                        type: draft.type, clientId: draft.clientId, siteId: draft.siteId,
+                        volumeElements: draft.volumeElements, volumeMargin: draft.volumeMargin,
+                        areaElements: draft.areaElements, areaMargin: draft.areaMargin,
+                        lines: draft.lines, extras: draft.extras, paymentMethodIds: draft.paymentMethodIds,
+                        paymentTerms: draft.paymentTerms, validityDays: validDays,
+                        executionDeadline: draft.executionDeadline, notes: draft.notes,
+                      })
+                      toast({ tone: 'info', title: 'Orçamento registrado', body: saved.number })
+                    } catch (error) {
+                      toast({ tone: 'erro', title: 'Falha ao salvar orçamento', body: error instanceof Error ? error.message : 'Erro inesperado.' })
+                    } finally {
+                      setSaving(false)
+                    }
+                  }}
+                >
+                  <FileText className="h-4 w-4" /> {saving ? 'Salvando…' : 'Salvar orçamento no CRM'}
+                </Button>
+                {demoMode && <p className="text-center text-xs text-warn">Desative os dados de demonstração para salvar um orçamento real.</p>}
+                <Button variant={canIssue ? 'secondary' : 'ghost'} className="w-full" onClick={() => setShowProposal(true)}>
                   {canIssue ? <FileText className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   {canIssue ? 'Gerar proposta em PDF' : 'Pré-visualizar proposta'}
                 </Button>
