@@ -1,4 +1,5 @@
-import { HeadContent, Outlet, Scripts, createRootRoute } from '@tanstack/react-router'
+import { HeadContent, Outlet, Scripts, createRootRoute, redirect, useRouterState } from '@tanstack/react-router'
+import { getAuthSession } from '../lib/auth.functions'
 
 import '../styles.css'
 import { StoreProvider } from '../data/store'
@@ -11,6 +12,11 @@ const siteDescription =
 const themeScript = `try{var t=localStorage.getItem('qmx-theme');if(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)t='dark';document.documentElement.dataset.theme=t||'light'}catch(e){}`
 
 export const Route = createRootRoute({
+  beforeLoad: async ({ location }) => {
+    if (location.pathname === '/login' || location.pathname === '/bootstrap') return
+    const session = await getAuthSession()
+    if (!session.authenticated) throw redirect({ to: '/login' })
+  },
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
@@ -36,11 +42,11 @@ export const Route = createRootRoute({
 })
 
 function RootLayout() {
+  const path = useRouterState({ select: (s) => s.location.pathname })
+  const publicPage = path === '/login' || path === '/bootstrap'
   return (
     <StoreProvider>
-      <AppShell>
-        <Outlet />
-      </AppShell>
+      {publicPage ? <Outlet /> : <AppShell><Outlet /></AppShell>}
     </StoreProvider>
   )
 }
