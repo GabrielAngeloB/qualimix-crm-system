@@ -11,7 +11,7 @@ import {
   type QuoteLine,
   type QuoteType,
 } from './quote'
-import { getCurrentProfile, requireCurrentProfile, type AuthProfile } from './auth.server'
+import { requireCurrentProfile, type AuthProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
 
 const isoDate = (value: unknown): string => {
