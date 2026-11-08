@@ -91,4 +91,10 @@ revoke all on function public.handle_new_auth_user() from public, anon, authenti
 revoke all on function public.has_role(text[]) from public, anon;
 grant execute on function public.has_role(text[]) to authenticated;
 
+-- Cada usuário comum só pode consultar o próprio perfil pela Data API.
+drop policy if exists perfis_select on public.perfis;
+create policy perfis_select on public.perfis
+  for select to authenticated
+  using (id = (select auth.uid()));
+
 commit;
