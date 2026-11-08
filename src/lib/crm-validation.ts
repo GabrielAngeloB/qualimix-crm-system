@@ -107,6 +107,7 @@ export function validateLeadFields(input: AnyRecord): Record<string, string> {
     const parsed = parseDecimal(estimatedValue)
     if (!parsed.ok || parsed.value === null) errors.estimatedValue = 'Use um valor numérico, por exemplo 25.000,00.'
     else if (parsed.value < 0 || parsed.value > 999_999_999_999.99) errors.estimatedValue = 'O valor deve ser positivo e caber no limite do sistema.'
+    else if (Math.abs(parsed.value * 100 - Math.round(parsed.value * 100)) > 1e-7) errors.estimatedValue = 'Informe o valor com no máximo duas casas decimais. Ex.: 25.000,50.'
   }
   return errors
 }
