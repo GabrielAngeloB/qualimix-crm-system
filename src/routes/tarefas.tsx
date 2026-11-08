@@ -38,7 +38,8 @@ const blankForm = {
 
 function Tarefas() {
   const search = Route.useSearch()
-  const { tasks, opportunities, clients, saveTask, toast } = useStore()
+  const { tasks, opportunities, clients, saveTask, toast, currentRole } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade)
   const [form, setForm] = useState(() => ({
     ...blankForm,
@@ -150,7 +151,7 @@ function Tarefas() {
         eyebrow="Comercial"
         title="Tarefas e retornos"
         description="Organize os próximos passos, acompanhe prazos e mantenha o histórico de retorno das oportunidades."
-        actions={<Button variant="primary" onClick={() => { setEditingId(null); setForm(blankForm); setShowForm((value) => !value) }}><Plus className="h-4 w-4" /> Nova tarefa</Button>}
+        actions={canEdit ? <Button variant="primary" onClick={() => { setEditingId(null); setForm(blankForm); setShowForm((value) => !value) }}><Plus className="h-4 w-4" /> Nova tarefa</Button> : undefined}
       />
 
       <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -172,7 +173,7 @@ function Tarefas() {
         </div>
       </div>
 
-      {showForm && (
+      {canEdit && showForm && (
         <Card className="mb-6">
           <CardHeader title={editingId ? 'Editar tarefa' : 'Nova tarefa'} subtitle="A tarefa pode ser geral ou vinculada a uma oportunidade do funil." />
           <div className="grid gap-4 p-5 md:grid-cols-2">
@@ -260,7 +261,7 @@ function Tarefas() {
                         <Button size="sm" variant="danger" onClick={() => void changeStatus(task, 'Cancelada')}><XCircle className="h-4 w-4" /> Cancelar</Button>
                       </>
                     )}
-                    {task.status === 'Concluída' && <Button size="sm" onClick={() => void changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
+                    {canEdit && task.status === 'Concluída' && <Button size="sm" onClick={() => void changeStatus(task, 'Pendente')}><RotateCcw className="h-4 w-4" /> Reabrir</Button>}
                     {opportunity && <Link to="/funil" className="inline-flex h-8 items-center px-2 text-sm font-semibold text-brand hover:underline">Ver funil</Link>}
                   </div>
                 </article>
