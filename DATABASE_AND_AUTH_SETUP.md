@@ -27,13 +27,13 @@ A migration de autenticação preserva os registros de clientes, obras, oportuni
 
 Configure no servidor local e na Vercel:
 - DATABASE_URL: URL PostgreSQL do projeto Supabase. Use o host/porta recomendados pelo Supabase para a hospedagem; se a conexão direta não for acessível, use a URL do Session Pooler.
-- VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY podem continuar no .env se outras partes do frontend precisarem delas; a autenticação e persistência descritas aqui não dependem delas.
+- VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY podem permanecer no .env porque já fazem parte da configuração do projeto, mas este branch de autenticação/persistência não as utiliza. Elas não substituem nem devem conter DATABASE_URL.
 
 Não coloque a senha do banco no Git, em variável VITE_ ou no navegador. A senha PostgreSQL antiga foi exposta durante a configuração: redefina a senha do usuário postgres, use uma senha nova para qualimix_app e atualize .env e a variável de produção antes de habilitar o acesso externo.
 
 ## Primeiro administrador
 
-O token de bootstrap é derivado da credencial de banco atual. Depois de rotacionar a senha, gere o token no terminal na pasta do projeto:
+O token de bootstrap é derivado do valor completo da DATABASE_URL. Gere-o somente depois de configurar a URL final do usuário qualimix_app (incluindo senha e host/pooler definitivos), no terminal da pasta do projeto:
 
 ```powershell
 node --env-file=.env -e "const c=require('node:crypto'); console.log(c.createHmac('sha256',process.env.DATABASE_URL).update('qualimix-crm/first-admin/v1').digest('hex'))"
