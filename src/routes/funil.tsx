@@ -27,7 +27,8 @@ function followUp(o: Opportunity) {
 }
 
 function Funil() {
-  const { opportunities, clients, sites, updateOpportunity, createOpportunity, toast, team } = useStore()
+  const { opportunities, clients, sites, updateOpportunity, createOpportunity, toast, team, currentRole } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [view, setView] = useState<'kanban' | 'tabela'>('kanban')
   const [owner, setOwner] = useState('')
   const [source, setSource] = useState('')
@@ -115,7 +116,7 @@ function Funil() {
         eyebrow="Comercial"
         title="Funil comercial"
         description="Acompanhe cada oportunidade do primeiro contato ao fechamento. O fechamento é sempre uma ação explícita."
-        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadTried(false); setLeadClientId(clients.find((client) => client.active)?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
+        actions={<div className="flex flex-wrap items-center gap-2">{canEdit && <Button variant="primary" onClick={() => { setLeadTried(false); setLeadClientId(clients.find((client) => client.active)?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button>}<SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
@@ -315,7 +316,7 @@ function Funil() {
           <p className="text-xs text-muted sm:col-span-2">O lead será criado na etapa “Novo”, vinculado ao usuário autenticado e salvo diretamente no PostgreSQL.</p>
         </div>}
       </Modal>
-      {selected && <OpportunityDrawer o={selected} onClose={() => setDetail(null)} clientName={clientName(selected.clientId)} onMove={(to) => move(selected, to)} userName={ownerName} />}
+      {selected && <OpportunityDrawer o={selected} onClose={() => setDetail(null)} clientName={clientName(selected.clientId)} onMove={(to) => move(selected, to)} userName={ownerName} readOnly={!canEdit} />}
     </>
   )
 }
@@ -344,7 +345,7 @@ function AlertBox({ title, items, tone, icon, onOpen, clientName }: { title: str
   )
 }
 
-function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Opportunity; onClose: () => void; clientName: string; onMove: (to: StageId) => void; userName: (id: string) => string }) {
+function OpportunityDrawer({ o, onClose, clientName, onMove, userName, readOnly = false }: { o: Opportunity; onClose: () => void; clientName: string; onMove: (to: StageId) => void; userName: (id: string) => string; readOnly?: boolean }) {
   const { updateOpportunity, toast, quotes } = useStore()
   const quoteNumber = quotes.find((q) => q.id === o.quoteId)?.number
   const [next, setNext] = useState(o.nextContact ?? '')
@@ -368,17 +369,17 @@ function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Op
             <Badge>{o.estimatedValue === null ? 'Valor a definir' : brl(o.estimatedValue)}</Badge>
             {quoteNumber
               ? <Link to="/orcamentos" search={{ q: quoteNumber }} className="text-xs font-semibold text-brand hover:underline">Ver orçamento {quoteNumber}</Link>
-              : o.stage !== 'perdido' && <Link to="/orcamentos/novo" search={{ oportunidade: o.id }} className="text-xs font-semibold text-brand hover:underline">Criar orçamento vinculado</Link>}
+              : !readOnly && o.stage !== 'perdido' && <Link to="/orcamentos/novo" search={{ oportunidade: o.id }} className="text-xs font-semibold text-brand hover:underline">Criar orçamento vinculado</Link>}
           </div>
         </div>
-        <Field label="Etapa">
+        {readOnly ? <p className="text-sm text-muted">Etapa atual: <strong>{stageLabel(o.stage)}</strong></p> : <Field label="Etapa">
           {(id) => (
             <select id={id} className={inputCls()} value={o.stage} onChange={(e) => onMove(e.target.value as StageId)}>
               {funnelStages.map((s) => <option key={s.id} value={s.id}>{s.label}</option>)}
             </select>
           )}
-        </Field>
-        <div className="rounded-md border border-line p-4">
+        </Field>}
+        {!readOnly && <div className="rounded-md border border-line p-4">
           <h4 className="mb-3 text-lg font-bold uppercase">Registrar contato e próximo passo</h4>
           <div className="grid gap-3 sm:grid-cols-2">
             <Field label="Próxima ação" error={contactTried ? contactErrors.action : undefined} hint="Descreva o que precisa acontecer. Ex.: ligar para confirmar as medidas.">{(id) => <input id={id} maxLength={300} className={inputCls(contactTried && !!contactErrors.action)} value={action} placeholder="Ex.: Ligar para confirmar as medidas" onChange={(e) => setAction(e.target.value)} />}</Field>
@@ -401,7 +402,7 @@ function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Op
           >
             Registrar contato
           </Button>
-        </div>
+        </div>}
         <section>
           <h4 className="mb-2 text-lg font-bold uppercase">Histórico</h4>
           <ol className="space-y-2 border-l-2 border-line pl-4 text-sm">
