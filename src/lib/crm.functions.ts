@@ -58,11 +58,13 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async () =>
     supabase.from('orcamentos').select('*').eq('is_demo', false).order('created_at', { ascending:false }),
   ])
   for (const result of [clients,sites,opportunities,quotes]) if (result.error) throw new Error('Não foi possível carregar os dados do CRM.')
+  const quoteRecords = (quotes.data ?? []).map(mapQuote)
+  const quoteByOpportunity = new Map((quotes.data ?? []).filter((row:any) => row.oportunidade_id).map((row:any) => [row.oportunidade_id, row.id]))
   return {
     clients:(clients.data ?? []).map(mapClient),
     sites:(sites.data ?? []).map(mapSite),
-    opportunities:(opportunities.data ?? []).map(mapOpportunity),
-    quotes:(quotes.data ?? []).map(mapQuote),
+    opportunities:(opportunities.data ?? []).map((row:any) => ({ ...mapOpportunity(row), quoteId: quoteByOpportunity.get(row.id) ?? null })),
+    quotes:quoteRecords,
   }
 })
 
