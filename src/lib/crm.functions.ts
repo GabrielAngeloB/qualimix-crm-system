@@ -11,7 +11,7 @@ import {
   type QuoteLine,
   type QuoteType,
 } from './quote'
-import { requireCurrentProfile, type AuthProfile } from './auth.server'
+import { assertSameOrigin, requireCurrentProfile, type AuthProfile } from './auth.server'
 import { getPool, withTransaction } from './db.server'
 
 const isoDate = (value: unknown): string => {
@@ -153,6 +153,7 @@ export const persistClient = createServerFn({ method: 'POST' })
     return data
   })
   .handler(async ({ data }) => {
+    assertSameOrigin()
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const c = data.client
