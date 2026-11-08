@@ -367,7 +367,7 @@ function cleanExtras(value: unknown): QuoteExtras {
   const stay = x.stay ?? {}
   if (!['nao','fixo','km','regiao'].includes(String(freight.mode))) throw new Error('Modalidade de frete inválida.')
   if (!['nao','fixo','m3','hora'].includes(String(pumping.mode))) throw new Error('Modalidade de bombeamento inválida.')
-  if (typeof stay.include !== 'boolean' || typeof x.applyMinVolume !== 'boolean') throw new Error('Adicionais inválidos.')
+  if (typeof stay.include !== 'boolean' || typeof x.applyMinVolume !== 'boolean' || typeof pumping.partner !== 'boolean') throw new Error('Adicionais inválidos.')
   return {
     freight: {
       mode: freight.mode,
@@ -377,7 +377,7 @@ function cleanExtras(value: unknown): QuoteExtras {
     pumping: {
       mode: pumping.mode,
       hours: cleanText(pumping.hours,'horas de bombeamento',40),
-      partner: Boolean(pumping.partner),
+      partner: pumping.partner,
     },
     stay: { include: stay.include, hours: cleanText(stay.hours,'horas de estadia',40) },
     applyMinVolume: x.applyMinVolume,
