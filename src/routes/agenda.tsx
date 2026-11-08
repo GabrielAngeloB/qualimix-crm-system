@@ -24,7 +24,6 @@ function Agenda() {
   const [orderId, setOrderId] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
-  const [truck, setTruck] = useState('')
   const [notes, setNotes] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [dateEdits, setDateEdits] = useState<Record<string, string>>({})
@@ -54,7 +53,6 @@ function Agenda() {
       volumeM3: quote.result.concreteVolume,
       fck: quote.fck,
       pump: quote.extras.pumping.mode !== 'nao',
-      truck: truck.trim(),
       status: 'Planejada',
       notes: [client?.name, site?.name, notes.trim()].filter(Boolean).join(' · '),
       demo: false,
@@ -65,7 +63,6 @@ function Agenda() {
       setOrderId('')
       setDate('')
       setTime('')
-      setTruck('')
       setNotes('')
       setShowForm(false)
     } catch (error) {
@@ -82,7 +79,7 @@ function Agenda() {
       setDateEdits((current) => ({ ...current, [event.id]: nextDate }))
       setTimeEdits((current) => ({ ...current, [event.id]: nextTime }))
     } catch (error) {
-      toast({ tone: 'erro', title: 'Não foi possível reagendar', body: error instanceof Error ? error.message : 'Revise a data, o horário e o recurso.' })
+      toast({ tone: 'erro', title: 'Não foi possível reagendar', body: error instanceof Error ? error.message : 'Revise a data e o horário.' })
     }
   }
 
@@ -134,9 +131,6 @@ function Agenda() {
             <Field label="Horário" required>
               {(id) => <input id={id} type="time" className={inputCls()} value={time} onChange={(event) => setTime(event.target.value)} />}
             </Field>
-            <Field label="Caminhão / recurso">
-              {(id) => <input id={id} className={inputCls()} placeholder="Identificação do recurso" value={truck} onChange={(event) => setTruck(event.target.value)} />}
-            </Field>
             <Field label="Observações" className="sm:col-span-2 lg:col-span-3">
               {(id) => <textarea id={id} className={cx(inputCls(), 'h-auto py-2')} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />}
             </Field>
@@ -160,7 +154,7 @@ function Agenda() {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1000px] text-left text-sm">
+            <table className="w-full min-w-[900px] text-left text-sm">
               <thead className="border-b border-line bg-surface-2 text-xs text-muted">
                 <tr>
                   <th className="px-4 py-3">Data / horário</th>
@@ -168,8 +162,7 @@ function Agenda() {
                   <th className="px-4 py-3">Serviço</th>
                   <th className="px-4 py-3">Volume / FCK</th>
                   <th className="px-4 py-3">Pedido / orçamento</th>
-                  <th className="px-4 py-3">Recurso</th>
-                  <th className="px-4 py-3">Status</th>
+                      <th className="px-4 py-3">Status</th>
                 </tr>
               </thead>
               <tbody>
@@ -190,8 +183,7 @@ function Agenda() {
                       <td className="px-4 py-3">{event.service}<span className="block text-xs text-muted">{event.pump ? 'Com bombeamento' : 'Sem bombeamento'}</span>{event.notes && <span className="mt-1 block max-w-[220px] text-xs text-muted">{event.notes}</span>}</td>
                       <td className="px-4 py-3 tabular">{event.volumeM3 > 0 ? `${event.volumeM3.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m³` : '—'}<span className="block text-xs text-muted">{event.fck ? `FCK ${event.fck}` : '—'}</span></td>
                       <td className="px-4 py-3"><strong>{order?.number ?? '—'}</strong><span className="block text-xs text-muted">{event.quoteId}</span></td>
-                      <td className="px-4 py-3">{event.truck || 'Não informado'}</td>
-                      <td className="px-4 py-3">
+                              <td className="px-4 py-3">
                         <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
                           {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                         </select>
