@@ -430,7 +430,7 @@ function cleanElements(value: unknown, label: string): MeasureElement[] {
       id: cleanText(x.id,'id da medição',80,true),
       label: cleanText(x.label,'rótulo da medição',120),
       elementType: cleanText(x.elementType,'tipo do elemento',80,true),
-      mode: x.mode,
+      mode: x.mode as MeasureElement['mode'],
       length: cleanText(x.length,'comprimento',40),
       width: cleanText(x.width,'largura',40),
       thicknessCm: cleanText(x.thicknessCm,'espessura',40),
