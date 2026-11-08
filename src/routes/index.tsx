@@ -75,6 +75,7 @@ function Painel() {
           <Card><CardHeader title="Contas financeiras" subtitle="vw_financeiro_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.finance.length}</p></Card>
           <Card><CardHeader title="Profissionais" subtitle="vw_profissionais_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.professionals.length}</p></Card>
           <Card><CardHeader title="Programações" subtitle="vw_agenda_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.schedule.length}</p></Card>
+          <Card><CardHeader title="Tarefas pendentes" subtitle="vw_tarefas_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.tasks.filter((row) => row.status === 'Pendente').reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
         </div>
         <Card>
           <CardHeader title="Funil resumido no PostgreSQL" subtitle="Contagem e valor estimado por etapa, calculados pela view vw_funil_resumo." />
