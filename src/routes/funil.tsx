@@ -49,9 +49,9 @@ function Funil() {
 
   const filtered = useMemo(
     () =>
-      opportunities.filter(
-        (o) => (!owner || o.ownerId === owner) && (!source || o.source === source) && (!stage || o.stage === stage) && (!period || daysBetween(o.enteredAt, today) <= Number(period)),
-      ),
+      opportunities
+        .filter((o) => (!owner || o.ownerId === owner) && (!source || o.source === source) && (!stage || o.stage === stage) && (!period || daysBetween(o.enteredAt, today) <= Number(period)))
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     [opportunities, owner, source, period, stage],
   )
 
