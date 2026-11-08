@@ -24,8 +24,17 @@ export const Route = createFileRoute('/clientes')({
 function Clientes() {
   const { id, novo } = Route.useSearch()
   const navigate = useNavigate()
-  const { clients, sites, quotes, currentRole } = useStore()
+  const { clients, sites, quotes, currentRole, views } = useStore()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
+  const clientSummaryById = useMemo(() => new Map(views.clients.map((row) => [String(row.id), row])), [views.clients])
+  const totalSitesForClient = (clientId: string) => {
+    const summary = clientSummaryById.get(clientId)
+    return summary ? Number(summary.total_obras ?? 0) : sites.filter((site) => site.clientId === clientId).length
+  }
+  const totalQuotesForClient = (clientId: string) => {
+    const summary = clientSummaryById.get(clientId)
+    return summary ? Number(summary.total_orcamentos ?? 0) : quotes.filter((quote) => quote.clientId === clientId).length
+  }
   const [q, setQ] = useState('')
   const [type, setType] = useState('')
   const [region, setRegion] = useState('')
@@ -49,7 +58,7 @@ function Clientes() {
     )
   }, [clients, q, type, region, source, status])
 
-  const t = useSortPage(filtered, { name: (c) => c.name, city: (c) => c.city, type: (c) => c.type, created: (c) => c.createdAt, sites: (c) => sites.filter((s) => s.clientId === c.id).length }, { key: 'name', dir: 'asc' })
+  const t = useSortPage(filtered, { name: (c) => c.name, city: (c) => c.city, type: (c) => c.type, created: (c) => c.createdAt, sites: (c) => totalSitesForClient(c.id) }, { key: 'name', dir: 'asc' })
   const selected = clients.find((c) => c.id === id)
   const closeDetail = () => navigate({ to: '/clientes', search: {} })
 
@@ -121,8 +130,8 @@ function Clientes() {
                     </td>
                     <td className="px-4 py-3"><Badge>{c.type}</Badge></td>
                     <td className="px-4 py-3 tabular">
-                      {sites.filter((s) => s.clientId === c.id).length}
-                      <span className="block text-xs text-muted">{quotes.filter((x) => x.clientId === c.id).length} orçamentos</span>
+                      {totalSitesForClient(c.id)}
+                      <span className="block text-xs text-muted">{totalQuotesForClient(c.id)} orçamentos</span>
                     </td>
                     <td className="px-4 py-3">{userName(c.ownerId)}</td>
                   </tr>
