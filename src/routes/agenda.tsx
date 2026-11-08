@@ -20,7 +20,8 @@ export const Route = createFileRoute('/agenda')({
 const statuses: ScheduleStatus[] = ['Planejada', 'Confirmada', 'Em preparação', 'Em execução', 'Concluída', 'Reagendada', 'Cancelada']
 
 function Agenda() {
-  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast } = useStore()
+  const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast, currentRole } = useStore()
+  const canEditSchedule = currentRole === 'administrador' || currentRole === 'operacao'
   const [orderId, setOrderId] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -101,12 +102,12 @@ function Agenda() {
         actions={
           <>
             <Link to="/pedidos" className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-4 font-semibold hover:bg-surface-2"><ClipboardList className="h-4 w-4" /> Pedidos</Link>
-            <Button variant="primary" onClick={() => setShowForm((value) => !value)}><Plus className="h-4 w-4" /> Agendar serviço</Button>
+            {canEditSchedule && <Button variant="primary" onClick={() => setShowForm((value) => !value)}><Plus className="h-4 w-4" /> Agendar serviço</Button>}
           </>
         }
       />
 
-      {showForm && (
+      {canEditSchedule && showForm && (
         <Card className="mb-6">
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-xl font-bold uppercase">Nova programação</h2>
@@ -173,20 +174,24 @@ function Agenda() {
                   return (
                     <tr key={event.id} className="border-b border-line last:border-0 align-top">
                       <td className="px-4 py-3">
-                        <div className="grid min-w-[150px] gap-1">
-                          <input aria-label={`Data de ${event.service}`} type="date" className={cx(inputCls(), 'h-8 text-xs')} value={dateEdits[event.id] ?? event.date} onChange={(change) => setDateEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
-                          <input aria-label={`Horário de ${event.service}`} type="time" className={cx(inputCls(), 'h-8 text-xs')} value={timeEdits[event.id] ?? event.time} onChange={(change) => setTimeEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
-                          {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => void saveReschedule(event)}>Salvar reagendamento</Button>}
-                        </div>
+                        {canEditSchedule ? (
+                          <div className="grid min-w-[150px] gap-1">
+                            <input aria-label={`Data de ${event.service}`} type="date" className={cx(inputCls(), 'h-8 text-xs')} value={dateEdits[event.id] ?? event.date} onChange={(change) => setDateEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
+                            <input aria-label={`Horário de ${event.service}`} type="time" className={cx(inputCls(), 'h-8 text-xs')} value={timeEdits[event.id] ?? event.time} onChange={(change) => setTimeEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
+                            {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => void saveReschedule(event)}>Salvar reagendamento</Button>}
+                          </div>
+                        ) : <div className="min-w-[150px] py-2 font-medium tabular">{dateBR(event.date)} · {event.time}</div>}
                       </td>
                       <td className="px-4 py-3"><strong className="block">{client?.name ?? '—'}</strong><span className="text-xs text-muted">{site?.name ?? '—'}</span></td>
                       <td className="px-4 py-3">{event.service}<span className="block text-xs text-muted">{event.pump ? 'Com bombeamento' : 'Sem bombeamento'}</span>{event.notes && <span className="mt-1 block max-w-[220px] text-xs text-muted">{event.notes}</span>}</td>
                       <td className="px-4 py-3 tabular">{event.volumeM3 > 0 ? `${event.volumeM3.toLocaleString('pt-BR', { maximumFractionDigits: 2 })} m³` : '—'}<span className="block text-xs text-muted">{event.fck ? `FCK ${event.fck}` : '—'}</span></td>
                       <td className="px-4 py-3"><strong>{order?.number ?? '—'}</strong><span className="block text-xs text-muted">{event.quoteId}</span></td>
                               <td className="px-4 py-3">
-                        <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
-                          {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
-                        </select>
+                        {canEditSchedule
+                          ? <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
+                              {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
+                            </select>
+                          : <span className="inline-flex py-2"><Badge>{event.status}</Badge></span>}
                       </td>
                     </tr>
                   )
