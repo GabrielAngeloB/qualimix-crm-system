@@ -24,7 +24,7 @@ function Painel() {
   }
   const upcoming = (demoMode
     ? schedule.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volume, fck: e.fck, pump: e.pump, status: e.status }))
-    : scheduleEvents.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volumeM3, fck: e.fck, pump: e.pump, truck: e.truck, status: e.status }))
+    : scheduleEvents.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volumeM3, fck: e.fck, pump: e.pump, status: e.status }))
   ).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada')
     .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
   const financeRows = views.finance ?? []
