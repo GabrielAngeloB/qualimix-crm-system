@@ -16,7 +16,27 @@ export const Route = createRootRoute({
     if (location.pathname === '/login' || location.pathname === '/bootstrap') return
     const session = await getAuthSession()
     if (!session.authenticated) throw redirect({ to: '/login' })
-    if (location.pathname === '/usuarios' && session.profile?.perfil !== 'admin') throw redirect({ to: '/' })
+
+    const profile = session.profile
+    if (!profile) throw redirect({ to: '/login' })
+    const pathPermissions: Record<string, string[]> = {
+      '/clientes': ['comercial', 'consulta'],
+      '/funil': ['comercial', 'consulta'],
+      '/tarefas': ['comercial', 'consulta'],
+      '/orcamentos': ['comercial', 'consulta'],
+      '/pedidos': ['comercial', 'operacao', 'financeiro', 'consulta'],
+      '/agenda': ['operacao', 'consulta'],
+      '/profissionais': ['operacao', 'financeiro', 'consulta'],
+      '/financeiro': ['financeiro', 'consulta'],
+      '/configuracoes': [],
+      '/usuarios': [],
+    }
+    const requiredRoles = Object.entries(pathPermissions)
+      .find(([prefix]) => location.pathname === prefix || location.pathname.startsWith(prefix + '/'))?.[1]
+    const isAdmin = profile.perfil === 'admin'
+    if (!isAdmin && requiredRoles && !requiredRoles.includes(profile.role)) {
+      throw redirect({ to: '/' })
+    }
   },
   head: () => ({
     meta: [
