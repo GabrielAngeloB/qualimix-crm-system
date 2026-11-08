@@ -53,7 +53,8 @@ const mapQuote = (r: any): QuoteRecord => {
     id: String(r.id), number: r.numero, version: Number(r.versao), createdAt: isoDate(r.created_at),
     validUntil: isoDate(r.validade), sentAt: r.enviado_em ? isoDateTime(r.enviado_em) : null,
     status: r.status, type: r.tipo, clientId: String(r.cliente_id), siteId: String(r.obra_id),
-    ownerId: r.responsavel_id, volumeElements: d.volumeElements ?? [], volumeMargin: d.volumeMargin ?? '',
+    ownerId: r.responsavel_id, opportunityId: r.oportunidade_id == null ? null : String(r.oportunidade_id),
+    volumeElements: d.volumeElements ?? [], volumeMargin: d.volumeMargin ?? '',
     areaElements: d.areaElements ?? [], areaMargin: d.areaMargin ?? '', lines: d.lines ?? [],
     extras: d.extras ?? defaultExtras(), paymentMethodIds: d.paymentMethodIds ?? [],
     paymentTerms: d.paymentTerms ?? '', executionDeadline: d.executionDeadline ?? '',
@@ -542,6 +543,7 @@ export type QuoteSaveInput = {
   type: QuoteType
   clientId: string
   siteId: string
+  opportunityId: string | null
   volumeElements: MeasureElement[]
   volumeMargin: string
   areaElements: MeasureElement[]
@@ -562,6 +564,9 @@ export const persistQuote = createServerFn({ method: 'POST' })
     if (!quoteTypes.includes(String(d.type))) throw new Error('Tipo de orçamento inválido.')
     if (typeof d.clientId !== 'string' || !d.clientId || d.clientId.length > 80) throw new Error('Selecione o cliente.')
     if (typeof d.siteId !== 'string' || !d.siteId || d.siteId.length > 80) throw new Error('Selecione a obra.')
+    if (d.opportunityId != null && (typeof d.opportunityId !== 'string' || !d.opportunityId || d.opportunityId.length > 80)) {
+      throw new Error('Oportunidade vinculada inválida.')
+    }
     if (!Number.isInteger(d.validityDays) || Number(d.validityDays) < 1 || Number(d.validityDays) > 365) {
       throw new Error('Validade inválida.')
     }
@@ -576,6 +581,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
       type: d.type as QuoteType,
       clientId: d.clientId,
       siteId: d.siteId,
+      opportunityId: d.opportunityId == null ? null : d.opportunityId,
       volumeElements: cleanElements(d.volumeElements,'volume'),
       volumeMargin,
       areaElements: cleanElements(d.areaElements,'área'),
@@ -594,7 +600,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
     const profile = await requireCurrentProfile()
     assertCommercial(profile)
     const db = getPool()
-    const [siteResult, productResult] = await Promise.all([
+    const [siteResult, productResult, opportunityResult] = await Promise.all([
       db.query(
         `SELECT o.id
          FROM public.obras o
@@ -606,8 +612,21 @@ export const persistQuote = createServerFn({ method: 'POST' })
         [data.siteId,data.clientId],
       ),
       db.query('SELECT * FROM public.produtos WHERE ativo = true'),
+      data.opportunityId
+        ? db.query(
+            `SELECT id FROM public.oportunidades
+             WHERE id = $1 AND cliente_id = $2
+               AND (obra_id IS NULL OR obra_id = $3)
+               AND is_demo = false
+             LIMIT 1`,
+            [data.opportunityId, data.clientId, data.siteId],
+          )
+        : Promise.resolve({ rows: [] }),
     ])
     if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado ou está inativa.')
+    if (data.opportunityId && !opportunityResult.rows.length) {
+      throw new Error('A oportunidade vinculada não pertence ao cliente selecionado ou está inativa.')
+    }
 
     const dbCatalog = productResult.rows.map(mapCatalog)
     const validProducts = new Map(dbCatalog.map((product) => [product.id, product]))
@@ -641,12 +660,12 @@ export const persistQuote = createServerFn({ method: 'POST' })
       `INSERT INTO public.orcamentos
         (tipo,cliente_id,obra_id,responsavel_id,created_by,validade,status,dados_orcamento,
          resultado_calculo,total_centavos,volume_concreto,area_piso,fck,pode_emitir,
-         precisa_aprovacao,versao_motor_calculo,calculado_em,is_demo)
-       VALUES ($1,$2,$3,$4,$4,$5,'Rascunho',$6::jsonb,$7::jsonb,$8,$9,$10,$11,$12,$13,'computeQuote-v1',now(),false)
+         precisa_aprovacao,versao_motor_calculo,calculado_em,is_demo,oportunidade_id)
+       VALUES ($1,$2,$3,$4,$4,$5,'Rascunho',$6::jsonb,$7::jsonb,$8,$9,$10,$11,$12,$13,'computeQuote-v1',now(),false,$14)
        RETURNING id, numero, versao`,
       [data.type,data.clientId,data.siteId,profile.id,validUntil,JSON.stringify(savedInput),
        JSON.stringify(result),result.totalCents,result.concreteVolume,result.floorArea,fck,
-       result.canIssue,result.needsApproval],
+       result.canIssue,result.needsApproval,data.opportunityId],
     )
     const row = saved.rows[0]
     if (!row) throw new Error('O orçamento não foi retornado pelo banco.')
