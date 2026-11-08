@@ -29,7 +29,7 @@ import { addDays, brl, brlCents, dateBR, num, parseDecimal } from '../lib/format
 import { formatPhone } from '../lib/documents'
 import { useStore } from '../data/store'
 import { catalog, categoryLabel, paymentMethods } from '../data/settings'
-import { currentUser, today, userName, type QuoteRecord, type QuoteType } from '../data/fixtures'
+import { today, type QuoteRecord, type QuoteType } from '../data/fixtures'
 import { MeasureCalculator, blankElement, newId } from './MeasureCalculator'
 import { ProposalModal, WhatsAppDialog } from './QuoteShare'
 import type { ProposalData } from './ProposalDocument'
@@ -82,12 +82,12 @@ function templateFor(type: QuoteType): Pick<Draft, 'lines' | 'volumeElements' | 
   }
 }
 
-function emptyDraft(validityDays: number | null): Draft {
+function emptyDraft(validityDays: number | null, ownerId = ''): Draft {
   return {
     type: 'concreto',
     clientId: '',
     siteId: '',
-    ownerId: currentUser.id,
+    ownerId,
     volumeMargin: '',
     areaMargin: '',
     extras: defaultExtras(),
@@ -124,15 +124,15 @@ function fromRecord(q: QuoteRecord, validityDays: number | null): Draft {
 }
 
 export function QuoteBuilder({ origin }: { origin?: string }) {
-  const { clients, sites, quotes, ctx, demoMode, toast, saveQuote } = useStore()
-  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays))
+  const { clients, sites, quotes, ctx, demoMode, toast, saveQuote, team, currentUserId } = useStore()
+  const [draft, setDraft] = useState<Draft>(() => emptyDraft(ctx.rules.validityDays, currentUserId))
   const [loaded, setLoaded] = useState(false)
   const [savedAt, setSavedAt] = useState<string | null>(null)
   const [showProposal, setShowProposal] = useState(false)
   const [saving, setSaving] = useState(false)
   const [showWa, setShowWa] = useState(false)
 
-  // Carrega duplicação ou rascunho guardado neste navegador
+  useEffect(() => {\n    if (currentUserId) setDraft((current) => ({ ...current, ownerId: currentUserId }))\n  }, [currentUserId])\n\n  // Carrega duplicação ou rascunho guardado neste navegador
   useEffect(() => {
     const src = origin ? quotes.find((q) => q.id === origin) : undefined
     if (src) {
@@ -142,7 +142,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
       try {
         const raw = localStorage.getItem(DRAFT_KEY)
         if (raw) {
-          setDraft({ ...emptyDraft(ctx.rules.validityDays), ...(JSON.parse(raw) as Draft) })
+          setDraft({ ...emptyDraft(ctx.rules.validityDays, currentUserId), ...(JSON.parse(raw) as Draft) })
           toast({ tone: 'info', title: 'Rascunho recuperado', body: 'Continuamos de onde você parou.' })
         }
       } catch {
@@ -205,7 +205,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
     validUntil,
     client,
     site,
-    ownerName: userName(draft.ownerId),
+    ownerName: team.find((member) => member.id === draft.ownerId)?.name ?? '—',
     lines: draft.lines,
     result,
     volume,
