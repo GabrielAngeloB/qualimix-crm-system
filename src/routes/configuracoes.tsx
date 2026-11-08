@@ -5,7 +5,14 @@ import { brl, num } from '../lib/format'
 import { Badge, Card, CardHeader, PageHeader } from '../components/ui'
 
 export const Route = createFileRoute('/configuracoes')({
-  head: () => ({ meta: [{ title: 'Configurações — Qualimix CRM' }] }),
+  head: () => ({
+    meta: [
+      { title: 'Configurações — Qualimix CRM' },
+      { name: 'description', content: 'Pendências de preços, regras comerciais, dados institucionais e perfis de acesso da Qualimix.' },
+      { property: 'og:title', content: 'Configurações — Qualimix CRM' },
+      { property: 'og:description', content: 'O que falta confirmar para emitir propostas com valores oficiais.' },
+    ],
+  }),
   component: Configuracoes,
 })
 

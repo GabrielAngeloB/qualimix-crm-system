@@ -1,6 +1,37 @@
+<!-- LOVABLE:BEGIN -->
+> [!IMPORTANT]
+> This project is connected to [Lovable](https://lovable.dev). Avoid rewriting
+> published git history — force pushing, or rebasing/amending/squashing commits
+> that are already pushed — as it rewrites history on Lovable's side and the
+> user will likely lose their project history.
+>
+> Commits you push to the connected branch sync back to Lovable and show up in
+> the editor, so keep the branch in a working state.
+
+## What Lovable manages
+
+Rules outside this block are the project's own. Change the pieces below in
+Lovable, not by hand. With the [Lovable MCP](https://mcp.lovable.dev)
+connected, `send_message` asks Lovable to do it; otherwise ask the user to
+use the editor.
+
+- **Database.** Do not add or edit `supabase/migrations/` or `drizzle/`.
+  Ask Lovable to change the schema.
+- **Generated files.** Do not edit a file whose header says it is automatically
+  generated.
+- **AI gateway.** Keep model calls on Lovable's gateway, and keep
+  `LOVABLE_API_KEY` out of browser code.
+- **Connectors.** Lovable provides native connectors. `list_connectors` shows
+  which are enabled; `add_connector` only returns the dashboard link. When a
+  connector is enabled, calls go through the connector gateway and need
+  `LOVABLE_API_KEY`. When Lovable does not provide one, users can bring their
+  own key and store it in Secrets.
+- **Secrets.** Lovable manages them. Do not put secret values in the repo.
+<!-- LOVABLE:END -->
+
 # AGENTS.md — Qualimix CRM
 
-CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em pt-BR, com BRL e datas DD/MM/AAAA. **Continue a partir de [PLAN.md](./PLAN.md)**: o Marco 1 (produto navegável + motor de orçamentos) está concluído e o próximo é o Marco 2 (PostgreSQL + Drizzle sem dependência do host).
+CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em pt-BR, com BRL e datas DD/MM/AAAA. **Continue a partir de [PLAN.md](./PLAN.md)**. A persistência multiusuário deve usar o projeto Supabase já indicado para este CRM, após confirmar o schema pelo fluxo Lovable; não criar um banco paralelo com Drizzle nem editar migrations manualmente.
 
 ## Arquitetura
 
@@ -38,3 +69,9 @@ CRM da Qualimix (concreto usinado, concretagens, pisos). Toda a interface é em 
 - Impressão: a proposta é renderizada em `.print-portal` (portal no `body`); o CSS de impressão oculta todo o resto.
 - Testes: `npm test` (Vitest, `src/**/*.test.ts`) e `npm run test:browser` (Playwright, `tests/`). O build não faz checagem de tipos.
 - TypeScript fica na versão 6 (a versão 6 é a versão atualmente validada pelo projeto; reavaliar upgrades com a suíte de testes).
+
+## Lovable migration notes
+
+- Root layout keeps Lovable's QueryClient router context, error reporting and `styles.css?url` link alongside the app's StoreProvider/AppShell; why: the template's router and SSR setup depend on them.
+- The template's shadcn kit (`src/components/ui/`) was removed; the app's own primitives live in `src/components/ui.tsx`; why: same import name and its color tokens are not defined here.
+- TanStack, Vite and TypeScript versions follow the Lovable template, not the source repo; why: the hosted build pins them.

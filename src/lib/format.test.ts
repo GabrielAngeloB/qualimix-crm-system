@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { addDays, brl, dateBR, num, parseDecimal, roundHalfUp, toCents } from './format'
 
+// Espaços não separáveis são intencionais: este helper testa a normalização do Intl.NumberFormat.
+// eslint-disable-next-line no-irregular-whitespace
 const nb = (s: string) => s.replace(/ | /g, ' ')
 
 describe('formatação brasileira', () => {

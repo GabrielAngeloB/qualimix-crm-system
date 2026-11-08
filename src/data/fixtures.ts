@@ -109,6 +109,7 @@ export interface QuoteRecord {
   clientId: string
   siteId: string
   ownerId: string
+  opportunityId: string | null
   volumeElements: MeasureElement[]
   volumeMargin: string
   areaElements: MeasureElement[]
@@ -166,6 +167,7 @@ function q(
     clientId,
     siteId,
     ownerId,
+    opportunityId: null,
     volumeElements: [],
     volumeMargin: '',
     areaElements: [],

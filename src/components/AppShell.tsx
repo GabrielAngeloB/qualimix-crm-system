@@ -42,7 +42,7 @@ const nav: { group: string; items: NavItem[] }[] = [
       { label: 'Caminhões', icon: Truck, soon: 'Em breve' },
     ],
   },
-  { group: 'Financeiro', items: [{ label: 'Contas a receber', icon: Wallet, soon: 'Em breve' }] },
+  { group: 'Financeiro', items: [{ label: 'Contas a pagar e receber', icon: Wallet, to: '/financeiro' }] },
   { group: 'Administração', items: [{ label: 'Configurações', icon: Settings, to: '/configuracoes' }, { label: 'Usuários', icon: Users, to: '/usuarios' }] },
 ]
 

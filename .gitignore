@@ -1,13 +1,32 @@
+# Dependencies
 node_modules/
+
+# Build output
 dist/
+dist-ssr/
 .output/
 .vinxi/
-.tanstack/
+.tanstack/**
+.nitro/
 .vite/
 coverage/
 playwright-report/
 test-results/
+
+# Environment
 .env
 .env.*
 !.env.example
-.env
+.dev.vars
+.wrangler/
+
+# Logs
+logs/
+*.log
+
+# Editor files
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+*.local
