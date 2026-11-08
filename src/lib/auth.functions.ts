@@ -15,6 +15,15 @@ import {
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,29}$/
 
+const assignableRoles = ['comercial', 'operacao', 'financeiro', 'consulta'] as const
+type AssignableRole = typeof assignableRoles[number]
+function normalizeAssignedRole(value: unknown): AssignableRole {
+  if (typeof value !== 'string' || !assignableRoles.includes(value as AssignableRole)) {
+    throw new Error('Selecione um perfil de acesso válido.')
+  }
+  return value as AssignableRole
+}
+
 function normalizeUsername(value: unknown) {
   if (typeof value !== 'string') throw new Error('Informe o nome de usuário.')
   const username = value.trim().toLowerCase()
@@ -169,14 +178,14 @@ export const logout = createServerFn({ method: 'POST' }).handler(async () => {
 export const listUsers = createServerFn({ method: 'GET' }).handler(async () => {
   requireAdmin(await requireCurrentProfile())
   const result = await getPool().query(
-    'SELECT u.id::text, u.username, p.nome, p.perfil, p.ativo, p.created_at, ' +
+    'SELECT u.id::text, u.username, p.nome, p.perfil AS role, p.ativo, p.created_at, ' +
     '(u.senha_hash IS NULL) AS senha_pendente ' +
     'FROM public.usuarios u JOIN public.perfis p ON p.id = u.id ' +
     'ORDER BY p.created_at DESC, p.nome ASC',
   )
   return result.rows.map((row) => ({
     ...row,
-    perfil: row.perfil === 'admin' || row.perfil === 'administrador' ? 'admin' : 'user',
+    perfil: row.role === 'admin' || row.role === 'administrador' ? 'admin' : 'user',
   }))
 })
 
@@ -188,6 +197,7 @@ export const createUser = createServerFn({ method: 'POST' })
       username: normalizeUsername(data.username),
       name: requireText(data.name, 'o nome', 2, 100),
       password: requirePassword(data.password),
+      role: normalizeAssignedRole(data.role ?? 'comercial'),
     }
   })
   .handler(async ({ data }) => {
@@ -200,7 +210,7 @@ export const createUser = createServerFn({ method: 'POST' })
       await withTransaction(async (client) => {
         await client.query(
           'INSERT INTO public.perfis (id, nome, perfil, ativo) VALUES ($1, $2, $3, true)',
-          [id, data.name, 'comercial'],
+          [id, data.name, data.role],
         )
         await client.query(
           'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
@@ -214,7 +224,7 @@ export const createUser = createServerFn({ method: 'POST' })
       throw new Error('Não foi possível criar o usuário. Confira a configuração do banco.')
     }
 
-    return { id, nome: data.name, username: data.username, perfil: 'user' as const, ativo: true, senha_pendente: false }
+    return { id, nome: data.name, username: data.username, perfil: 'user' as const, role: data.role, ativo: true, senha_pendente: false }
   })
 
 export const setUserActive = createServerFn({ method: 'POST' })
