@@ -70,7 +70,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<{ nome: string; perfil: 'admin' | 'user'; username: string } | null>(null)
   useEffect(() => {
     void getAuthSession().then((session: { profile: { nome: string; perfil: 'admin' | 'user'; username: string } | null }) => {
-      setProfile(session.profile)
+      setProfile(session.profile ?? null)
     })
   }, [])
   const signOut = async () => { await logout(); await navigate({ to: '/login' }) }
