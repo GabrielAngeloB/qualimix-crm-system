@@ -194,12 +194,12 @@ export const createUser = createServerFn({ method: 'POST' })
     try {
       await withTransaction(async (client) => {
         await client.query(
-          'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
-          [id, data.username, passwordHash],
-        )
-        await client.query(
           'INSERT INTO public.perfis (id, nome, perfil, ativo) VALUES ($1, $2, $3, true)',
           [id, data.name, 'comercial'],
+        )
+        await client.query(
+          'INSERT INTO public.usuarios (id, username, senha_hash) VALUES ($1, $2, $3)',
+          [id, data.username, passwordHash],
         )
       })
     } catch (error) {
