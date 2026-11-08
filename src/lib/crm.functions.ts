@@ -55,6 +55,8 @@ const mapQuote = (r: any): QuoteRecord => {
     extras: d.extras ?? defaultExtras(), paymentMethodIds: d.paymentMethodIds ?? [],
     paymentTerms: d.paymentTerms ?? '', executionDeadline: d.executionDeadline ?? '',
     notes: d.notes ?? '', demo: Boolean(r.is_demo),
+    savedResult: r.resultado_calculo ?? null,
+    savedFck: r.fck == null ? null : Number(r.fck),
   }
 }
 const mapCatalog = (r: any): CatalogItem => ({
