@@ -38,7 +38,11 @@ Abra /bootstrap, informe nome, usuário, senha de pelo menos 12 caracteres e o t
 
 ## Usuários
 
-O administrador entra em Administração > Usuários e cria as contas comuns. O servidor gera o hash Scrypt, nunca armazena senha em texto puro, valida o papel no servidor e revoga sessões ao desativar usuário. A ação Excluir é lógica (desativa a conta) para preservar vínculos históricos.
+O administrador entra em Administração > Usuários e cria as contas comuns. O servidor gera o hash Scrypt, nunca armazena senha em texto puro, valida o papel no servidor e revoga sessões ao desativar usuário. A ação de desativar revoga todas as sessões e preserva os vínculos históricos.
+
+## Lead de teste
+
+Depois de aplicar a migration e criar o primeiro administrador, execute o arquivo `supabase/examples/test_lead.sql` no SQL Editor do Supabase. Ele cria um cliente e um lead com marcador `[TESTE CRM]`, sem sobrescrever registros existentes. O lead entra como `is_demo=false` e deve aparecer em Clientes, Funil e na view `vw_funil_resumo` após atualizar o site.
 
 ## Dados e views
 
