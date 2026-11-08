@@ -80,7 +80,7 @@ function Funil() {
       <div className="mb-4 flex flex-wrap gap-2">
         <select aria-label="Responsável" className={cx(inputCls(), 'w-auto')} value={owner} onChange={(e) => setOwner(e.target.value)}>
           <option value="">Responsável: todos</option>
-          {team.filter((u) => u.role === 'Comercial').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+          {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
         </select>
         <select aria-label="Origem" className={cx(inputCls(), 'w-auto')} value={source} onChange={(e) => setSource(e.target.value)}>
           <option value="">Origem: todas</option>
