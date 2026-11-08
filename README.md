@@ -1,44 +1,47 @@
 # Qualimix CRM
 
-CRM e sistema de gestão da Qualimix (concreto usinado, concretagens e pisos de concreto). Interface em português do Brasil, moeda BRL e datas DD/MM/AAAA.
+CRM da Qualimix para gestão comercial e operacional de concreto usinado, concretagens e pisos de concreto. Interface em português do Brasil, com valores em BRL e datas no padrão brasileiro.
 
-## O que já funciona
+## Estado atual
 
-- **Novo orçamento**: calculadoras de volume e área com vários elementos, margem de segurança e volume informado; itens do catálogo ou itens livres; frete (fixo, por km, por região), bombeamento (fixo, por m³, por hora, mínimo, parceiro), estadia, volume mínimo e descontos; validações em tempo real; bloqueio de proposta definitiva com preço pendente; proposta A4 imprimível/salvável em PDF; WhatsApp com mensagem editável; rascunho salvo automaticamente no navegador.
-- **Orçamentos**: pesquisa, filtros, ordenação, paginação, visualização da proposta e duplicação com preços atuais.
-- **Clientes e obras**: pesquisa por nome, CPF/CNPJ ou telefone; cadastro rápido com validação de documento e alerta de duplicidade; visão consolidada com obras, orçamentos, contratado, em aberto e histórico.
-- **Funil comercial**: colunas e tabela, cadastro de oportunidades reais associadas a clientes/obras, mudança de etapa, motivo de perda obrigatório, follow-ups, histórico e vínculo com orçamento.
-- **Tarefas e retornos**: tarefas vinculadas a oportunidades, prazo e horário, prioridade, conclusão/cancelamento e alertas visuais de atrasos e tarefas do dia no painel. Agendamento externo, e-mail e notificações push ainda não estão configurados.
-- **Pedidos**: conversão de orçamento real aceito em pedido, com vínculo à oportunidade, cliente e obra e geração da primeira conta a receber.
-- **Agenda operacional**: criação, reagendamento e mudança de status de serviços, com vínculos a pedidos e identificação livre de recurso opcional. Não há módulo separado de gestão de caminhões/frota.
-- **Profissionais**: cadastro, custo de referência por serviço/unidade, forma de pagamento preferida e histórico de baixas associadas.
-- **Financeiro**: despesas por obra gerando contas a pagar, contas a receber originadas pelos pedidos, vencimentos, baixas parciais, cancelamentos e histórico.
-- **Resultado por obra**: valor contratado menos despesas efetivamente lançadas.
-- **Painel gerencial**: leads e funil, orçamentos, conversão, contratado, agenda futura, contas a pagar, despesas de obras e saldo após custos. Os filtros comerciais continuam aplicados aos indicadores de venda; os totais operacionais são agregados dos registros visíveis.
-- **Configurações**: pendências que dependem da Qualimix (preços, regras, dados institucionais, formas de pagamento) e perfis de acesso previstos.
+- **Autenticação:** login próprio com usuário e senha. As credenciais ficam em `public.usuarios` como hashes Scrypt com salt individual; os perfis e papéis ficam em `public.perfis`. A sessão usa cookie assinado, HttpOnly e SameSite=Strict. Em produção, o cookie também usa Secure.
+- **Banco:** PostgreSQL do projeto Supabase conectado. O navegador não recebe `DATABASE_URL`; consultas e gravações passam por Server Functions do TanStack Start.
+- **Clientes e obras:** leitura de registros reais e respectivos resumos; o cadastro de clientes é exclusivo do administrador e grava cliente + primeira obra opcional em uma transação.
+- **Funil comercial:** oportunidades reais associadas a clientes/obras, mudança de etapa, motivo de perda, follow-ups, histórico e vínculo com orçamento.
+- **Orçamentos:** listagem e gravação no banco; o cálculo e a validação final são executados no servidor.
+- **Pedidos:** conversão de orçamento real aceito em pedido, com vínculo comercial e criação da conta a receber.
+- **Agenda operacional:** eventos vinculados a pedido, orçamento, cliente e obra.
+- **Profissionais e Financeiro:** cadastro de profissionais, despesas, contas a pagar/receber, baixas parciais e histórico.
+- **Tarefas:** tarefas comerciais vinculadas a oportunidades.
+- **Configurações:** o catálogo de produtos ativo é lido da tabela `public.produtos`. Regras comerciais e dados institucionais que ainda dependem de confirmação da Qualimix permanecem como pendências, não como valores inventados.
+- **Administração:** somente administrador pode cadastrar clientes e criar/gerenciar usuários.
 
-> **Limite importante desta etapa:** os novos registros operacionais ainda são persistidos no armazenamento local do navegador (`localStorage`). Eles não são sincronizados entre usuários ou dispositivos, não têm autorização no servidor e não devem ser tratados como dados de produção. O menu exibe esse estado. A conexão ao Supabase, políticas de acesso e persistência multiusuário continuam pendentes.
+## Limites conhecidos
 
-A base inicial não carrega clientes, obras, oportunidades, orçamentos ou atividades fictícias. Preços e regras comerciais ainda não confirmados permanecem como **Pendente**; não são substituídos por valores de demonstração.
-
-## Tecnologias
-
-- TanStack Start (React 19 + TypeScript), Vite, Tailwind CSS 4
-- Chart.js (gráficos), lucide-react (ícones)
-- Vitest (testes de regras e indicadores)
-- Hospedagem: runtime compatível com TanStack Start e SSR. A persistência final deve usar o projeto Supabase já indicado para o CRM, com políticas de acesso no banco e autenticação configurada no fluxo do projeto.
+- Não há uma tela de Frota no roteador, embora existam tabelas e a view `vw_frota_resumo` no banco.
+- A tela de Clientes ainda não oferece edição do cadastro principal; o fluxo implementado cria clientes e, opcionalmente, a primeira obra.
+- A listagem não tem formulário para editar orçamentos já existentes.
+- Rascunhos de orçamento e preferência de tema usam armazenamento local do navegador; isso não substitui a persistência dos registros de negócio.
 
 ## Executar localmente
 
+1. Copie `.env.example` para `.env`.
+2. Configure no ambiente do servidor `DATABASE_URL` e `SUPABASE_CA_CERT_BASE64`. Não use prefixo `VITE_` para segredos.
+3. Instale e inicie:
+
 ```bash
-npm install
-npm run dev          # http://localhost:3000
-npm test             # testes de cálculo, regras e indicadores
+pnpm install
+pnpm dev
 ```
 
+A configuração de primeiro administrador, papel PostgreSQL restrito e variáveis de produção está em [DATABASE_AND_AUTH_SETUP.md](./DATABASE_AND_AUTH_SETUP.md).
 
-Ainda não há conexão Supabase implementada no código desta branch. Não há cliente de banco, carregamento remoto, políticas RLS verificadas ou autenticação integrada. As credenciais devem existir somente como variáveis de ambiente/segredos do ambiente e nunca ser adicionadas ao repositório. O armazenamento local é provisório e serve apenas para validar os fluxos da interface.
+## Validação
 
-## Roteiro
+```bash
+pnpm typecheck
+pnpm test
+pnpm lint
+```
 
-Veja [PLAN.md](./PLAN.md). Próximos marcos: integrar o armazenamento atual ao Supabase existente, validar políticas de acesso, adicionar autenticação e auditoria no servidor, implementar versões/aprovações de orçamento, notificações agendadas.
+O gate de CI verifica instalação, typecheck/build e testes unitários. O lint global ainda contém problemas de formatação e regras em arquivos antigos; consulte [docs/INTEGRACAO_BANCO.md](./docs/INTEGRACAO_BANCO.md) para limitações e auditoria técnica.
