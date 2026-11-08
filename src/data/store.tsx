@@ -1,97 +1,154 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import {
-  clients as seedClients, opportunities as seedOpps, quotes as seedQuotes, sites as seedSites,
-  type Client, type Opportunity, type QuoteRecord, type Site,
+  clients as seedClients,
+  opportunities as seedOpps,
+  quotes as seedQuotes,
+  sites as seedSites,
+  team as seedTeam,
+  type Client,
+  type Opportunity,
+  type QuoteRecord,
+  type Site,
+  type TeamUser,
 } from './fixtures'
 import { buildReceivables, evaluateAll, quoteContext, type EvaluatedQuote, type ReceivableRow } from './derived'
 import type { QuoteContext } from '../lib/quote'
-import { loadCrmData, persistClient, persistOpportunity, persistQuote, type QuoteSaveInput } from '../lib/crm.functions'
+import {
+  loadCrmData,
+  persistClient,
+  persistOpportunity,
+  persistQuote,
+  type QuoteSaveInput,
+  type CrmData,
+  type CrmViews,
+} from '../lib/crm.functions'
 
-export interface Toast { id:number; tone:'ok'|'erro'|'info'; title:string; body?:string }
+export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string; body?: string }
 interface Store {
-  demoMode:boolean; setDemoMode:(v:boolean)=>void; ctx:QuoteContext
-  clients:Client[]; sites:Site[]; quotes:EvaluatedQuote[]; opportunities:Opportunity[]
-  receivables:ReceivableRow[]; loading:boolean
-  addClient:(c:Client,site?:Site)=>Promise<void>
-  updateOpportunity:(id:string,patch:Partial<Opportunity>,historyText?:string)=>void
-  saveQuote:(input:QuoteSaveInput)=>Promise<{id:string;number:string;version:number}>
-  refresh:()=>Promise<void>
-  toasts:Toast[]; toast:(t:Omit<Toast,'id'>)=>void; dismissToast:(id:number)=>void
+  demoMode: boolean
+  setDemoMode: (v: boolean) => void
+  ctx: QuoteContext
+  clients: Client[]
+  sites: Site[]
+  quotes: EvaluatedQuote[]
+  opportunities: Opportunity[]
+  team: TeamUser[]
+  currentUserId: string
+  views: CrmViews
+  receivables: ReceivableRow[]
+  loading: boolean
+  addClient: (c: Client, site?: Site) => Promise<void>
+  updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
+  saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
+  refresh: () => Promise<void>
+  toasts: Toast[]
+  toast: (t: Omit<Toast, 'id'>) => void
+  dismissToast: (id: number) => void
 }
-const StoreCtx=createContext<Store|null>(null)
 
-export function StoreProvider({children}:{children:ReactNode}) {
-  const [demoMode,setDemoModeState]=useState(false)
-  const [dbData,setDbData]=useState<{clients:Client[];sites:Site[];opportunities:Opportunity[];quotes:QuoteRecord[]}>({clients:[],sites:[],opportunities:[],quotes:[]})
-  const [opps,setOpps]=useState<Opportunity[]>(seedOpps)
-  const [loading,setLoading]=useState(true)
-  const [toasts,setToasts]=useState<Toast[]>([])
+const emptyViews: CrmViews = { clients: [], funnel: [], quotes: [], fleet: [] }
+const emptyData: CrmData = {
+  clients: [], sites: [], opportunities: [], quotes: [], products: [], team: [], currentUserId: '', views: emptyViews,
+}
+const StoreCtx = createContext<Store | null>(null)
 
-  const refresh=useCallback(async()=>{
+export function StoreProvider({ children }: { children: ReactNode }) {
+  const [demoModeState, setDemoModeState] = useState(false)
+  const [dbData, setDbData] = useState<CrmData>(emptyData)
+  const [opps, setOpps] = useState<Opportunity[]>(seedOpps)
+  const [loading, setLoading] = useState(true)
+  const [toasts, setToasts] = useState<Toast[]>([])
+
+  const refresh = useCallback(async () => {
     setLoading(true)
-    try { setDbData(await loadCrmData()) }
-    finally { setLoading(false) }
-  },[])
+    try {
+      setDbData(await loadCrmData())
+    } finally {
+      setLoading(false)
+    }
+  }, [])
 
-  useEffect(()=>{
-    try { if(localStorage.getItem('qmx-demo')==='1') setDemoModeState(true) } catch {}
-    void refresh().catch((error)=> {
-      const id=Date.now()
-      setToasts((xs)=>[...xs,{id,tone:'erro',title:'Falha ao carregar o CRM',body:error instanceof Error?error.message:'Verifique a conexão com o banco.'}])
+  useEffect(() => {
+    // Fixtures só podem ser exibidas durante desenvolvimento local.
+    if (import.meta.env.DEV) {
+      try { if (localStorage.getItem('qmx-demo') === '1') setDemoModeState(true) } catch { /* storage opcional */ }
+    }
+    void refresh().catch((error) => {
+      const id = Date.now()
+      setToasts((xs) => [...xs, {
+        id, tone: 'erro', title: 'Falha ao carregar o CRM',
+        body: error instanceof Error ? error.message : 'Verifique a conexão do banco no servidor.',
+      }])
     })
-  },[refresh])
+  }, [refresh])
 
-  const setDemoMode=useCallback((v:boolean)=>{
-    setDemoModeState(v)
-    try { localStorage.setItem('qmx-demo',v?'1':'0') } catch {}
-  },[])
-  const toast=useCallback((t:Omit<Toast,'id'>)=>{
-    const id=Date.now()+Math.random()
-    setToasts((xs)=>[...xs,{...t,id}])
-    setTimeout(()=>setToasts((xs)=>xs.filter((x)=>x.id!==id)),5000)
-  },[])
-  const dismissToast=useCallback((id:number)=>setToasts((xs)=>xs.filter((x)=>x.id!==id)),[])
+  const demoMode = import.meta.env.DEV && demoModeState
+  const setDemoMode = useCallback((value: boolean) => {
+    if (!import.meta.env.DEV) return
+    setDemoModeState(value)
+    try { localStorage.setItem('qmx-demo', value ? '1' : '0') } catch { /* storage opcional */ }
+  }, [])
 
-  const addClient=useCallback(async(client:Client,site?:Site)=>{
-    await persistClient({data:{client,site}})
+  const toast = useCallback((item: Omit<Toast, 'id'>) => {
+    const id = Date.now() + Math.random()
+    setToasts((xs) => [...xs, { ...item, id }])
+    setTimeout(() => setToasts((xs) => xs.filter((x) => x.id !== id)), 5000)
+  }, [])
+  const dismissToast = useCallback((id: number) => setToasts((xs) => xs.filter((x) => x.id !== id)), [])
+
+  const addClient = useCallback(async (client: Client, site?: Site) => {
+    await persistClient({ data: { client, site } })
     await refresh()
-    toast({tone:'ok',title:'Cliente cadastrado',body:'Dados salvos no banco de dados.'})
-  },[refresh,toast])
+    toast({ tone: 'ok', title: 'Cliente cadastrado', body: 'Dados salvos no banco de dados.' })
+  }, [refresh, toast])
 
-  const updateOpportunity=useCallback((id:string,patch:Partial<Opportunity>,historyText?:string)=>{
-    const update=(xs:Opportunity[])=>xs.map((o)=>o.id===id?{...o,...patch,history:historyText?[{at:new Date().toISOString(),by:'current-user',text:historyText},...o.history]:o.history}:o)
-    if(dbData.opportunities.some((o)=>o.id===id)){
-      setDbData((current)=>({...current,opportunities:update(current.opportunities)}))
-      void persistOpportunity({data:{id,patch,historyText}}).catch((error)=>{
-        toast({tone:'erro',title:'Não foi possível atualizar a oportunidade',body:error instanceof Error?error.message:'Erro de gravação.'})
+  const updateOpportunity = useCallback((id: string, patch: Partial<Opportunity>, historyText?: string) => {
+    const update = (items: Opportunity[]) => items.map((item) => item.id === id
+      ? { ...item, ...patch, history: historyText ? [{ at: new Date().toISOString(), by: dbData.currentUserId, text: historyText }, ...item.history] : item.history }
+      : item)
+    if (dbData.opportunities.some((item) => item.id === id)) {
+      setDbData((current) => ({ ...current, opportunities: update(current.opportunities) }))
+      void persistOpportunity({ data: { id, patch, historyText } }).catch((error) => {
+        toast({ tone: 'erro', title: 'Não foi possível atualizar a oportunidade', body: error instanceof Error ? error.message : 'Erro de gravação.' })
         void refresh()
       })
-    } else setOpps(update)
-  },[dbData.opportunities,refresh,toast])
-
-  const saveQuote=useCallback(async(input:QuoteSaveInput)=>{
-    const saved=await persistQuote({data:input})
-    await refresh()
-    toast({tone:'ok',title:'Orçamento salvo',body:`${saved.number} · versão ${saved.version}`})
-    return saved
-  },[refresh,toast])
-
-  const value=useMemo<Store>(()=>{
-    const ctx=quoteContext(demoMode)
-    const keep=<T extends {demo:boolean}>(xs:T[])=>demoMode?xs:xs.filter((x)=>!x.demo)
-    const quotes=evaluateAll([...dbData.quotes,...keep(seedQuotes as QuoteRecord[])],ctx)
-    return {
-      demoMode,setDemoMode,ctx,
-      clients:[...dbData.clients,...keep(seedClients)],
-      sites:[...dbData.sites,...keep(seedSites)],
-      quotes,
-      opportunities:[...dbData.opportunities,...keep(opps)],
-      receivables:demoMode?buildReceivables(quotes):[],
-      loading,addClient,updateOpportunity,saveQuote,refresh,
-      toasts,toast,dismissToast,
+    } else if (demoMode) {
+      setOpps(update)
     }
-  },[demoMode,setDemoMode,dbData,opps,loading,addClient,updateOpportunity,saveQuote,refresh,toasts,toast,dismissToast])
+  }, [dbData.currentUserId, dbData.opportunities, demoMode, refresh, toast])
+
+  const saveQuote = useCallback(async (input: QuoteSaveInput) => {
+    const saved = await persistQuote({ data: input })
+    await refresh()
+    toast({ tone: 'ok', title: 'Orçamento salvo', body: saved.number + ' · versão ' + saved.version })
+    return saved
+  }, [refresh, toast])
+
+  const value = useMemo<Store>(() => {
+    const ctx = quoteContext(demoMode, dbData.products)
+    const clients = demoMode ? [...dbData.clients, ...seedClients] : dbData.clients
+    const sites = demoMode ? [...dbData.sites, ...seedSites] : dbData.sites
+    const quoteRecords = demoMode ? [...dbData.quotes, ...(seedQuotes as QuoteRecord[])] : dbData.quotes
+    const opportunities = demoMode ? [...dbData.opportunities, ...opps.filter((item) => item.demo)] : dbData.opportunities
+    return {
+      demoMode, setDemoMode, ctx, clients, sites,
+      quotes: evaluateAll(quoteRecords, ctx),
+      opportunities,
+      team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
+      currentUserId: dbData.currentUserId,
+      views: dbData.views,
+      // Contas a receber ainda não têm tabela de produção no esquema atual.
+      receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
+      loading, addClient, updateOpportunity, saveQuote, refresh,
+      toasts, toast, dismissToast,
+    }
+  }, [demoMode, setDemoMode, dbData, opps, loading, addClient, updateOpportunity, saveQuote, refresh, toasts, toast, dismissToast])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }
-export function useStore(){const store=useContext(StoreCtx);if(!store)throw new Error('useStore fora do StoreProvider');return store}
+
+export function useStore() {
+  const store = useContext(StoreCtx)
+  if (!store) throw new Error('useStore fora do StoreProvider')
+  return store
+}
