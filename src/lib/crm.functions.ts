@@ -342,11 +342,10 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
       const historyMessage = values.length + 1
       values.push(data.historyText.trim())
       sets.push(
-        `historico = jsonb_build_array(jsonb_build_object(
-          'at', ${historyAt}::text,
-          'by', ${historyBy}::text,
-          'text', ${historyMessage}::text
-        )) || historico`,
+        'historico = jsonb_build_array(jsonb_build_object(' +
+        "'at', $" + historyAt + '::text, ' +
+        "'by', $" + historyBy + '::text, ' +
+        "'text', $" + historyMessage + '::text)) || historico',
       )
     }
     if (!sets.length) return { success: true }
