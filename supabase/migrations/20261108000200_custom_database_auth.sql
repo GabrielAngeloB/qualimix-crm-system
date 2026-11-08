@@ -69,10 +69,24 @@ create index if not exists usuarios_updated_at_idx
 -- Limite persistente de tentativas: funciona entre instâncias/serverless.
 -- A chave é SHA-256(IP + username), portanto o IP não fica salvo em claro.
 create table if not exists public.login_tentativas (
-  chave text primary key check (chave ~ '^[a-f0-9]{64}$'),
-  tentativas integer not null default 0 check (tentativas >= 0),
+  username text not null,
+  ip_hash text not null check (ip_hash ~ '^[a-f0-9]{64}
+
+create index if not exists login_tentativas_updated_at_idx
+  on public.login_tentativas (updated_at);
+
+-- Hashes e tentativas nunca devem ser acessíveis pela Data API pública.
+alter table public.usuarios enable row level security;
+alter table public.login_tentativas enable row level security;
+
+revoke all on public.usuarios, public.login_tentativas from anon, authenticated;
+
+commit;
+),
+  falhas integer not null default 0 check (falhas >= 0),
   bloqueado_ate timestamptz,
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  primary key (username, ip_hash)
 );
 
 create index if not exists login_tentativas_updated_at_idx
