@@ -7,7 +7,7 @@ import { today, type Opportunity } from '../data/fixtures'
 import { brl, dateBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, Modal, PageHeader, SegTabs, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
-import { parseOptionalAmount, validateLeadFields } from '../lib/crm-validation'
+import { isValidIsoDate, parseOptionalAmount, validateLeadFields } from '../lib/crm-validation'
 
 export const Route = createFileRoute('/funil')({
   head: () => ({ meta: [{ title: 'Funil comercial — Qualimix CRM' }] }),
@@ -350,6 +350,12 @@ function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Op
   const [next, setNext] = useState(o.nextContact ?? '')
   const [action, setAction] = useState(o.nextAction)
   const [note, setNote] = useState('')
+  const [contactTried, setContactTried] = useState(false)
+  const contactErrors = {
+    action: action.trim().length > 300 ? 'A próxima ação deve ter até 300 caracteres.' : '',
+    next: next && (!isValidIsoDate(next) || next < today) ? 'Informe uma data de hoje ou futura.' : '',
+    note: note.trim().length > 400 ? 'O resumo deve ter até 400 caracteres.' : '',
+  }
 
   return (
     <Drawer open onClose={onClose} title="Oportunidade">
@@ -373,15 +379,20 @@ function OpportunityDrawer({ o, onClose, clientName, onMove, userName }: { o: Op
         <div className="rounded-md border border-line p-4">
           <h4 className="mb-3 text-lg font-bold uppercase">Registrar contato e próximo passo</h4>
           <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Próxima ação">{(id) => <input id={id} className={inputCls()} value={action} onChange={(e) => setAction(e.target.value)} />}</Field>
-            <Field label="Data do próximo contato">{(id) => <input id={id} type="date" className={inputCls()} value={next} min={today} onChange={(e) => setNext(e.target.value)} />}</Field>
-            <Field label="Resumo do contato de hoje (opcional)" className="sm:col-span-2">{(id) => <textarea id={id} rows={2} className={cx(inputCls(), 'h-auto py-2')} value={note} onChange={(e) => setNote(e.target.value)} />}</Field>
+            <Field label="Próxima ação" error={contactTried ? contactErrors.action : undefined} hint="Descreva o que precisa acontecer. Ex.: ligar para confirmar as medidas.">{(id) => <input id={id} maxLength={300} className={inputCls(contactTried && !!contactErrors.action)} value={action} placeholder="Ex.: Ligar para confirmar as medidas" onChange={(e) => setAction(e.target.value)} />}</Field>
+            <Field label="Data do próximo contato" error={contactTried ? contactErrors.next : undefined} hint="Dia em que o comercial deve retomar o contato. Não escolha uma data passada.">{(id) => <input id={id} type="date" className={inputCls(contactTried && !!contactErrors.next)} value={next} min={today} onChange={(e) => setNext(e.target.value)} />}</Field>
+            <Field label="Resumo do contato de hoje (opcional)" error={contactTried ? contactErrors.note : undefined} hint="Registre o que foi combinado. Ex.: cliente enviará a planta até sexta-feira." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={400} className={cx(inputCls(contactTried && !!contactErrors.note), 'h-auto py-2')} value={note} placeholder="Ex.: Cliente enviará a planta até sexta-feira." onChange={(e) => setNote(e.target.value)} /></Field>
           </div>
           <Button
             variant="primary"
             className="mt-3"
             onClick={() => {
-              updateOpportunity(o.id, { lastContact: today, nextContact: next || null, nextAction: action }, `Contato registrado${note ? `: ${note}` : ''}${next ? ` · próximo em ${dateBR(next)}` : ''}`)
+              setContactTried(true)
+              if (contactErrors.action || contactErrors.next || contactErrors.note) {
+                toast({ tone: 'erro', title: 'Revise os dados do contato', body: Object.values(contactErrors).filter(Boolean).join(' ') })
+                return
+              }
+              updateOpportunity(o.id, { lastContact: today, nextContact: next || null, nextAction: action.trim() }, `Contato registrado${note.trim() ? `: ${note.trim()}` : ''}${next ? ` · próximo em ${dateBR(next)}` : ''}`)
               setNote('')
               toast({ tone: 'ok', title: 'Contato registrado' })
             }}
