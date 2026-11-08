@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { createFileRoute } from '@tanstack/react-router'
 import { LockKeyhole, LogIn } from 'lucide-react'
 import { login } from '../lib/auth.functions'
 
@@ -9,7 +9,6 @@ export const Route = createFileRoute('/login')({
 })
 
 function LoginPage() {
-  const navigate = useNavigate()
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -21,7 +20,7 @@ function LoginPage() {
     setBusy(true)
     try {
       await login({ data: { username, password } })
-      await navigate({ to: '/' })
+      window.location.assign('/')
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível entrar.')
     } finally {
