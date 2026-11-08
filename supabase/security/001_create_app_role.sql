@@ -34,7 +34,7 @@ grant select, insert on public.perfis to qualimix_app;
 grant update (ativo) on public.perfis to qualimix_app;
 grant select, insert on public.usuarios to qualimix_app;
 grant update (session_version) on public.usuarios to qualimix_app;
-grant select, insert, update, delete on public.login_tentativas to qualimix_app;
+grant select, insert, update on public.login_tentativas to qualimix_app;
 
 -- CRM comercial.
 grant select, insert, update on public.clientes, public.obras, public.oportunidades to qualimix_app;
