@@ -287,17 +287,326 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
     for (const [key, column] of Object.entries(allowed)) {
       const value = (data.patch as Record<string, unknown>)[key]
       if (value === undefined) continue
-      if (key === 'title' && (typeof value !== 'string' || value.trim().length < 2 || value.length > 180)) {
-        throw new Error('Título da oportunidade inválido.')
+      if (key === 'title' && (typeof value !== 'string' || value.trim().length < 3 || value.trim().length > 180)) {
+        throw new Error('O título deve ter entre 3 e 180 caracteres.')
       }
       if (key === 'stage' && !['novo','atendimento','levantamento','elaboracao','enviado','negociacao','fechado','perdido'].includes(String(value))) {
         throw new Error('Etapa inválida.')
       }
-      if (key === 'estimatedValue' && value !== null && (typeof value !== 'number' || !Number.isFinite(value) || value < 0)) {
-        throw new Error('Valor estimado inválido.')
+      if (key === 'source' && (typeof value !== 'string' || !leadSources.includes(value as (typeof leadSources)[number]))) {
+        throw new Error('Selecione uma origem de lead válida.')
       }
-      values.push(key === 'title' && typeof value === 'string' ? value.trim() : value)
-      sets.push(column + ' = $' + values.length)
+      if (key === 'estimatedValue' && value !== null && (
+        typeof value !== 'number' || !Number.isFinite(value) || value < 0 ||
+        value > 999_999_999_999.99 || Math.abs(value * 100 - Math.round(value * 100)) > 1e-7
+      )) {
+        throw new Error('O valor estimado deve ser positivo, ter até duas casas decimais e caber no limite do sistema.')
+      }
+      if (key === 'nextAction' && (typeof value !== 'string' || value.trim().length > 300)) {
+        throw new Error('A próxima ação deve ter até 300 caracteres.')
+      }
+      if ((key === 'lastContact' || key === 'nextContact') && value !== null && (
+        typeof value !== 'string' || !isValidIsoDate(value)
+      )) {
+        throw new Error('Informe uma data válida no formato dia/mês/ano.')
+      }
+      if (key === 'lossReason' && value !== null && (
+        typeof value !== 'string' || !lossReasons.includes(value)
+      )) {
+        throw new Error('Selecione um motivo de perda válido.')
+      }
+      if (key === 'clientId' && (typeof value !== 'string' || !value || value.length > 80)) {
+        throw new Error('Cliente inválido.')
+      }
+      if (key === 'siteId' && value !== null && (typeof value !== 'string' || value.length > 80)) {
+        throw new Error('Obra inválida.')
+      }
+      values.push(typeof value === 'string' ? value.trim() : value)
+      sets.push(column + ' = 
+    }
+    if (data.historyText) {
+      values.push(JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: data.historyText }]))
+      sets.push('historico = $' + values.length + '::jsonb || historico')
+    }
+    if (!sets.length) return { success: true }
+    values.push(data.id)
+    const result = await getPool().query(
+      'UPDATE public.oportunidades SET ' + sets.join(', ') + ', updated_at = now() WHERE id = $' + values.length,
+      values,
+    )
+    if (result.rowCount === 0) throw new Error('Oportunidade não encontrada.')
+    return { success: true }
+  })
+
+export type OpportunityCreateInput = {
+  title: string
+  clientId: string
+  siteId: string | null
+  source: string
+  estimatedValue: number | null
+}
+
+export const createOpportunity = createServerFn({ method: 'POST' })
+  .validator((input: unknown): OpportunityCreateInput => {
+    if (!input || typeof input !== 'object') throw new Error('Dados da oportunidade inválidos.')
+    const data = input as Record<string, unknown>
+    const errors = validateLeadFields({
+      title: data.title,
+      clientId: data.clientId,
+      siteId: data.siteId,
+      source: data.source,
+      estimatedValue: data.estimatedValue == null ? '' : String(data.estimatedValue),
+    })
+    if (Object.keys(errors).length) throw new Error(Object.values(errors).join(' '))
+    const estimatedValue = data.estimatedValue == null || data.estimatedValue === ''
+      ? null
+      : parseOptionalAmount(String(data.estimatedValue))
+    return {
+      title: String(data.title).trim(),
+      clientId: String(data.clientId),
+      siteId: typeof data.siteId === 'string' && data.siteId ? data.siteId : null,
+      source: String(data.source).trim(),
+      estimatedValue,
+    }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    assertCommercial(profile)
+    const db = getPool()
+    const clientResult = await db.query(
+      'SELECT id FROM public.clientes WHERE id = $1 AND ativo = true AND is_demo = false LIMIT 1',
+      [data.clientId],
+    )
+    if (!clientResult.rows.length) throw new Error('Cliente não encontrado ou inativo.')
+
+    if (data.siteId) {
+      const siteResult = await db.query(
+        'SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true AND is_demo = false LIMIT 1',
+        [data.siteId, data.clientId],
+      )
+      if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado.')
+    }
+
+    const history = JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: 'Oportunidade criada.' }])
+    const saved = await db.query<{ id: string }>(
+      `INSERT INTO public.oportunidades
+        (titulo,cliente_id,obra_id,etapa,valor_estimado,responsavel_id,origem,entrou_em,
+         historico,relatorios,is_demo,created_by)
+       VALUES ($1,$2,$3,'novo',$4,$5,$6,current_date,$7::jsonb,'[]'::jsonb,false,$5)
+       RETURNING id`,
+      [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,history],
+    )
+    const row = saved.rows[0]
+    if (!row) throw new Error('O banco não retornou a nova oportunidade.')
+    return { id: String(row.id) }
+  })
+
+const categories = ['concreto','piso','bombeamento','frete','estadia','servico','material','equipamento']
+const units = ['m³','m²','un','h','km','viagem','diária']
+const quoteTypes = ['concreto','piso','combinado']
+
+function cleanText(value: unknown, label: string, max = 500, required = false): string {
+  if (typeof value !== 'string') {
+    if (required) throw new Error('Campo inválido: ' + label + '.')
+    return ''
+  }
+  const result = value.trim()
+  if (required && !result) throw new Error('Campo obrigatório: ' + label + '.')
+  if (result.length > max) throw new Error('Campo muito longo: ' + label + '.')
+  return result
+}
+function assertOptionalDecimal(raw: string, label: string, options: { min?: number; max?: number; integer?: boolean; positive?: boolean } = {}) {
+  const error = validateOptionalDecimal(raw, label, options)
+  if (error) throw new Error(error)
+}
+function cleanElements(value: unknown, label: string): MeasureElement[] {
+  if (!Array.isArray(value) || value.length > 100) throw new Error('Medições inválidas: ' + label + '.')
+  return value.map((raw) => {
+    if (!raw || typeof raw !== 'object') throw new Error('Medição inválida.')
+    const x = raw as Record<string, unknown>
+    if (x.mode !== 'dimensoes' && x.mode !== 'informado') throw new Error('Modo de medição inválido.')
+    const element = {
+      id: cleanText(x.id,'id da medição',80,true),
+      label: cleanText(x.label,'rótulo da medição',120),
+      elementType: cleanText(x.elementType,'tipo do elemento',80,true),
+      mode: x.mode,
+      length: cleanText(x.length,'comprimento',40),
+      width: cleanText(x.width,'largura',40),
+      thicknessCm: cleanText(x.thicknessCm,'espessura',40),
+      count: cleanText(x.count,'quantidade',40),
+      informed: cleanText(x.informed,'medida informada',40),
+      notes: cleanText(x.notes,'observação',300),
+    }
+    assertOptionalDecimal(element.length, 'Comprimento', { positive: true })
+    assertOptionalDecimal(element.width, 'Largura', { positive: true })
+    assertOptionalDecimal(element.thicknessCm, 'Espessura', { positive: true })
+    assertOptionalDecimal(element.informed, 'Medida informada', { positive: true })
+    assertOptionalDecimal(element.count, 'Quantidade', { positive: true, integer: true })
+    return element
+  })
+}
+function cleanLines(value: unknown): QuoteLine[] {
+  if (!Array.isArray(value) || value.length < 1 || value.length > 50) throw new Error('Adicione de 1 a 50 itens ao orçamento.')
+  return value.map((raw) => {
+    if (!raw || typeof raw !== 'object') throw new Error('Item inválido.')
+    const x = raw as Record<string, unknown>
+    if (!categories.includes(String(x.category)) || !units.includes(String(x.unit))) throw new Error('Categoria ou unidade inválida.')
+    if (!['manual','volume','area'].includes(String(x.quantityMode))) throw new Error('Modo de quantidade inválido.')
+    const line: QuoteLine = {
+      id: cleanText(x.id,'id do item',80,true),
+      catalogId: typeof x.catalogId === 'string' && x.catalogId ? x.catalogId : null,
+      description: cleanText(x.description,'descrição do item',180,true),
+      unit: x.unit as QuoteLine['unit'],
+      category: x.category as QuoteLine['category'],
+      quantityMode: x.quantityMode as QuoteLine['quantityMode'],
+      quantity: cleanText(x.quantity,'quantidade',40),
+      unitPriceInput: cleanText(x.unitPriceInput,'preço unitário',40),
+      discountPct: cleanText(x.discountPct,'desconto',40),
+    }
+    assertOptionalDecimal(line.quantity, 'Quantidade', { positive: true, max: 999_999_999_999.99 })
+    assertOptionalDecimal(line.unitPriceInput, 'Preço unitário', { max: 999_999_999_999.99 })
+    assertOptionalDecimal(line.discountPct, 'Desconto', { min: 0, max: 100 })
+    return line
+  })
+}
+function cleanExtras(value: unknown): QuoteExtras {
+  if (!value || typeof value !== 'object') throw new Error('Adicionais inválidos.')
+  const x = value as Record<string, any>
+  const freight = x.freight ?? {}
+  const pumping = x.pumping ?? {}
+  const stay = x.stay ?? {}
+  if (!['nao','fixo','km','regiao'].includes(String(freight.mode))) throw new Error('Modalidade de frete inválida.')
+  if (!['nao','fixo','m3','hora'].includes(String(pumping.mode))) throw new Error('Modalidade de bombeamento inválida.')
+  if (typeof stay.include !== 'boolean' || typeof x.applyMinVolume !== 'boolean' || typeof pumping.partner !== 'boolean') throw new Error('Adicionais inválidos.')
+  const cleaned = {
+    freight: {
+      mode: freight.mode,
+      km: cleanText(freight.km,'km de frete',40),
+      regionId: cleanText(freight.regionId,'região do frete',80),
+    },
+    pumping: {
+      mode: pumping.mode,
+      hours: cleanText(pumping.hours,'horas de bombeamento',40),
+      partner: pumping.partner,
+    },
+    stay: { include: stay.include, hours: cleanText(stay.hours,'horas de estadia',40) },
+    applyMinVolume: x.applyMinVolume,
+    globalDiscount: cleanText(x.globalDiscount,'desconto global',40),
+  }
+  assertOptionalDecimal(cleaned.freight.km, 'Distância do frete (km)', { positive: true })
+  assertOptionalDecimal(cleaned.pumping.hours, 'Horas de bombeamento', { positive: true })
+  assertOptionalDecimal(cleaned.stay.hours, 'Horas de estadia', { positive: true })
+  assertOptionalDecimal(cleaned.globalDiscount, 'Desconto geral', { max: 999_999_999_999.99 })
+  return cleaned
+}
+
+export type QuoteSaveInput = {
+  type: QuoteType
+  clientId: string
+  siteId: string
+  volumeElements: MeasureElement[]
+  volumeMargin: string
+  areaElements: MeasureElement[]
+  areaMargin: string
+  lines: QuoteLine[]
+  extras: QuoteExtras
+  paymentMethodIds: string[]
+  paymentTerms: string
+  validityDays: number
+  executionDeadline: string
+  notes: string
+}
+
+export const persistQuote = createServerFn({ method: 'POST' })
+  .validator((input: unknown): QuoteSaveInput => {
+    if (!input || typeof input !== 'object') throw new Error('Dados do orçamento inválidos.')
+    const d = input as Record<string, unknown>
+    if (!quoteTypes.includes(String(d.type))) throw new Error('Tipo de orçamento inválido.')
+    if (typeof d.clientId !== 'string' || !d.clientId || d.clientId.length > 80) throw new Error('Selecione o cliente.')
+    if (typeof d.siteId !== 'string' || !d.siteId || d.siteId.length > 80) throw new Error('Selecione a obra.')
+    if (!Number.isInteger(d.validityDays) || Number(d.validityDays) < 1 || Number(d.validityDays) > 365) {
+      throw new Error('Validade inválida.')
+    }
+    if (!Array.isArray(d.paymentMethodIds) || d.paymentMethodIds.length > 10 || d.paymentMethodIds.some((v) => typeof v !== 'string')) {
+      throw new Error('Formas de pagamento inválidas.')
+    }
+    const volumeMargin = cleanText(d.volumeMargin,'margem de volume',40)
+    const areaMargin = cleanText(d.areaMargin,'margem de área',40)
+    assertOptionalDecimal(volumeMargin, 'Margem de volume (%)', { min: 0, max: 100 })
+    assertOptionalDecimal(areaMargin, 'Margem de área (%)', { min: 0, max: 100 })
+    return {
+      type: d.type as QuoteType,
+      clientId: d.clientId,
+      siteId: d.siteId,
+      volumeElements: cleanElements(d.volumeElements,'volume'),
+      volumeMargin,
+      areaElements: cleanElements(d.areaElements,'área'),
+      areaMargin,
+      lines: cleanLines(d.lines),
+      extras: cleanExtras(d.extras),
+      paymentMethodIds: d.paymentMethodIds as string[],
+      paymentTerms: cleanText(d.paymentTerms,'condições de pagamento',500),
+      validityDays: Number(d.validityDays),
+      executionDeadline: cleanText(d.executionDeadline,'prazo de execução',180),
+      notes: cleanText(d.notes,'observações',2000),
+    }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    assertCommercial(profile)
+    const db = getPool()
+    const [siteResult, productResult] = await Promise.all([
+      db.query('SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true AND is_demo = false LIMIT 1', [data.siteId,data.clientId]),
+      db.query('SELECT * FROM public.produtos WHERE ativo = true'),
+    ])
+    if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado ou está inativa.')
+
+    const dbCatalog = productResult.rows.map(mapCatalog)
+    const validProducts = new Map(dbCatalog.map((product) => [product.id, product]))
+    const lines = data.lines.map((line) => {
+      if (line.catalogId) {
+        const product = validProducts.get(line.catalogId)
+        if (!product) throw new Error('Um dos produtos selecionados não está ativo no catálogo.')
+        return { ...line, description: product.name, unit: product.unit, category: product.category }
+      }
+      return line
+    })
+
+    const volume = summarizeMeasures(data.volumeElements, data.volumeMargin, 'volume')
+    const area = summarizeMeasures(data.areaElements, data.areaMargin, 'area')
+    const ctx = quoteContext(false, dbCatalog)
+    const result = computeQuote({
+      clientId: data.clientId, siteId: data.siteId, lines, volume, area,
+      extras: data.extras, paymentMethodIds: data.paymentMethodIds,
+    }, ctx)
+
+    const validUntil = new Date(Date.now() + data.validityDays * 86_400_000).toISOString().slice(0,10)
+    const savedInput = {
+      volumeElements: data.volumeElements, volumeMargin: data.volumeMargin,
+      areaElements: data.areaElements, areaMargin: data.areaMargin, lines,
+      extras: data.extras, paymentMethodIds: data.paymentMethodIds,
+      paymentTerms: data.paymentTerms, executionDeadline: data.executionDeadline, notes: data.notes,
+    }
+    const concreteLine = lines.find((line) => line.category === 'concreto')
+    const fck = concreteLine?.catalogId ? validProducts.get(concreteLine.catalogId)?.fck ?? null : null
+    const saved = await db.query<{id:string;numero:string;versao:number}>(
+      `INSERT INTO public.orcamentos
+        (tipo,cliente_id,obra_id,responsavel_id,created_by,validade,status,dados_orcamento,
+         resultado_calculo,total_centavos,volume_concreto,area_piso,fck,pode_emitir,
+         precisa_aprovacao,versao_motor_calculo,calculado_em,is_demo)
+       VALUES ($1,$2,$3,$4,$4,$5,'Rascunho',$6::jsonb,$7::jsonb,$8,$9,$10,$11,$12,$13,'computeQuote-v1',now(),false)
+       RETURNING id, numero, versao`,
+      [data.type,data.clientId,data.siteId,profile.id,validUntil,JSON.stringify(savedInput),
+       JSON.stringify(result),result.totalCents,result.concreteVolume,result.floorArea,fck,
+       result.canIssue,result.needsApproval],
+    )
+    const row = saved.rows[0]
+    if (!row) throw new Error('O orçamento não foi retornado pelo banco.')
+    return { id: String(row.id), number: row.numero, version: Number(row.versao) }
+  })
+ + values.length)
     }
     if (data.historyText) {
       values.push(JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: data.historyText }]))
