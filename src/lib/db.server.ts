@@ -41,10 +41,9 @@ function getSql(): ReturnType<typeof postgres> {
     }
 
     sql = postgres(connectionString, {
-      // loadCrmData dispara consultas independentes em paralelo. Com max=1,
-      // o driver serializava todas elas, anulando o Promise.all.
-      // Um pool pequeno permite concorrência sem abrir dezenas de conexões.
-      max: 4,
+      // loadCrmData consolida os dados em uma única consulta SQL; manter um
+      // pool pequeno evita multiplicar conexões em ambientes serverless.
+      max: 1,
       idle_timeout: 10,
       connect_timeout: 10,
       ssl: { ca, rejectUnauthorized: true },
