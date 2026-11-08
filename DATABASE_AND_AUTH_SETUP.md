@@ -62,4 +62,5 @@ A UI não é uma fronteira de segurança. As funções do servidor e as polític
 - O banco atual não possui tabelas de agenda, pedidos ou contas a receber. Esses módulos estão marcados como “Em breve” no projeto e não devem ser simulados como dados persistidos.
 - A migration de autenticação converte os papéis antigos para ADMIN/USER. Revise usuários já existentes antes de aplicá-la em produção.
 - O endpoint aplica bloqueio temporário por username após cinco falhas no mesmo processo. Isso é defesa adicional, não substitui rate limiting distribuído no gateway/hosting; em deploy serverless/multirréplica, configure também limite por IP no provedor.
-- O `pnpm-lock.yaml` precisa ser regenerado com `pnpm install` após a inclusão das dependências.\n- Após configurar as chaves, execute typecheck, testes e testes reais de login/RLS em um projeto Supabase de homologação.
+- O `pnpm-lock.yaml` precisa ser regenerado com `pnpm install` após a inclusão das dependências.
+- Após configurar as chaves, execute typecheck, testes e testes reais de login/RLS em um projeto Supabase de homologação.
