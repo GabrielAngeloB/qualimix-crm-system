@@ -30,6 +30,8 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: ESLint
+        run: pnpm exec eslint . --rule 'prettier/prettier: 0'
 
       - name: Generate routes, typecheck and production build
         run: pnpm typecheck
