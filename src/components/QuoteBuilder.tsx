@@ -399,7 +399,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                           <p className="text-xs text-muted">{item?.code} · {categoryLabel[l.category]} · {l.unit}</p>
                         </>
                       ) : (
-                        <input aria-label="Descrição do item livre" className={inputCls()} value={l.description} onChange={(e) => patchLine(l.id, { description: e.target.value })} />
+                        <input aria-label="Descrição do item livre" maxLength={180} className={inputCls()} value={l.description} placeholder="Ex.: Taxa de mobilização" onChange={(e) => patchLine(l.id, { description: e.target.value })} />
                       )}
                     </div>
                     <div>
@@ -412,14 +412,14 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                         </select>
                       )}
                       {l.quantityMode === 'manual' ? (
-                        <input aria-label={`Quantidade de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.quantity} placeholder="0" onChange={(e) => patchLine(l.id, { quantity: e.target.value })} />
+                        <input aria-label={`Quantidade de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.quantity} placeholder="Ex.: 12,5" onChange={(e) => patchLine(l.id, { quantity: e.target.value })} />
                       ) : (
                         <div className="flex h-10 items-center rounded-md border border-dashed border-line px-3 font-semibold tabular">{c?.quantity != null ? `${num(c.quantity, 2)} ${l.unit}` : '—'}</div>
                       )}
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Preço unitário</label>
-                      <input aria-label={`Preço unitário de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.unitPriceInput} placeholder={ref != null ? num(ref, 2) : 'Pendente'} onChange={(e) => patchLine(l.id, { unitPriceInput: e.target.value })} />
+                      <input aria-label={`Preço unitário de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.unitPriceInput} placeholder={ref != null ? num(ref, 2) : 'Ex.: 420,00'} onChange={(e) => patchLine(l.id, { unitPriceInput: e.target.value })} />
                       <div className="mt-1">
                         {c?.priceSource === 'tabela' && <Badge tone="ok">Tabela oficial</Badge>}
                         {c?.priceSource === 'demonstracao' && <Badge tone="warn">Fictício (demo)</Badge>}
@@ -429,7 +429,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                     </div>
                     <div>
                       <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Desconto %</label>
-                      <input aria-label={`Desconto de ${l.description}`} inputMode="decimal" className={inputCls()} value={l.discountPct} placeholder="0" onChange={(e) => patchLine(l.id, { discountPct: e.target.value })} />
+                      <input aria-label={`Desconto de ${l.description}`} inputMode="decimal" maxLength={40} className={inputCls()} value={l.discountPct} placeholder="Ex.: 5" onChange={(e) => patchLine(l.id, { discountPct: e.target.value })} />
                     </div>
                     <div className="text-right">
                       <label className="mb-1 block text-xs font-semibold text-muted md:hidden">Subtotal</label>
@@ -485,7 +485,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 {draft.extras.freight.mode === 'fixo' && <RuleValue label="Valor fixo" v={r.freight.fixed} />}
                 {draft.extras.freight.mode === 'km' && (
                   <div className="mt-3 flex items-end gap-3">
-                    <Field label="Distância (km)" className="w-32">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.freight.km} onChange={(e) => setExtras({ freight: { ...draft.extras.freight, km: e.target.value } })} />}</Field>
+                    <Field label="Distância (km)" hint="Distância usada no cálculo do frete. Ex.: 25,5 km." className="w-32">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.freight.km} placeholder="Ex.: 25,5" onChange={(e) => setExtras({ freight: { ...draft.extras.freight, km: e.target.value } })} />}</Field>
                     <RuleValue label="Valor por km" v={r.freight.perKm} />
                   </div>
                 )}
@@ -509,7 +509,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                     {draft.extras.pumping.mode === 'm3' && <RuleValue label={`Por m³ × ${num(result.concreteVolume, 2)} m³`} v={r.pumping.perM3} />}
                     {draft.extras.pumping.mode === 'hora' && (
                       <>
-                        <Field label="Horas" className="w-24">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.pumping.hours} onChange={(e) => setExtras({ pumping: { ...draft.extras.pumping, hours: e.target.value } })} />}</Field>
+                        <Field label="Horas" hint="Tempo previsto de bombeamento. Ex.: 2,5 horas." className="w-24">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.pumping.hours} placeholder="Ex.: 2,5" onChange={(e) => setExtras({ pumping: { ...draft.extras.pumping, hours: e.target.value } })} />}</Field>
                         <RuleValue label="Por hora" v={r.pumping.perHour} />
                       </>
                     )}
@@ -530,7 +530,7 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 <p className="mt-1 text-xs text-muted">Tolerância: {r.stay.toleranceMin === null ? 'não configurada' : `${r.stay.toleranceMin} min`}</p>
                 {draft.extras.stay.include && (
                   <div className="mt-3 flex items-end gap-3">
-                    <Field label="Horas adicionais" className="w-32">{(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.stay.hours} onChange={(e) => setExtras({ stay: { ...draft.extras.stay, hours: e.target.value } })} />}</Field>
+                    <Field label="Horas adicionais" hint="Tempo acima da tolerância configurada. Ex.: 1,5 hora." className="w-32">{(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.stay.hours} placeholder="Ex.: 1,5" onChange={(e) => setExtras({ stay: { ...draft.extras.stay, hours: e.target.value } })} />}</Field>
                     <RuleValue label="Por hora" v={r.stay.perHour} />
                   </div>
                 )}
@@ -544,8 +544,8 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 <p className="mt-1 text-xs text-muted">
                   {r.minVolume.m3 === null ? 'Volume mínimo não configurado' : `Mínimo ${num(r.minVolume.m3, 1)} m³ · ${r.minVolume.chargeDifference ? 'cobra a diferença' : 'apenas alerta'}`}
                 </p>
-                <Field label="Desconto geral (R$)" className="mt-3 max-w-[200px]" hint={`Sem aprovação até ${r.maxDiscountPctWithoutApproval === null ? '— (não configurado)' : `${r.maxDiscountPctWithoutApproval}%`}`}>
-                  {(id) => <input id={id} inputMode="decimal" className={inputCls()} value={draft.extras.globalDiscount} placeholder="0,00" onChange={(e) => setExtras({ globalDiscount: e.target.value })} />}
+                <Field label="Desconto geral (R$)" className="mt-3 max-w-[200px]" hint={`Informe o desconto total em reais, não em porcentagem. Ex.: 150,00. Sem aprovação até ${r.maxDiscountPctWithoutApproval === null ? '— (não configurado)' : `${r.maxDiscountPctWithoutApproval}%`}`}>
+                  {(id) => <input id={id} inputMode="decimal" maxLength={40} className={inputCls()} value={draft.extras.globalDiscount} placeholder="Ex.: 150,00" onChange={(e) => setExtras({ globalDiscount: e.target.value })} />}
                 </Field>
               </RuleBlock>
             </div>
@@ -577,17 +577,17 @@ export function QuoteBuilder({ origin }: { origin?: string }) {
                 </div>
                 {ctx.enabledPaymentMethodIds.length === 0 && <p className="mt-2 text-xs text-warn">Nenhuma forma de pagamento habilitada. Confirme as modalidades aceitas em Configurações.</p>}
               </div>
-              <Field label="Prazo e condições de pagamento" hint="Ex.: entrada, parcelamento, faturamento em 28 dias">
-                {(id) => <input id={id} className={inputCls()} value={draft.paymentTerms} onChange={(e) => set('paymentTerms', e.target.value)} />}
+              <Field label="Prazo e condições de pagamento" hint="Descreva como o cliente pagará. Ex.: 30% de entrada e saldo em 28 dias.">
+                {(id) => <input id={id} maxLength={500} className={inputCls()} value={draft.paymentTerms} placeholder="Ex.: 30% de entrada e saldo em 28 dias" onChange={(e) => set('paymentTerms', e.target.value)} />}
               </Field>
               <Field label="Validade da proposta (dias)" required hint={validUntil ? `Válida até ${dateBR(validUntil)}` : r.validityDays === null ? 'Validade padrão não configurada' : undefined}>
-                {(id) => <input id={id} inputMode="numeric" className={inputCls(!validUntil && draft.validityDays !== '')} value={draft.validityDays} onChange={(e) => set('validityDays', e.target.value)} />}
+                {(id) => <input id={id} inputMode="numeric" maxLength={3} className={inputCls(!validUntil && draft.validityDays !== '')} value={draft.validityDays} placeholder="Ex.: 15" onChange={(e) => set('validityDays', e.target.value)} />}
               </Field>
               <Field label="Prazo de execução (opcional)">
-                {(id) => <input id={id} className={inputCls()} value={draft.executionDeadline} placeholder="Ex.: concretagem prevista para a 2ª quinzena" onChange={(e) => set('executionDeadline', e.target.value)} />}
+                {(id) => <input id={id} maxLength={180} className={inputCls()} value={draft.executionDeadline} placeholder="Ex.: concretagem prevista para a 2ª quinzena" onChange={(e) => set('executionDeadline', e.target.value)} />}
               </Field>
               <Field label="Observações comerciais">
-                {(id) => <textarea id={id} rows={3} className={cx(inputCls(), 'h-auto py-2')} value={draft.notes} onChange={(e) => set('notes', e.target.value)} />}
+                {(id) => <textarea id={id} rows={3} maxLength={2000} className={cx(inputCls(), 'h-auto py-2')} value={draft.notes} placeholder="Ex.: acesso pela rua lateral; confirmar disponibilidade de bomba." onChange={(e) => set('notes', e.target.value)} />}
               </Field>
             </div>
           </Card>
