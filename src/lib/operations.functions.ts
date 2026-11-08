@@ -193,44 +193,47 @@ export const createWorkOrderFromQuoteOnServer = createServerFn({ method: 'POST' 
     const profile = await requireCurrentProfile()
     assertRole(profile, roles.commercial)
     return withTransaction(async (tx) => {
-      const q = await tx.query<any>(
-        `select id,numero,status,tipo,cliente_id,obra_id,oportunidade_id,total_centavos,is_demo
-         from public.orcamentos where id=$1`, [data.quoteId])
-      const quote = q.rows[0]
-      if (!quote || quote.is_demo) throw new Error('Orçamento real não encontrado.')
-      if (quote.status !== 'Aceito') throw new Error('Somente orçamentos aceitos podem gerar pedidos.')
-      const existing = await tx.query('select id from public.pedidos where orcamento_id=$1 limit 1', [data.quoteId])
-      if (existing.rowCount) throw new Error('Este orçamento já foi convertido em pedido.')
-      const amount = safeCents(quote.total_centavos, 'Total contratado')
-      const numberResult = await tx.query<{ numero: string}>(
-        `select 'PED-'||to_char(current_date,'YYYY')||'-'||lpad(nextval('public.pedido_numero_seq')::text,4,'0') as numero`)
-      const id = 'ped-' + randomUUID()
-      const now = new Date().toISOString()
-      const orderResult = await tx.query<any>(
-        `insert into public.pedidos
-          (id,numero,orcamento_id,oportunidade_id,cliente_id,obra_id,descricao,
-           valor_contratado_centavos,status,created_by,is_demo)
-         values($1,$2,$3,$4,$5,$6,$7,$8,'Aguardando programação',$9,false)
-         returning *`,
-        [id,numberResult.rows[0].numero,quote.id,quote.oportunidade_id,quote.cliente_id,
-         quote.obra_id,'Pedido originado do orçamento '+quote.numero,amount,profile.id])
-      await tx.query(
-        `insert into public.lancamentos_financeiros
-          (id,tipo,pedido_id,orcamento_id,cliente_id,descricao,valor_centavos,
-           emitido_em,vencimento,metodo,status,created_by,is_demo)
-         values($1,'receber',$2,$3,$4,$5,$6,current_date,$7,$8,'Em aberto',$9,false)`,
-        ['fin-'+randomUUID(),id,quote.id,quote.cliente_id,'Conta a receber · pedido '+numberResult.rows[0].numero,
-         amount,data.dueDate,data.method,profile.id])
-      return mapWorkOrder(orderResult.rows[0])
-    })
-    } catch (error) {
-      // pedidos.orcamento_id possui UNIQUE: sob corrida, apenas uma transação vence.
-      if ((error as { code?: string; constraint?: string })?.code === '23505' &&
-          (error as { constraint?: string })?.constraint === 'pedidos_orcamento_id_key') {
-        throw new Error('Este orçamento já foi convertido em pedido.')
+      try {
+        const q = await tx.query<any>(
+          `select id,numero,status,tipo,cliente_id,obra_id,oportunidade_id,total_centavos,is_demo
+           from public.orcamentos where id=$1`, [data.quoteId])
+        const quote = q.rows[0]
+        if (!quote || quote.is_demo) throw new Error('Orçamento real não encontrado.')
+        if (quote.status !== 'Aceito') throw new Error('Somente orçamentos aceitos podem gerar pedidos.')
+
+        // pedidos.orcamento_id tem UNIQUE. A constraint, não um lock no orçamento,
+        // arbitra duas conversões concorrentes sem exigir UPDATE em orcamentos.
+        const existing = await tx.query('select id from public.pedidos where orcamento_id=$1 limit 1', [data.quoteId])
+        if (existing.rowCount) throw new Error('Este orçamento já foi convertido em pedido.')
+
+        const amount = safeCents(quote.total_centavos, 'Total contratado')
+        const numberResult = await tx.query<{ numero: string }>(
+          `select 'PED-'||to_char(current_date,'YYYY')||'-'||lpad(nextval('public.pedido_numero_seq')::text,4,'0') as numero`)
+        const id = 'ped-' + randomUUID()
+        const orderResult = await tx.query<any>(
+          `insert into public.pedidos
+            (id,numero,orcamento_id,oportunidade_id,cliente_id,obra_id,descricao,
+             valor_contratado_centavos,status,created_by,is_demo)
+           values($1,$2,$3,$4,$5,$6,$7,$8,'Aguardando programação',$9,false)
+           returning *`,
+          [id,numberResult.rows[0].numero,quote.id,quote.oportunidade_id,quote.cliente_id,
+           quote.obra_id,'Pedido originado do orçamento '+quote.numero,amount,profile.id])
+        await tx.query(
+          `insert into public.lancamentos_financeiros
+            (id,tipo,pedido_id,orcamento_id,cliente_id,descricao,valor_centavos,
+             emitido_em,vencimento,metodo,status,created_by,is_demo)
+           values($1,'receber',$2,$3,$4,$5,$6,current_date,$7,$8,'Em aberto',$9,false)`,
+          ['fin-'+randomUUID(),id,quote.id,quote.cliente_id,'Conta a receber · pedido '+numberResult.rows[0].numero,
+           amount,data.dueDate,data.method,profile.id])
+        return mapWorkOrder(orderResult.rows[0])
+      } catch (error) {
+        if ((error as { code?: string; constraint?: string })?.code === '23505' &&
+            (error as { constraint?: string })?.constraint === 'pedidos_orcamento_id_key') {
+          throw new Error('Este orçamento já foi convertido em pedido.')
+        }
+        throw error
       }
-      throw error
-    }
+    })
   })
 
 export const updateWorkOrderAmountOnServer = createServerFn({ method: 'POST' })
