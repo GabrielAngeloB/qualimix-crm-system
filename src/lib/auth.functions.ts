@@ -1,5 +1,5 @@
 import { createServerFn } from '@tanstack/react-start'
-import { randomUUID, timingSafeEqual } from 'node:crypto'
+import { createHmac, randomUUID, timingSafeEqual } from 'node:crypto'
 import { getRequestHeader } from '@tanstack/react-start/server'
 import { getPool, withTransaction } from './db.server'
 import {
@@ -14,7 +14,6 @@ import {
 } from './auth.server'
 
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,29}$/
-const loginFailures = new Map<string, { count: number; blockedUntil: number }>()
 
 function normalizeUsername(value: unknown) {
   if (typeof value !== 'string') throw new Error('Informe o nome de usuário.')
@@ -46,32 +45,51 @@ function requireAdmin(profile: Awaited<ReturnType<typeof requireCurrentProfile>>
   return profile
 }
 
-function rateKey(username: string) {
+function clientIpHash(): string {
   const forwarded = getRequestHeader('x-forwarded-for') ?? ''
-  const ip = forwarded.split(',')[0]?.trim() || 'unknown'
-  return ip + ':' + username
+  const ip = forwarded.split(',')[0]?.trim() || getRequestHeader('x-real-ip') || 'unknown'
+  const key = process.env.DATABASE_URL
+  if (!key) throw new Error('DATABASE_URL não está configurada.')
+  return createHmac('sha256', key).update(ip).digest('hex')
 }
 
-function assertLoginAllowed(key: string) {
-  const state = loginFailures.get(key)
-  if (state && state.blockedUntil > Date.now()) {
+async function assertLoginAllowed(username: string, ipHash: string) {
+  const result = await getPool().query<{ bloqueado_ate: Date | string | null }>(
+    'SELECT bloqueado_ate FROM public.login_tentativas WHERE username = $1 AND ip_hash = $2 LIMIT 1',
+    [username, ipHash],
+  )
+  const blockedUntil = result.rows[0]?.bloqueado_ate
+  if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) {
     throw new Error('Muitas tentativas. Aguarde 15 minutos e tente novamente.')
   }
-  if (state && state.blockedUntil <= Date.now()) loginFailures.delete(key)
 }
 
-function recordLoginFailure(key: string) {
-  const current = loginFailures.get(key) ?? { count: 0, blockedUntil: 0 }
-  current.count += 1
-  if (current.count >= 5) {
-    current.blockedUntil = Date.now() + 15 * 60 * 1000
-    current.count = 0
-  }
-  loginFailures.set(key, current)
+async function recordLoginFailure(username: string, ipHash: string) {
+  await getPool().query(
+    \`INSERT INTO public.login_tentativas (username, ip_hash, falhas, bloqueado_ate)
+     VALUES ($1, $2, 1, NULL)
+     ON CONFLICT (username, ip_hash) DO UPDATE SET
+       falhas = CASE
+         WHEN public.login_tentativas.bloqueado_ate IS NOT NULL
+          AND public.login_tentativas.bloqueado_ate <= now()
+         THEN 1 ELSE public.login_tentativas.falhas + 1 END,
+       bloqueado_ate = CASE
+         WHEN (CASE
+           WHEN public.login_tentativas.bloqueado_ate IS NOT NULL
+            AND public.login_tentativas.bloqueado_ate <= now()
+           THEN 1 ELSE public.login_tentativas.falhas + 1 END) >= 5
+         THEN now() + interval '15 minutes'
+         ELSE NULL END,
+       updated_at = now()\`,
+    [username, ipHash],
+  )
 }
 
-function clearLoginFailures(key: string) {
-  loginFailures.delete(key)
+async function clearLoginFailures(username: string, ipHash: string) {
+  await getPool().query(
+    'DELETE FROM public.login_tentativas WHERE username = $1 AND ip_hash = $2',
+    [username, ipHash],
+  )
 }
 
 export const getAuthSession = createServerFn({ method: 'GET' }).handler(async () => {
@@ -94,8 +112,8 @@ export const login = createServerFn({ method: 'POST' })
   })
   .handler(async ({ data }) => {
     assertSameOrigin()
-    const key = rateKey(data.username)
-    assertLoginAllowed(key)
+    const ipHash = clientIpHash()
+    await assertLoginAllowed(data.username, ipHash)
 
     const result = await getPool().query<{
       id: string
@@ -115,11 +133,11 @@ export const login = createServerFn({ method: 'POST' })
     const validPassword = await verifyPassword(data.password, user?.senha_hash ?? null)
 
     if (!user || !user.ativo || !user.senha_hash || !validPassword) {
-      recordLoginFailure(key)
+      await recordLoginFailure(data.username, ipHash)
       throw new Error('Usuário ou senha inválidos.')
     }
 
-    clearLoginFailures(key)
+    await clearLoginFailures(data.username, ipHash)
     await setAuthenticatedSession(user.id, Number(user.session_version))
     return {
       profile: {
