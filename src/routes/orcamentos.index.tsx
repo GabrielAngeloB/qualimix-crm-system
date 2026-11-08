@@ -21,7 +21,8 @@ export const Route = createFileRoute('/orcamentos/')({
 
 function Orcamentos() {
   const { q: initialQ } = Route.useSearch()
-  const { quotes, clients, sites, demoMode, team } = useStore()
+  const { quotes, clients, sites, demoMode, team, currentRole } = useStore()
+  const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
   const [q, setQ] = useState(initialQ ?? '')
   const [status, setStatus] = useState<string>('')
   const [type, setType] = useState<string>('')
@@ -76,11 +77,11 @@ function Orcamentos() {
         eyebrow="Comercial"
         title="Orçamentos"
         description="Concreto usinado, pisos e orçamentos combinados. Cada número é contado uma única vez, independentemente das versões."
-        actions={
+        actions={canEdit ? (
           <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
             <Plus className="h-4 w-4" /> Novo orçamento
           </Link>
-        }
+        ) : undefined}
       />
 
       <div className="mb-5 grid gap-3 sm:grid-cols-3">
@@ -154,9 +155,9 @@ function Orcamentos() {
                         <div className="flex justify-end gap-1">
                           <IconBtn label="Ver proposta" onClick={() => setPreview(p)}><Eye className="h-4 w-4" /></IconBtn>
                           <IconBtn label="Compartilhar no WhatsApp" onClick={() => setWa(p)}><MessageCircle className="h-4 w-4" /></IconBtn>
-                          <Link to="/orcamentos/novo" search={{ origem: x.id }} title="Duplicar com preços atuais" aria-label="Duplicar com preços atuais" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
+                          {canEdit && <Link to="/orcamentos/novo" search={{ origem: x.id }} title="Duplicar com preços atuais" aria-label="Duplicar com preços atuais" className="grid h-8 w-8 place-items-center rounded-md text-ink-2 hover:bg-surface-2">
                             <Copy className="h-4 w-4" />
-                          </Link>
+                          </Link>}
                         </div>
                       </td>
                     </tr>
