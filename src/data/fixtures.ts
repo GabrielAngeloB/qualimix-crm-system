@@ -274,16 +274,15 @@ export interface ScheduleEvent {
   fck: number | null
   service: string
   pump: boolean
-  truck: string | null
   status: 'Planejada' | 'Confirmada' | 'Em preparação' | 'Em execução' | 'Concluída' | 'Reagendada' | 'Cancelada'
   demo: boolean
 }
 
 export const schedule: ScheduleEvent[] = [
-  { id: 'ag-1', quoteId: 'orc-12', date: rel(1), time: '07:30', volume: 12.1, fck: 25, service: 'Laje', pump: true, truck: 'Betoneira 01 (demo)', status: 'Confirmada', demo: true },
-  { id: 'ag-2', quoteId: 'orc-7', date: rel(3), time: '08:00', volume: 46.2, fck: 30, service: 'Laje + piso', pump: true, truck: null, status: 'Planejada', demo: true },
-  { id: 'ag-3', quoteId: 'orc-9', date: rel(4), time: '13:30', volume: 12, fck: 20, service: 'Contrapiso', pump: false, truck: 'Betoneira 02 (demo)', status: 'Planejada', demo: true },
-  { id: 'ag-4', quoteId: 'orc-5', date: rel(-2), time: '07:00', volume: 32.4, fck: 25, service: 'Radier', pump: true, truck: 'Betoneira 01 (demo)', status: 'Concluída', demo: true },
+  { id: 'ag-1', quoteId: 'orc-12', date: rel(1), time: '07:30', volume: 12.1, fck: 25, service: 'Laje', pump: true, status: 'Confirmada', demo: true },
+  { id: 'ag-2', quoteId: 'orc-7', date: rel(3), time: '08:00', volume: 46.2, fck: 30, service: 'Laje + piso', pump: true, status: 'Planejada', demo: true },
+  { id: 'ag-3', quoteId: 'orc-9', date: rel(4), time: '13:30', volume: 12, fck: 20, service: 'Contrapiso', pump: false, status: 'Planejada', demo: true },
+  { id: 'ag-4', quoteId: 'orc-5', date: rel(-2), time: '07:00', volume: 32.4, fck: 25, service: 'Radier', pump: true, status: 'Concluída', demo: true },
 ]
 
 /** Parcelas como fração do total calculado do orçamento (valores derivados em derived.ts). */
