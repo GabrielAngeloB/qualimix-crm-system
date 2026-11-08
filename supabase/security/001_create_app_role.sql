@@ -66,6 +66,8 @@ grant usage, select on sequence public.orcamento_numero_seq,
 
 -- Os triggers updated_at precisam executar esta função durante UPDATE.
 grant execute on function public.set_updated_at() to qualimix_app;
+grant execute on function public.validar_baixa_financeira(),
+  public.atualizar_status_lancamento() to qualimix_app;
 
 -- A autenticação da aplicação é própria: a autorização de cada pessoa ocorre
 -- nas Server Functions, antes do SQL. O papel técnico não é usado pelo browser.
