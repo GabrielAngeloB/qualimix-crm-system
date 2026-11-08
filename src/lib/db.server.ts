@@ -1,10 +1,32 @@
-import { Pool, type PoolClient } from 'pg'
+import postgres from 'postgres'
 
-let pool: Pool | undefined
+type QueryResult<Row> = { rows: Row[]; rowCount: number }
+type DbClient = {
+  query<Row = Record<string, unknown>>(text: string, values?: unknown[]): Promise<QueryResult<Row>>
+}
+type SqlExecutor = { unsafe: (query: string, parameters?: any[]) => Promise<unknown> }
 
-export function getPool(): Pool {
+let sql: ReturnType<typeof postgres> | undefined
+let client: DbClient | undefined
+
+function adapt(executor: SqlExecutor): DbClient {
+  return {
+    async query<Row>(text: string, values: unknown[] = []) {
+      const result = await executor.unsafe(text, values as any[]) as { count?: number } & Iterable<Row>
+      const rows = Array.from(result)
+      return { rows, rowCount: result.count ?? rows.length }
+    },
+  }
+}
+
+/**
+ * Driver usado exclusivamente no servidor. A URL nunca é importada pelo bundle do browser.
+ * max=1 e prepare=false funcionam melhor com ambientes serverless e transaction poolers.
+ */
+export function getPool(): DbClient {
   const connectionString = process.env.DATABASE_URL
   if (!connectionString) throw new Error('DATABASE_URL não está configurada no ambiente do servidor.')
+
   let parsed: URL
   try { parsed = new URL(connectionString) } catch {
     throw new Error('DATABASE_URL não contém uma URL PostgreSQL válida.')
@@ -13,34 +35,21 @@ export function getPool(): Pool {
     throw new Error('DATABASE_URL deve usar postgres:// ou postgresql://.')
   }
 
-  if (!pool) {
-    pool = new Pool({
-      connectionString,
+  if (!sql) {
+    sql = postgres(connectionString, {
       max: 1,
-      idleTimeoutMillis: 10_000,
-      connectionTimeoutMillis: 10_000,
-      keepAlive: true,
+      idle_timeout: 20,
+      connect_timeout: 10,
+      prepare: false,
       ssl: { rejectUnauthorized: true },
-      application_name: 'qualimix-crm',
+      connection: { application_name: 'qualimix-crm' },
     })
-    pool.on('error', (error) => {
-      console.error('[qualimix-db] erro no pool PostgreSQL:', error.message)
-    })
+    client = adapt(sql)
   }
-  return pool
+  return client!
 }
 
-export async function withTransaction<T>(work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await getPool().connect()
-  try {
-    await client.query('BEGIN')
-    const result = await work(client)
-    await client.query('COMMIT')
-    return result
-  } catch (error) {
-    try { await client.query('ROLLBACK') } catch { /* preserva o erro original */ }
-    throw error
-  } finally {
-    client.release()
-  }
+export async function withTransaction<T>(work: (client: DbClient) => Promise<T>): Promise<T> {
+  getPool()
+  return sql!.begin(async (transaction) => work(adapt(transaction)))
 }
