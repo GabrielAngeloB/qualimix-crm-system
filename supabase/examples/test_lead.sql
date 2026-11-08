@@ -10,12 +10,14 @@ DECLARE
   v_client_name text;
   v_lead_title text;
 BEGIN
-  SELECT id
+  SELECT p.id
     INTO v_owner_id
-    FROM public.perfis
-   WHERE ativo = true
-     AND perfil IN ('administrador', 'comercial')
-   ORDER BY CASE WHEN perfil = 'administrador' THEN 0 ELSE 1 END, created_at
+    FROM public.perfis p
+    JOIN public.usuarios u ON u.id = p.id
+   WHERE p.ativo = true
+     AND u.senha_hash IS NOT NULL
+     AND p.perfil IN ('administrador', 'comercial')
+   ORDER BY CASE WHEN p.perfil = 'administrador' THEN 0 ELSE 1 END, p.created_at
    LIMIT 1;
 
   IF v_owner_id IS NULL THEN
