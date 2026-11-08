@@ -25,11 +25,26 @@ function getSql(): ReturnType<typeof postgres> {
   }
 
   if (!sql) {
+    // O Supabase usa uma CA própria para o certificado do PostgreSQL.
+    // A CA é configurada como variável de ambiente em Base64 para funcionar
+    // tanto localmente quanto na Vercel, sem versionar arquivos/certificados.
+    const caBase64 = process.env.SUPABASE_CA_CERT_BASE64?.trim()
+    if (!caBase64) {
+      throw new Error(
+        'SUPABASE_CA_CERT_BASE64 não está configurada. Baixe o certificado CA em Database Settings > SSL Configuration no Supabase e configure essa variável no servidor.',
+      )
+    }
+
+    const ca = Buffer.from(caBase64, 'base64').toString('utf8')
+    if (!ca.includes('-----BEGIN CERTIFICATE-----')) {
+      throw new Error('SUPABASE_CA_CERT_BASE64 não contém um certificado CA PEM válido em Base64.')
+    }
+
     sql = postgres(connectionString, {
       max: 1,
       idle_timeout: 10,
       connect_timeout: 10,
-      ssl: 'verify-full',
+      ssl: { ca, rejectUnauthorized: true },
       prepare: false,
       fetch_types: false,
       connection: { application_name: 'qualimix-crm' },
