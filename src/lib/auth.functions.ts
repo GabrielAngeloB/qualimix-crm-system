@@ -46,11 +46,16 @@ function requireAdmin(profile: Awaited<ReturnType<typeof requireCurrentProfile>>
 }
 
 function clientIpHash(): string {
-  const forwarded = getRequestHeader('x-forwarded-for') ?? ''
-  const ip = forwarded.split(',')[0]?.trim() || getRequestHeader('x-real-ip') || 'unknown'
+  // Prioriza o cabeçalho definido pelo proxy de hospedagem (Vercel/Cloudflare).
+  // x-forwarded-for só é fallback; usa o último IP, normalmente anexado pelo proxy.
+  const trustedIp =
+    getRequestHeader('x-real-ip')?.trim() ||
+    getRequestHeader('cf-connecting-ip')?.trim() ||
+    getRequestHeader('x-forwarded-for')?.split(',').at(-1)?.trim() ||
+    'unknown'
   const key = process.env.DATABASE_URL
   if (!key) throw new Error('DATABASE_URL não está configurada.')
-  return createHmac('sha256', key).update(ip).digest('hex')
+  return createHmac('sha256', key).update(trustedIp).digest('hex')
 }
 
 async function assertLoginAllowed(username: string, ipHash: string) {
