@@ -1,66 +1,51 @@
-# Qualimix CRM — banco de dados e autenticação
+# Qualimix CRM — PostgreSQL e autenticação
 
-## Estado da implementação
+## Arquitetura
 
-Este repositório nasceu sem banco ou autenticação. O projeto usa TanStack Start, React 19 e TypeScript. A integração usa Supabase Auth + PostgreSQL e mantém o motor de cálculo `src/lib/quote.ts` como fonte da regra comercial.
+- O navegador nunca recebe DATABASE_URL.
+- Todas as consultas e gravações passam por Server Functions do TanStack Start.
+- PostgreSQL é acessado pelo driver postgres, com consultas parametrizadas.
+- O login próprio usa Scrypt (salt aleatório por senha) e cookie assinado HttpOnly, SameSite=Strict e Secure em produção.
+- public.usuarios guarda username, hash da senha e versão da sessão. public.perfis mantém nome, papel e estado e continua sendo referenciada pelas tabelas comerciais.
+- VITE_SUPABASE_PUBLISHABLE_KEY não autentica este login. A persistência e autenticação atuais usam DATABASE_URL apenas no servidor.
 
-## Arquitetura de autenticação
+## Aplicação no banco
 
-- O Supabase Auth armazena e verifica as senhas. A aplicação não cria tabela de senha nem armazena hash próprio.
-- O usuário digita um nome de usuário. No servidor, o nome é resolvido para um e-mail técnico no domínio reservado `auth.qualimix.invalid`, compatível com `signInWithPassword`.
-- O perfil em `public.perfis` contém `username`, `nome`, `perfil` (`admin` ou `user`) e `ativo`.
-- A sessão é mantida em cookie HttpOnly, SameSite=Lax e Secure em produção, usando `@supabase/ssr`.
-- A chave `SUPABASE_SERVICE_ROLE_KEY` só é lida no servidor. Nunca a coloque em variável `VITE_*`, HTML ou código executado no navegador.
-- A página de usuários é apenas interface. Cada operação administrativa valida novamente a sessão e o perfil no servidor.
+1. Faça backup do banco.
+2. Confirme que o esquema de 9 tabelas já existe. Não execute o SQL inicial em cima de uma base com dados.
+3. Execute supabase/migrations/20261108000200_custom_server_auth.sql no SQL Editor do Supabase.
+4. Confirme no resultado que fks_restantes_para_auth_users é zero e que usuarios e login_tentativas existem.
 
-## Instalação
-
-1. Crie um projeto Supabase.
-2. Execute primeiro o SQL base enxuto de 9 tabelas já fornecido para o Qualimix.
-3. Execute a migration `supabase/migrations/20261108000100_username_auth_roles.sql`.
-4. Instale as dependências já declaradas no package.json e regenere o lockfile:
-   ```bash
-   pnpm install
-   ```
-5. Copie `.env.example` para `.env` e preencha as variáveis no ambiente local e no provedor de hospedagem.
-6. Reinicie o servidor de desenvolvimento.
-
-## Primeiro administrador
-
-1. Gere um segredo aleatório com pelo menos 32 caracteres.
-2. Defina-o como `BOOTSTRAP_ADMIN_SECRET` somente no ambiente do servidor.
-3. Abra `https://SEU-DOMINIO/bootstrap` (ou `http://localhost:3000/bootstrap` localmente) e informe nome, username, senha e o segredo de bootstrap.
-4. A criação só funciona enquanto não existir nenhum perfil `admin`. O endpoint cria a conta no Supabase Auth e promove o perfil. Se a criação do perfil falhar, tenta excluir a conta Auth criada.
-5. Depois do bootstrap, remova `BOOTSTRAP_ADMIN_SECRET` do ambiente e faça novo deploy/restart.
-
-A senha deve ter ao menos 12 caracteres. O username é normalizado para minúsculas e aceita 3–30 caracteres: letras, números, ponto, hífen e sublinhado.
-
-## Usuários comuns
-
-O administrador autenticado cria usuários em Administração > Usuários. O sistema cria a identidade no Supabase Auth com confirmação interna e grava o perfil como `user`. Não há cadastro público. A ativação/desativação é aplicada no perfil; a exclusão remove a identidade Auth e, pela FK, o perfil.
-
-## Papéis
-
-- `admin`: pode gerenciar usuários e executar operações administrativas.
-- `user`: usa as funcionalidades comuns autorizadas pelas políticas RLS.
-
-A UI não é uma fronteira de segurança. As funções do servidor e as políticas RLS continuam verificando o usuário. Não promova usuários editando o frontend.
+A migration não apaga clientes, obras, oportunidades nem orçamentos. Ela remove somente o vínculo de perfis com auth.users e o trigger que criava perfis pelo Auth. Contas antigas não migram senha: será necessário criar novo usuário pelo bootstrap ou pela tela de administração.
 
 ## Variáveis
 
-| Variável | Onde usar | Segredo? |
-|---|---|---|
-| `SUPABASE_URL` | Servidor | Não |
-| `SUPABASE_ANON_KEY` | Servidor/cliente conforme integração | Não é chave privilegiada |
-| `SUPABASE_SERVICE_ROLE_KEY` | Somente servidor | **Sim** |
-| `BOOTSTRAP_ADMIN_SECRET` | Somente servidor e temporário | **Sim** |
+Configure no servidor local e na Vercel:
+- DATABASE_URL: URL PostgreSQL do projeto Supabase. Use o host/porta recomendados pelo Supabase para a hospedagem; se a conexão direta não for acessível, use a URL do Session Pooler.
+- VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY podem continuar no .env se outras partes do frontend precisarem delas; a autenticação e persistência descritas aqui não dependem delas.
 
-## Limitações que exigem configuração/validação externa
+Não coloque a senha do banco no Git, em variável VITE_ ou no navegador. A senha de conexão foi exposta durante a configuração: redefina-a no Supabase e atualize .env e a variável de produção antes de habilitar o acesso externo.
 
-- O projeto Supabase e suas chaves precisam ser fornecidos no ambiente de execução. O bootstrap inicial fica em `/bootstrap`.
-- O SQL base deve corresponder à versão de 9 tabelas usada como referência. Não execute o SQL base em banco que já tenha tabelas ou dados sem revisar a migração.
-- O banco atual não possui tabelas de agenda, pedidos ou contas a receber. Esses módulos estão marcados como “Em breve” no projeto e não devem ser simulados como dados persistidos.
-- A migration de autenticação converte os papéis antigos para ADMIN/USER. Revise usuários já existentes antes de aplicá-la em produção.
-- O endpoint aplica bloqueio temporário por username após cinco falhas no mesmo processo. Isso é defesa adicional, não substitui rate limiting distribuído no gateway/hosting; em deploy serverless/multirréplica, configure também limite por IP no provedor.
-- O `pnpm-lock.yaml` precisa ser regenerado com `pnpm install` após a inclusão das dependências.
-- Após configurar as chaves, execute typecheck, testes e testes reais de login/RLS em um projeto Supabase de homologação.
+## Primeiro administrador
+
+O token de bootstrap é derivado da credencial de banco atual. Depois de rotacionar a senha, gere o token no terminal na pasta do projeto:
+
+```powershell
+node --env-file=.env -e "const c=require('node:crypto'); console.log(c.createHmac('sha256',process.env.DATABASE_URL).update('qualimix-crm/first-admin/v1').digest('hex'))"
+```
+
+Abra /bootstrap, informe nome, usuário, senha de pelo menos 12 caracteres e o token gerado. O endpoint serializa a inicialização no PostgreSQL e só permite criar o administrador se ainda não existir um administrador com senha. Sem conhecer DATABASE_URL não é possível derivar o token.
+
+## Usuários
+
+O administrador entra em Administração > Usuários e cria as contas comuns. O servidor gera o hash Scrypt, nunca armazena senha em texto puro, valida o papel no servidor e revoga sessões ao desativar usuário. A ação Excluir é lógica (desativa a conta) para preservar vínculos históricos.
+
+## Dados e views
+
+As telas comerciais carregam registros reais de clientes, obras, oportunidades e orçamentos. As views vw_clientes_resumo, vw_funil_resumo, vw_orcamentos_resumo e vw_frota_resumo são disponibilizadas para consulta no servidor. Módulos que o projeto ainda marca como “Em breve” (pedidos, agenda e contas a receber) não são apresentados como persistidos.
+
+O catálogo e as regras comerciais oficiais ainda dependem dos valores confirmados pela Qualimix. Preços de demonstração não são usados em produção nem transformados em preços reais automaticamente.
+
+## Verificações pendentes
+
+Após configurar DATABASE_URL e executar a migration, rode pnpm install, pnpm typecheck, pnpm test e pnpm build. Teste login, logout, bloqueio de tentativas, criação/desativação de usuários, cadastro de cliente/obra, funil e gravação/leitura de orçamento em homologação antes de publicar.
