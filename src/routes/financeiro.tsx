@@ -11,7 +11,7 @@ import {
   type FinancialKind,
   type FinancialPayment,
 } from '../data/operations'
-import { today } from '../lib/clock'
+import { todayInSaoPaulo } from '../lib/clock'
 import { brlCents, dateBR, parseDecimal } from '../lib/format'
 import { Badge, Button, Card, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
 
@@ -27,7 +27,7 @@ export const Route = createFileRoute('/financeiro')({
 
 const categories: ExpenseCategory[] = ['Mão de obra', 'Material', 'Equipamento', 'Frete', 'Bombeamento', 'Combustível', 'Terceirizado', 'Outros']
 
-const blankExpense = {
+const blankExpense = () => ({
   workOrderId: '',
   professionalId: '',
   category: 'Mão de obra' as ExpenseCategory,
@@ -35,10 +35,10 @@ const blankExpense = {
   unitRate: '',
   quantity: '1',
   amount: '',
-  incurredAt: today,
-  dueDate: today,
+  incurredAt: todayInSaoPaulo(),
+  dueDate: todayInSaoPaulo(),
   method: '',
-}
+})
 
 function Financeiro() {
   const {
@@ -57,9 +57,10 @@ function Financeiro() {
     views,
   } = useStore()
   const canEditFinance = currentRole === 'administrador' || currentRole === 'financeiro'
+  const today = todayInSaoPaulo()
   const [kind, setKind] = useState<'todos' | FinancialKind>('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
-  const [expense, setExpense] = useState(blankExpense)
+  const [expense, setExpense] = useState(() => blankExpense())
   const [showExpense, setShowExpense] = useState(false)
   const [paymentFor, setPaymentFor] = useState<string | null>(null)
   const [payment, setPayment] = useState({ amount: '', paidAt: today, method: '', note: '' })
@@ -77,7 +78,7 @@ function Financeiro() {
       ),
     }))
     .filter((entry) => (kind === 'todos' || entry.kind === kind) && (statusFilter === 'todos' || entry.status === statusFilter))
-    .sort((a, b) => (a.dueDate + a.createdAt).localeCompare(b.dueDate + b.createdAt)), [financialEntries, financeSummaryById, kind, statusFilter])
+    .sort((a, b) => (a.dueDate + a.createdAt).localeCompare(b.dueDate + b.createdAt)), [financialEntries, financeSummaryById, kind, statusFilter, today])
 
   const receivables = financialEntries.filter((entry) => entry.kind === 'receber')
   const payables = financialEntries.filter((entry) => entry.kind === 'pagar')
@@ -140,7 +141,7 @@ function Financeiro() {
     try {
       await addExpense(record, expense.dueDate, expense.method)
       toast({ tone: 'ok', title: 'Despesa registrada', body: 'A despesa foi vinculada à obra e gerou uma conta a pagar.' })
-      setExpense(blankExpense)
+      setExpense(blankExpense())
       setShowExpense(false)
     } catch (error) {
       toast({ tone: 'erro', title: 'Não foi possível registrar a despesa', body: error instanceof Error ? error.message : 'Revise os dados.' })
