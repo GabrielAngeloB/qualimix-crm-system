@@ -28,7 +28,7 @@ export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string
 interface Store {
   demoMode: boolean; setDemoMode: (v: boolean) => void; ctx: QuoteContext
   clients: Client[]; sites: Site[]; quotes: EvaluatedQuote[]; opportunities: Opportunity[]
-  team: TeamUser[]; currentUserId: string; views: CrmViews & OperationalRecords['views']
+  team: TeamUser[]; currentUserId: string; currentRole: string; views: CrmViews & OperationalRecords['views']
   receivables: ReceivableRow[]; loading: boolean
   workOrders: WorkOrder[]; scheduleEvents: ScheduleEvent[]; professionals: Professional[]
   expenses: JobExpense[]; financialEntries: FinancialEntry[]; tasks: CommercialTask[]
@@ -57,7 +57,7 @@ const emptyViews: CrmViews & OperationalRecords['views'] = {
 }
 const emptyData: StoreData = {
   clients: [], sites: [], opportunities: [], quotes: [], products: [], team: [],
-  currentUserId: '', views: emptyViews,
+  currentUserId: '', currentRole: '', views: emptyViews,
   workOrders: [], scheduleEvents: [], professionals: [], expenses: [], financialEntries: [], tasks: [],
 }
 const StoreCtx = createContext<Store | null>(null)
@@ -187,7 +187,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       demoMode, setDemoMode, ctx, clients, sites,
       quotes: evaluateAll(quoteRecords, ctx), opportunities,
       team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
-      currentUserId: dbData.currentUserId, views: dbData.views,
+      currentUserId: dbData.currentUserId, currentRole: dbData.currentRole, views: dbData.views,
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
       workOrders: dbData.workOrders, scheduleEvents: dbData.scheduleEvents,
       professionals: dbData.professionals, expenses: dbData.expenses,
