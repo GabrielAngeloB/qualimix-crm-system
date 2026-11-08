@@ -59,8 +59,11 @@ export interface EvaluatedQuote extends QuoteRecord {
 export function evaluateAll(records: QuoteRecord[], ctx: QuoteContext): EvaluatedQuote[] {
   return records.map((r) => {
     const concrete = r.lines.find((l) => l.category === 'concreto')
-    const fck = concrete ? (ctx.catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
-    return { ...r, result: evaluateRecord(r, ctx), fck }
+    const fck = r.savedFck !== undefined
+      ? r.savedFck
+      : concrete ? (ctx.catalog.find((c) => c.id === concrete.catalogId)?.fck ?? null) : null
+    const result = r.savedResult ?? evaluateRecord(r, ctx)
+    return { ...r, result, fck }
   })
 }
 
