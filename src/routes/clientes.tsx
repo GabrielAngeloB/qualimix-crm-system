@@ -245,7 +245,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
             )}
           </div>
           <Field label="E-mail" error={liveErrors.email} hint="Ex.: compras@empresa.com.br. Campo opcional.">{(id) => <input id={id} type="email" maxLength={254} autoComplete="email" className={inputCls(!!liveErrors.email)} value={f.email} placeholder="compras@empresa.com.br" onChange={(e) => up('email', e.target.value)} />}</Field>
-          <Field label="Origem do lead" required error={liveErrors.source}>
+          <Field label="Origem do lead" required error={liveErrors.source} hint="Registre o canal por onde o primeiro contato chegou. Ex.: WhatsApp 1, Instagram ou Indicação.">
             {(id) => (
               <select id={id} className={inputCls(!!liveErrors.source)} value={f.source} onChange={(e) => up('source', e.target.value)}>
                 <option value="">Selecione…</option>
@@ -255,7 +255,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
           </Field>
           <Field label="Endereço" error={liveErrors.address} hint="Ex.: Quadra 00, Conjunto 00, Lote 00, Setor Norte." className="sm:col-span-2">{(id) => <input id={id} maxLength={200} className={inputCls(!!liveErrors.address)} value={f.address} placeholder="Ex.: Quadra 00, Conjunto 00, Lote 00" onChange={(e) => up('address', e.target.value)} />}</Field>
           <Field label="Cidade" error={liveErrors.city} hint="Inclua a UF para evitar cidades com o mesmo nome. Ex.: Sobradinho - DF.">{(id) => <input id={id} maxLength={100} className={inputCls(!!liveErrors.city)} value={f.city} placeholder="Ex.: Sobradinho - DF" onChange={(e) => up('city', e.target.value)} />}</Field>
-          <Field label="Região de atendimento" required error={liveErrors.region}>
+          <Field label="Região de atendimento" required error={liveErrors.region} hint="Escolha a região comercial atendida pela empresa, não o bairro do endereço.">
             {(id) => (
               <select id={id} className={inputCls(!!liveErrors.region)} value={f.region} onChange={(e) => up('region', e.target.value)}>
                 <option value="">Selecione…</option>
