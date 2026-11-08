@@ -26,8 +26,10 @@ grant connect on database postgres to qualimix_app;
 grant usage on schema public to qualimix_app;
 
 -- Dados comerciais usados pelas telas existentes.
-grant select, insert, update on public.perfis to qualimix_app;
-grant select, insert, update on public.usuarios to qualimix_app;
+grant select, insert on public.perfis to qualimix_app;
+grant update (ativo) on public.perfis to qualimix_app;
+grant select, insert on public.usuarios to qualimix_app;
+grant update (session_version) on public.usuarios to qualimix_app;
 grant select, insert, update, delete on public.login_tentativas to qualimix_app;
 
 grant select, insert, update on public.clientes to qualimix_app;
