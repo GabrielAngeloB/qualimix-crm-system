@@ -17,7 +17,7 @@ CRM e sistema de gestão da Qualimix (concreto usinado, concretagens e pisos de 
 - **Painel gerencial**: leads e funil, orçamentos, conversão, contratado, agenda futura, contas a pagar, despesas de obras e saldo após custos. Os filtros comerciais continuam aplicados aos indicadores de venda; os totais operacionais são agregados dos registros visíveis.
 - **Configurações**: pendências que dependem da Qualimix (preços, regras, dados institucionais, formas de pagamento) e perfis de acesso previstos.
 
-> **Limite importante desta etapa:** os novos registros operacionais ainda são persistidos no armazenamento local do navegador (`localStorage`). Eles não são sincronizados entre usuários ou dispositivos, não têm autorização no servidor e não devem ser tratados como dados de produção. O menu exibe esse estado. A conexão ao Supabase, políticas de acesso e persistência multiusuário continuam pendentes.
+> **Estado atual da integração:** clientes, obras, oportunidades, orçamentos e os módulos operacionais/financeiros usam PostgreSQL no projeto Supabase conectado, por Server Functions no servidor. A autenticação é própria do CRM (`usuarios` + `perfis` + cookie HTTP-only). As tabelas operacionais, views e políticas RLS já foram aplicadas no projeto conectado. A conexão final da hospedagem ainda exige definir a senha do papel restrito `qualimix_app` e atualizar `DATABASE_URL` e `SUPABASE_CA_CERT_BASE64` no ambiente server-only; até concluir isso e testar os fluxos no ambiente publicado, não trate a versão como pronta para produção.
 
 A base inicial não carrega clientes, obras, oportunidades, orçamentos ou atividades fictícias. Preços e regras comerciais ainda não confirmados permanecem como **Pendente**; não são substituídos por valores de demonstração.
 
