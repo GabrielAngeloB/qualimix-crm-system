@@ -35,11 +35,11 @@ function BootstrapPage() {
       <form onSubmit={submit} className="w-full max-w-md rounded-xl border border-line bg-surface p-8 shadow-xl">
         <p className="text-xs font-bold uppercase tracking-[.2em] text-brand">Configuração inicial</p>
         <h1 className="mt-1 font-display text-3xl font-extrabold uppercase">Criar administrador</h1>
-        <p className="mb-6 mt-2 text-sm text-muted">Disponível somente enquanto não existir um administrador e mediante o segredo definido no servidor.</p>
+        <p className="mb-6 mt-2 text-sm text-muted">Disponível somente enquanto não existir um administrador. Gere o token localmente a partir da DATABASE_URL seguindo DATABASE_AND_AUTH_SETUP.md.</p>
         <label className="mb-3 block text-sm font-semibold">Nome completo<input required minLength={2} maxLength={100} value={name} onChange={(e) => setName(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-line bg-surface px-3" /></label>
         <label className="mb-3 block text-sm font-semibold">Nome de usuário<input required minLength={3} maxLength={30} autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-line bg-surface px-3" /></label>
         <label className="mb-3 block text-sm font-semibold">Senha (mínimo 12 caracteres)<input required minLength={12} maxLength={128} type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-line bg-surface px-3" /></label>
-        <label className="mb-5 block text-sm font-semibold">Segredo de inicialização<input required minLength={24} type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-line bg-surface px-3" /></label>
+        <label className="mb-5 block text-sm font-semibold">Token de inicialização<input required minLength={24} type="password" autoComplete="off" value={secret} onChange={(e) => setSecret(e.target.value)} className="mt-1 h-11 w-full rounded-md border border-line bg-surface px-3" /></label>
         {error && <p role="alert" className="mb-4 rounded-md border border-brand/30 bg-brand-soft p-3 text-sm text-brand">{error}</p>}
         <button disabled={busy} className="h-11 w-full rounded-md bg-brand px-4 font-semibold text-white disabled:opacity-60">{busy ? 'Criando…' : 'Criar primeiro administrador'}</button>
       </form>
