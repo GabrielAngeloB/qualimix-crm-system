@@ -31,14 +31,16 @@ const nav: { group: string; items: NavItem[] }[] = [
     items: [
       { label: 'Clientes e obras', icon: Users, to: '/clientes' },
       { label: 'Funil comercial', icon: SquareKanban, to: '/funil' },
+      { label: 'Tarefas e retornos', icon: ClipboardList, to: '/tarefas' },
       { label: 'Orçamentos', icon: FileText, to: '/orcamentos' },
     ],
   },
   {
     group: 'Operação',
     items: [
-      { label: 'Pedidos', icon: ClipboardList, soon: 'Em breve' },
-      { label: 'Agenda de concretagens', icon: CalendarDays, soon: 'Em breve' },
+      { label: 'Pedidos', icon: ClipboardList, to: '/pedidos' },
+      { label: 'Agenda de concretagens', icon: CalendarDays, to: '/agenda' },
+      { label: 'Profissionais', icon: Users, to: '/profissionais' },
       { label: 'Caminhões', icon: Truck, soon: 'Em breve' },
     ],
   },
