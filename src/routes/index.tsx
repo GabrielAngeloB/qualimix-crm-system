@@ -12,7 +12,7 @@ import { BarChart, ChartCard } from '../components/Charts'
 export const Route = createFileRoute('/')({ component: Painel })
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, financialEntries, workOrders, expenses, professionals } = useStore()
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
   const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
@@ -22,15 +22,26 @@ function Painel() {
     const q = quotes.find((x) => x.id === quoteId)
     return { client: clients.find((c) => c.id === q?.clientId), site: sites.find((s) => s.id === q?.siteId), q }
   }
-  const upcoming = (demoMode ? schedule : []).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada').sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
-  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0
+  const upcoming = (demoMode
+    ? schedule.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volume, fck: e.fck, pump: e.pump, truck: e.truck, status: e.status }))
+    : scheduleEvents.map((e) => ({ id: e.id, date: e.date, time: e.time, quoteId: e.quoteId, volume: e.volumeM3, fck: e.fck, pump: e.pump, truck: e.truck, status: e.status }))
+  ).filter((e) => daysBetween(today, e.date) >= 0 && e.status !== 'Cancelada')
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+  const financeRows = views.finance ?? []
+  const financeSummary = {
+    billed: financeRows.filter((x) => x.tipo === 'receber').reduce((sum, x) => sum + Number(x.valor_centavos ?? 0), 0),
+    received: financeRows.filter((x) => x.tipo === 'receber').reduce((sum, x) => sum + Number(x.total_pago_centavos ?? 0), 0),
+    open: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado !== 'Cancelado').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
+    overdue: financeRows.filter((x) => x.tipo === 'receber' && x.status_calculado === 'Vencido').reduce((sum, x) => sum + Number(x.saldo_centavos ?? 0), 0),
+  }
+  const hasData = clients.length > 0 || quotes.length > 0 || opportunities.length > 0 || workOrders.length > 0
 
   return (
     <>
       <PageHeader
         eyebrow={`Hoje, ${dateBR(today)}`}
         title="Painel gerencial"
-        description="Indicadores calculados a partir dos registros persistidos de clientes, oportunidades e orçamentos."
+        description="Indicadores calculados a partir dos registros comerciais, operacionais e financeiros persistidos no banco."
         actions={
           <>
             <select aria-label="Período" className={cx(inputCls(), 'w-auto')} value={days} onChange={(e) => setDays(Number(e.target.value))}>
@@ -60,6 +71,10 @@ function Painel() {
           <Card><CardHeader title="Orçamentos" subtitle="vw_orcamentos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.quotes.length}</p></Card>
           <Card><CardHeader title="Veículos" subtitle="vw_frota_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.fleet.length}</p></Card>
           <Card><CardHeader title="Oportunidades" subtitle="vw_funil_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.funnel.reduce((sum, row) => sum + Number(row.quantidade ?? 0), 0)}</p></Card>
+          <Card><CardHeader title="Pedidos" subtitle="vw_pedidos_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.orders.length}</p></Card>
+          <Card><CardHeader title="Contas financeiras" subtitle="vw_financeiro_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.finance.length}</p></Card>
+          <Card><CardHeader title="Profissionais" subtitle="vw_profissionais_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.professionals.length}</p></Card>
+          <Card><CardHeader title="Programações" subtitle="vw_agenda_resumo" /><p className="px-5 pb-4 text-2xl font-bold tabular">{views.schedule.length}</p></Card>
         </div>
         <Card>
           <CardHeader title="Funil resumido no PostgreSQL" subtitle="Contagem e valor estimado por etapa, calculados pela view vw_funil_resumo." />
@@ -144,7 +159,7 @@ function Painel() {
             <Kpi accent label="Valor contratado" value={brlCents(d.contractedCents)} def="Orçamentos aceitos — pedidos fechados" />
             <Kpi label="Concreto vendido" value={`${num(d.volumeM3, 1)} m³`} def="Volume dos orçamentos aceitos" />
             <Kpi label="Pisos vendidos" value={`${num(d.areaM2, 0)} m²`} def="Área dos orçamentos aceitos" />
-            <Kpi label="Contas a receber" value={demoMode ? brlCents(d.overdueCents) : '—'} def={demoMode ? `${d.overdue.length} parcela(s) em atraso (demo)` : 'Módulo ainda não integrado ao banco'} />
+            <Kpi label="Contas a receber" value={brlCents(demoMode ? d.openCents : financeSummary.open)} def={demoMode ? `${d.overdue.length} parcela(s) em atraso (demo)` : `${brlCents(financeSummary.overdue)} vencido`} />
           </dl>
 
           <div className="mt-6 grid gap-6 xl:grid-cols-3">
@@ -193,7 +208,7 @@ function Painel() {
             <Card>
               <CardHeader title="Próximas concretagens" action={<CalendarDays className="h-5 w-5 text-brand" />} />
               {upcoming.length === 0 ? (
-                <p className="p-5 text-sm text-muted">{demoMode ? 'Nenhuma concretagem programada.' : 'A agenda de concretagens ainda não está integrada ao banco.'}</p>
+                <p className="p-5 text-sm text-muted">'Nenhuma concretagem programada.'</p>
               ) : (
                 <ul className="divide-y divide-line">
                   {upcoming.map((e) => {
@@ -223,12 +238,12 @@ function Painel() {
 
             <Card>
               <CardHeader title="Contas a receber" subtitle="Contratado, cobrado e efetivamente recebido são indicadores distintos." action={<Wallet className="h-5 w-5 text-brand" />} />
-              {demoMode ? <div className="space-y-3 p-5">
-                <Flow label="Cobrado (parcelas emitidas)" value={d.billedCents} max={d.billedCents} />
-                <Flow label="Recebido (pagamentos confirmados)" value={d.receivedCents} max={d.billedCents} tone="ok" />
-                <Flow label="Em aberto" value={d.openCents} max={d.billedCents} tone="grey" />
-                <Flow label="Vencido" value={d.overdueCents} max={d.billedCents} tone="red" />
-                {d.overdue.length > 0 && (
+              {<div className="space-y-3 p-5">
+                <Flow label="Cobrado (parcelas emitidas)" value={demoMode ? d.billedCents : financeSummary.billed} max={demoMode ? d.billedCents : financeSummary.billed} />
+                <Flow label="Recebido (pagamentos confirmados)" value={demoMode ? d.receivedCents : financeSummary.received} max={demoMode ? d.billedCents : financeSummary.billed} tone="ok" />
+                <Flow label="Em aberto" value={demoMode ? d.openCents : financeSummary.open} max={demoMode ? d.billedCents : financeSummary.billed} tone="grey" />
+                <Flow label="Vencido" value={demoMode ? d.overdueCents : financeSummary.overdue} max={demoMode ? d.billedCents : financeSummary.billed} tone="red" />
+                {demoMode && d.overdue.length > 0 && (
                   <div className="rounded-md border border-brand/30 bg-brand-soft p-3 text-sm">
                     <p className="mb-1 flex items-center gap-1 font-bold text-brand"><CircleAlert className="h-4 w-4" /> Parcelas vencidas</p>
                     <ul className="space-y-1">
@@ -241,7 +256,7 @@ function Painel() {
                     </ul>
                   </div>
                 )}
-              </div> : <p className="p-5 text-sm text-muted">Contas a receber ainda não possuem tabela no esquema atual. Nenhum valor fictício é exibido em produção.</p>}
+              </div>}
             </Card>
 
             <Card>
