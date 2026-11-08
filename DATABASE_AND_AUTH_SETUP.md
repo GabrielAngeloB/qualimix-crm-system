@@ -90,7 +90,7 @@ Verificação realizada no banco: as 7 tabelas operacionais têm RLS ativado; as
 
 ### Papel PostgreSQL restrito
 
-O papel qualimix_app já foi criado no Supabase com login habilitado e permissões/policies concedidas. A senha ainda **não foi configurada**; o catálogo confirma que `rolpassword` está vazio. A verificação do PostgreSQL confirmou:
+O papel qualimix_app já foi criado no Supabase com login habilitado, senha configurada e permissões/policies concedidas. A verificação de 08/11/2026 confirmou que ele não é superusuário, não cria bancos ou papéis e não possui BYPASSRLS. Não registre nem consulte o valor da senha em arquivos versionados.
 
 - rolsuper=false
 - rolcreatedb=false
@@ -98,9 +98,9 @@ O papel qualimix_app já foi criado no Supabase com login habilitado e permissõ
 - rolbypassrls=false
 - rolcanlogin=true
 
-Para definir a senha, abra uma cópia de supabase/security/001_create_app_role.sql no SQL Editor do Supabase, substitua o placeholder por uma senha aleatória forte e execute como postgres. O script é idempotente quanto a grants e policies; executá-lo novamente troca a senha do papel. Não salve a senha no repositório.
+Para rotacionar a senha no futuro, abra uma cópia de `supabase/security/001_create_app_role.sql` no SQL Editor do Supabase, substitua o placeholder por uma senha aleatória forte e execute como postgres. O script reaplica grants e policies e troca a senha do papel. Não salve a senha no repositório.
 
-Depois, configure no ambiente **server-only** da hospedagem a DATABASE_URL usando o usuário qualimix_app e a senha escolhida. Mantenha também SUPABASE_CA_CERT_BASE64 configurada conforme a seção de SSL deste documento. Não use VITE_DATABASE_URL, não envie essa conexão ao navegador e não coloque a chave service_role no frontend.
+A hospedagem deve manter a variável server-only `DATABASE_URL` usando o usuário `qualimix_app` e a senha atualmente configurada, além de `SUPABASE_CA_CERT_BASE64`. Não use `VITE_DATABASE_URL`, não envie essa conexão ao navegador e não coloque a chave `service_role` no frontend.
 
 **Atenção:** a assinatura dos cookies de sessão e o token do primeiro administrador são derivados da DATABASE_URL atual. Ao trocar a URL de conexão, sessões já emitidas deixam de validar e todos precisarão entrar novamente. Se o bootstrap do primeiro administrador ainda não foi feito, gere o token novamente depois de definir a DATABASE_URL definitiva.
 
@@ -119,4 +119,4 @@ Depois, configure no ambiente **server-only** da hospedagem a DATABASE_URL usand
 
 - O workflow principal `.github/workflows/ci.yml` valida instalação congelada, geração de rotas, TypeScript, build de produção e testes unitários.
 - O ESLint global não faz parte do gate até reduzir o débito técnico existente: a execução atual acusa 55 erros de `@typescript-eslint/no-explicit-any` em módulos antigos e no backend operacional. Não marcar esse lint como aprovado.
-- A branch deve ser mantida como candidata a merge enquanto o papel `qualimix_app` ainda não tiver senha e a hospedagem não tiver sido atualizada com a DATABASE_URL server-only correspondente.
+- A senha do papel `qualimix_app` já foi confirmada no banco em 08/11/2026. Ainda é necessário validar a variável `DATABASE_URL`, o certificado `SUPABASE_CA_CERT_BASE64` e o login no ambiente publicado da Vercel.
