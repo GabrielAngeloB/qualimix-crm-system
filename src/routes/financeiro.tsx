@@ -53,7 +53,9 @@ function Financeiro() {
     cancelFinancialEntry,
     jobBalance,
     toast,
+    currentRole,
   } = useStore()
+  const canEditFinance = currentRole === 'administrador' || currentRole === 'financeiro'
   const [kind, setKind] = useState<'todos' | FinancialKind>('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
   const [expense, setExpense] = useState(blankExpense)
@@ -168,7 +170,7 @@ function Financeiro() {
         eyebrow="Financeiro"
         title="Contas a pagar e receber"
         description="Vencimentos, baixas totais ou parciais, vínculo com obras e profissionais. Pix/boleto informado não representa pagamento sem uma baixa registrada."
-        actions={<Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button>}
+        actions={canEditFinance ? <Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button> : undefined}
       />
 
       <dl className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -179,7 +181,7 @@ function Financeiro() {
         <Kpi label="Vencido" value={brlCents(overdueCents)} sub="Pagar + receber" danger={overdueCents > 0} />
       </dl>
 
-      {showExpense && (
+      {canEditFinance && showExpense && (
         <Card className="mb-6">
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-xl font-bold uppercase">Nova despesa da obra</h2>
@@ -344,8 +346,8 @@ function Financeiro() {
                   )}
 
                   <div className="ml-12 mt-3 flex flex-wrap gap-2">
-                    {openCents > 0 && entry.status !== 'Cancelado' && <Button size="sm" onClick={() => isPaymentOpen ? setPaymentFor(null) : openPayment(entry)}>{isPaymentOpen ? 'Fechar baixa' : 'Registrar baixa'}</Button>}
-                    {entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { void cancelFinancialEntry(entry.id).then(() => toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description })).catch((error) => toast({ tone: 'erro', title: 'Não foi possível cancelar', body: error instanceof Error ? error.message : 'Revise o lançamento.' })) } }}>Cancelar lançamento</Button>}
+                    {canEditFinance && openCents > 0 && entry.status !== 'Cancelado' && <Button size="sm" onClick={() => isPaymentOpen ? setPaymentFor(null) : openPayment(entry)}>{isPaymentOpen ? 'Fechar baixa' : 'Registrar baixa'}</Button>}
+                    {canEditFinance && entry.status !== 'Cancelado' && openCents > 0 && <Button size="sm" variant="danger" onClick={() => { if (confirm('Cancelar este lançamento? A ação não apaga o histórico de pagamentos.')) { void cancelFinancialEntry(entry.id).then(() => toast({ tone: 'info', title: 'Lançamento cancelado', body: entry.description })).catch((error) => toast({ tone: 'erro', title: 'Não foi possível cancelar', body: error instanceof Error ? error.message : 'Revise o lançamento.' })) } }}>Cancelar lançamento</Button>}
                   </div>
                 </article>
               )
