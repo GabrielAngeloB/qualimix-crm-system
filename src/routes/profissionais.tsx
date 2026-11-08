@@ -32,7 +32,8 @@ const blank = {
 }
 
 function Profissionais() {
-  const { professionals, financialEntries, saveProfessional, toast } = useStore()
+  const { professionals, financialEntries, saveProfessional, toast, currentRole } = useStore()
+  const canEditProfessionals = ['administrador', 'operacao', 'financeiro'].includes(currentRole)
   const [form, setForm] = useState(blank)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [filter, setFilter] = useState<'ativos' | 'todos' | 'inativos'>('ativos')
@@ -102,7 +103,7 @@ function Profissionais() {
         actions={<Link to="/financeiro" className="inline-flex h-10 items-center gap-2 rounded-md border border-line px-4 font-semibold hover:bg-surface-2"><Wallet className="h-4 w-4" /> Financeiro</Link>}
       />
 
-      <Card className="mb-6">
+      {canEditProfessionals && <Card className="mb-6">
         <div className="border-b border-line px-5 py-4">
           <h2 className="text-xl font-bold uppercase">{editingId ? 'Editar profissional' : 'Novo profissional'}</h2>
           <p className="text-sm text-muted">O custo de referência não cria despesas automaticamente. Cada pagamento precisa estar ligado a um custo/serviço registrado na obra.</p>
@@ -138,7 +139,7 @@ function Profissionais() {
           {editingId && <Button onClick={() => { setEditingId(null); setForm(blank) }}>Cancelar edição</Button>}
           <Button variant="primary" onClick={() => void save()}><Plus className="h-4 w-4" /> {editingId ? 'Salvar alterações' : 'Cadastrar profissional'}</Button>
         </div>
-      </Card>
+      </Card>}
 
       <Card>
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4">
@@ -165,7 +166,7 @@ function Profissionais() {
                       <p className="text-sm text-muted">{professional.serviceType} · {professional.document || 'Documento não informado'} · {professional.phone || 'Sem telefone'}</p>
                       <p className="mt-1 font-semibold tabular">{brlCents(professional.rateCents)} / {professional.rateUnit} <span className="font-normal text-muted">· pagamento preferido: {professional.paymentMethod || 'não informado'}</span></p>
                     </div>
-                    <Button size="sm" onClick={() => edit(professional)}>Editar cadastro</Button>
+                    {canEditProfessionals && <Button size="sm" onClick={() => edit(professional)}>Editar cadastro</Button>}
                   </div>
                   <div className="mt-3 grid gap-3 sm:grid-cols-2">
                     <div className="rounded-md bg-surface-2 p-3 text-sm"><p className="text-xs font-semibold uppercase text-muted">Em aberto a pagar</p><p className="font-display text-2xl font-bold tabular">{brlCents(openCents)}</p></div>
