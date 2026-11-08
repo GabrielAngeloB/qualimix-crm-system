@@ -335,8 +335,19 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
       sets.push(column + ' = ' + String.fromCharCode(36) + values.length)
     }
     if (data.historyText) {
-      values.push(JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: data.historyText }]))
-      sets.push('historico = $' + values.length + '::jsonb || historico')
+      const historyAt = values.length + 1
+      values.push(new Date().toISOString())
+      const historyBy = values.length + 1
+      values.push(profile.id)
+      const historyMessage = values.length + 1
+      values.push(data.historyText.trim())
+      sets.push(
+        `historico = jsonb_build_array(jsonb_build_object(
+          'at', ${historyAt}::text,
+          'by', ${historyBy}::text,
+          'text', ${historyMessage}::text
+        )) || historico`,
+      )
     }
     if (!sets.length) return { success: true }
     values.push(data.id)
@@ -398,14 +409,22 @@ export const createOpportunity = createServerFn({ method: 'POST' })
       if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado.')
     }
 
-    const history = JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: 'Oportunidade criada.' }])
+    const historyAt = new Date().toISOString()
     const saved = await db.query<{ id: string }>(
       `INSERT INTO public.oportunidades
         (titulo,cliente_id,obra_id,etapa,valor_estimado,responsavel_id,origem,entrou_em,
          historico,relatorios,is_demo,created_by)
-       VALUES ($1,$2,$3,'novo',$4,$5,$6,current_date,$7::jsonb,'[]'::jsonb,false,$5)
+       VALUES (
+         $1,$2,$3,'novo',$4,$5,$6,current_date,
+         jsonb_build_array(jsonb_build_object(
+           'at', $7::text,
+           'by', $5::text,
+           'text', 'Oportunidade criada.'
+         )),
+         '[]'::jsonb,false,$5
+       )
        RETURNING id`,
-      [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,history],
+      [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,historyAt],
     )
     const row = saved.rows[0]
     if (!row) throw new Error('O banco não retornou a nova oportunidade.')
