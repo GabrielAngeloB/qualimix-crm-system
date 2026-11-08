@@ -325,29 +325,22 @@ export const createOpportunity = createServerFn({ method: 'POST' })
   .validator((input: unknown): OpportunityCreateInput => {
     if (!input || typeof input !== 'object') throw new Error('Dados da oportunidade inválidos.')
     const data = input as Record<string, unknown>
-    if (typeof data.title !== 'string' || data.title.trim().length < 2 || data.title.trim().length > 180) {
-      throw new Error('Informe um título de 2 a 180 caracteres.')
-    }
-    if (typeof data.clientId !== 'string' || !data.clientId || data.clientId.length > 80) {
-      throw new Error('Selecione um cliente válido.')
-    }
-    if (data.siteId !== null && data.siteId !== undefined && (typeof data.siteId !== 'string' || data.siteId.length > 80)) {
-      throw new Error('Obra inválida.')
-    }
-    if (typeof data.source !== 'string' || !data.source.trim() || data.source.length > 80) {
-      throw new Error('Informe a origem do lead.')
-    }
-    const estimatedValue = data.estimatedValue === null || data.estimatedValue === undefined || data.estimatedValue === ''
-      ? null
-      : Number(data.estimatedValue)
-    if (estimatedValue !== null && (!Number.isFinite(estimatedValue) || estimatedValue < 0)) {
-      throw new Error('Valor estimado inválido.')
-    }
-    return {
-      title: data.title.trim(),
+    const errors = validateLeadFields({
+      title: data.title,
       clientId: data.clientId,
+      siteId: data.siteId,
+      source: data.source,
+      estimatedValue: data.estimatedValue == null ? '' : String(data.estimatedValue),
+    })
+    if (Object.keys(errors).length) throw new Error(Object.values(errors).join(' '))
+    const estimatedValue = data.estimatedValue == null || data.estimatedValue === ''
+      ? null
+      : parseOptionalAmount(String(data.estimatedValue))
+    return {
+      title: String(data.title).trim(),
+      clientId: String(data.clientId),
       siteId: typeof data.siteId === 'string' && data.siteId ? data.siteId : null,
-      source: data.source.trim(),
+      source: String(data.source).trim(),
       estimatedValue,
     }
   })
