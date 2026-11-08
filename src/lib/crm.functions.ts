@@ -232,6 +232,76 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export type OpportunityCreateInput = {
+  title: string
+  clientId: string
+  siteId: string | null
+  source: string
+  estimatedValue: number | null
+}
+
+export const createOpportunity = createServerFn({ method: 'POST' })
+  .validator((input: unknown): OpportunityCreateInput => {
+    if (!input || typeof input !== 'object') throw new Error('Dados da oportunidade inválidos.')
+    const data = input as Record<string, unknown>
+    if (typeof data.title !== 'string' || data.title.trim().length < 2 || data.title.trim().length > 180) {
+      throw new Error('Informe um título de 2 a 180 caracteres.')
+    }
+    if (typeof data.clientId !== 'string' || !data.clientId || data.clientId.length > 80) {
+      throw new Error('Selecione um cliente válido.')
+    }
+    if (data.siteId !== null && data.siteId !== undefined && (typeof data.siteId !== 'string' || data.siteId.length > 80)) {
+      throw new Error('Obra inválida.')
+    }
+    if (typeof data.source !== 'string' || !data.source.trim() || data.source.length > 80) {
+      throw new Error('Informe a origem do lead.')
+    }
+    const estimatedValue = data.estimatedValue === null || data.estimatedValue === undefined || data.estimatedValue === ''
+      ? null
+      : Number(data.estimatedValue)
+    if (estimatedValue !== null && (!Number.isFinite(estimatedValue) || estimatedValue < 0)) {
+      throw new Error('Valor estimado inválido.')
+    }
+    return {
+      title: data.title.trim(),
+      clientId: data.clientId,
+      siteId: typeof data.siteId === 'string' && data.siteId ? data.siteId : null,
+      source: data.source.trim(),
+      estimatedValue,
+    }
+  })
+  .handler(async ({ data }) => {
+    const profile = await requireCurrentProfile()
+    assertCommercial(profile)
+    const db = getPool()
+    const clientResult = await db.query(
+      'SELECT id FROM public.clientes WHERE id = $1 AND ativo = true LIMIT 1',
+      [data.clientId],
+    )
+    if (!clientResult.rows.length) throw new Error('Cliente não encontrado ou inativo.')
+
+    if (data.siteId) {
+      const siteResult = await db.query(
+        'SELECT id FROM public.obras WHERE id = $1 AND cliente_id = $2 AND ativa = true LIMIT 1',
+        [data.siteId, data.clientId],
+      )
+      if (!siteResult.rows.length) throw new Error('A obra não pertence ao cliente selecionado.')
+    }
+
+    const history = JSON.stringify([{ at: new Date().toISOString(), by: profile.id, text: 'Oportunidade criada.' }])
+    const saved = await db.query<{ id: string }>(
+      \`INSERT INTO public.oportunidades
+        (titulo,cliente_id,obra_id,etapa,valor_estimado,responsavel_id,origem,entrou_em,
+         historico,relatorios,is_demo,created_by)
+       VALUES ($1,$2,$3,'novo',$4,$5,$6,current_date,$7::jsonb,'[]'::jsonb,false,$5)
+       RETURNING id\`,
+      [data.title,data.clientId,data.siteId,data.estimatedValue,profile.id,data.source,history],
+    )
+    const row = saved.rows[0]
+    if (!row) throw new Error('O banco não retornou a nova oportunidade.')
+    return { id: String(row.id) }
+  })
+
 const categories = ['concreto','piso','bombeamento','frete','estadia','servico','material','equipamento']
 const units = ['m³','m²','un','h','km','viagem','diária']
 const quoteTypes = ['concreto','piso','combinado']
