@@ -106,7 +106,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
     db.query('SELECT * FROM public.oportunidades WHERE is_demo = false ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.orcamentos WHERE is_demo = false ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.produtos WHERE ativo = true ORDER BY categoria, nome'),
-    db.query('SELECT id::text, nome, perfil FROM public.perfis WHERE ativo = true ORDER BY nome'),
+    db.query('SELECT p.id::text, p.nome, p.perfil FROM public.perfis p JOIN public.usuarios u ON u.id = p.id WHERE p.ativo = true ORDER BY p.nome'),
     db.query('SELECT * FROM public.vw_clientes_resumo ORDER BY created_at DESC'),
     db.query('SELECT * FROM public.vw_funil_resumo ORDER BY ordem'),
     db.query('SELECT * FROM public.vw_orcamentos_resumo ORDER BY created_at DESC'),
