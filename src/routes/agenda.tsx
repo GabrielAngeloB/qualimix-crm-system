@@ -33,7 +33,7 @@ function Agenda() {
   const plannedOrders = useMemo(() => workOrders.filter((order) => order.status !== 'Cancelada'), [workOrders])
   const sortedEvents = useMemo(() => [...scheduleEvents].sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time)), [scheduleEvents])
 
-  const saveSchedule = () => {
+  const saveSchedule = async () => {
     const order = workOrders.find((item) => item.id === orderId)
     const quote = order ? quotes.find((item) => item.id === order.quoteId) : undefined
     if (!order || !quote) {
@@ -60,7 +60,7 @@ function Agenda() {
       demo: false,
     }
     try {
-      addScheduleEvent(event)
+      await addScheduleEvent(event)
       toast({ tone: 'ok', title: 'Serviço agendado', body: `${dateBR(date)} às ${time}` })
       setOrderId('')
       setDate('')
@@ -73,11 +73,11 @@ function Agenda() {
     }
   }
 
-  const saveReschedule = (event: ScheduleEvent) => {
+  const saveReschedule = async (event: ScheduleEvent) => {
     const nextDate = dateEdits[event.id] ?? event.date
     const nextTime = timeEdits[event.id] ?? event.time
     try {
-      addScheduleEvent({ ...event, date: nextDate, time: nextTime, status: 'Reagendada' })
+      await addScheduleEvent({ ...event, date: nextDate, time: nextTime, status: 'Reagendada' })
       toast({ tone: 'ok', title: 'Serviço reagendado', body: `${dateBR(nextDate)} às ${nextTime}` })
       setDateEdits((current) => ({ ...current, [event.id]: nextDate }))
       setTimeEdits((current) => ({ ...current, [event.id]: nextTime }))
@@ -86,9 +86,9 @@ function Agenda() {
     }
   }
 
-  const changeStatus = (event: ScheduleEvent, status: ScheduleStatus) => {
+  const changeStatus = async (event: ScheduleEvent, status: ScheduleStatus) => {
     try {
-      addScheduleEvent({ ...event, status })
+      await addScheduleEvent({ ...event, status })
       toast({ tone: 'ok', title: 'Status operacional atualizado', body: `${dateBR(event.date)} · ${status}` })
     } catch (error) {
       toast({ tone: 'erro', title: 'Não foi possível atualizar', body: error instanceof Error ? error.message : 'Revise os dados.' })
@@ -143,7 +143,7 @@ function Agenda() {
           </div>
           <div className="flex justify-end gap-2 border-t border-line px-5 py-3">
             <Button onClick={() => setShowForm(false)}>Cancelar</Button>
-            <Button variant="primary" disabled={!orderId || !date || !time} onClick={saveSchedule}>Salvar programação</Button>
+            <Button variant="primary" disabled={!orderId || !date || !time} onClick={() => void saveSchedule()}>Salvar programação</Button>
           </div>
         </Card>
       )}
@@ -183,7 +183,7 @@ function Agenda() {
                         <div className="grid min-w-[150px] gap-1">
                           <input aria-label={`Data de ${event.service}`} type="date" className={cx(inputCls(), 'h-8 text-xs')} value={dateEdits[event.id] ?? event.date} onChange={(change) => setDateEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
                           <input aria-label={`Horário de ${event.service}`} type="time" className={cx(inputCls(), 'h-8 text-xs')} value={timeEdits[event.id] ?? event.time} onChange={(change) => setTimeEdits((current) => ({ ...current, [event.id]: change.target.value }))} />
-                          {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => saveReschedule(event)}>Salvar reagendamento</Button>}
+                          {((dateEdits[event.id] ?? event.date) !== event.date || (timeEdits[event.id] ?? event.time) !== event.time) && <Button size="sm" onClick={() => void saveReschedule(event)}>Salvar reagendamento</Button>}
                         </div>
                       </td>
                       <td className="px-4 py-3"><strong className="block">{client?.name ?? '—'}</strong><span className="text-xs text-muted">{site?.name ?? '—'}</span></td>
@@ -192,7 +192,7 @@ function Agenda() {
                       <td className="px-4 py-3"><strong>{order?.number ?? '—'}</strong><span className="block text-xs text-muted">{event.quoteId}</span></td>
                       <td className="px-4 py-3">{event.truck || 'Não informado'}</td>
                       <td className="px-4 py-3">
-                        <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => changeStatus(event, change.target.value as ScheduleStatus)}>
+                        <select aria-label={`Status de ${event.service} em ${event.date}`} className={cx(inputCls(), 'h-9 min-w-[150px] text-xs')} value={event.status} onChange={(change) => void changeStatus(event, change.target.value as ScheduleStatus)}>
                           {statuses.map((status) => <option key={status} value={status}>{status}</option>)}
                         </select>
                       </td>
