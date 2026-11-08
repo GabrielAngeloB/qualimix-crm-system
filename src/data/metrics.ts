@@ -10,6 +10,13 @@
  */
 import type { EvaluatedQuote, ReceivableRow } from './derived'
 import type { Opportunity } from './fixtures'
+import {
+  openAmountCents,
+  type FinancialEntry,
+  type JobExpense,
+  type ScheduleEvent,
+  type WorkOrder,
+} from './operations'
 import { addDays, daysBetween } from '../lib/format'
 
 export interface DashboardFilter {
@@ -54,6 +61,15 @@ export function computeDashboard(
   }
   const bySource = [...sourceMap.entries()].map(([source, v]) => ({ source, ...v })).sort((a, b) => b.leads - a.leads)
 
+  // Integração do pipeline com os orçamentos existentes. Só considera vínculos
+  // cujo orçamento ainda está presente no conjunto exibido (respeita filtros).
+  const periodOpps = opps.filter((o) => inPeriod(o.enteredAt))
+  const openPipeline = periodOpps.filter((o) => o.stage !== 'fechado' && o.stage !== 'perdido')
+  const quoteIds = new Set(quotes.map((q) => q.id))
+  const opportunitiesWithQuote = periodOpps.filter((o) => !!o.quoteId && quoteIds.has(o.quoteId)).length
+  const opportunitiesWithoutQuote = openPipeline.filter((o) => !o.quoteId || !quoteIds.has(o.quoteId)).length
+  const pipelineCents = openPipeline.reduce((sum, o) => sum + Math.round((o.estimatedValue ?? 0) * 100), 0)
+
   // Histórico mensal (6 meses)
   const months: { key: string; label: string; quoted: number; contracted: number }[] = []
   const [y, m] = f.today.split('-').map(Number)
@@ -71,10 +87,18 @@ export function computeDashboard(
     if (q.status === 'Aceito') mo.contracted += (q.result.totalCents ?? 0) / 100
   }
 
-  const recv = receivables.filter((r) => !f.ownerId || quotes.some((q) => q.id === r.quoteId))
+  const recv = receivables.filter((r) => !f.ownerId || quotes.some((q) => q.id === r.quoteId && q.ownerId === f.ownerId))
   const openRecv = recv.filter((r) => r.status !== 'Pago' && r.status !== 'Cancelado')
   const overdueRecv = openRecv.filter((r) => r.status === 'Vencido')
-  const receivedInPeriod = recv.filter((r) => r.paidCents > 0 && inPeriod(r.dueDate)).reduce((s, r) => s + r.paidCents, 0)
+  const receivedInPeriod = recv.reduce((sum, row) => {
+    if (row.payments) {
+      return sum + row.payments
+        .filter((payment) => inPeriod(payment.paidAt))
+        .reduce((paid, payment) => paid + payment.amountCents, 0)
+    }
+    // Fixtures antigas não têm data de cada pagamento; esse fallback só afeta o modo de demonstração.
+    return sum + (row.paidCents > 0 && inPeriod(row.dueDate) ? row.paidCents : 0)
+  }, 0)
 
   const pendingReturn = quotes
     .filter((q) => q.status === 'Enviado ao cliente' || q.status === 'Em negociação')
@@ -82,7 +106,10 @@ export function computeDashboard(
     .sort((a, b) => a.expiresIn - b.expiresIn)
 
   return {
-    leads: opps.filter((o) => inPeriod(o.enteredAt)).length,
+    leads: periodOpps.length,
+    opportunitiesWithQuote,
+    opportunitiesWithoutQuote,
+    pipelineCents,
     createdCount: created.length,
     sentCount: sent.length,
     acceptedCount: accepted.length,
@@ -102,5 +129,42 @@ export function computeDashboard(
     overdue: overdueRecv,
     openRecv,
     pendingReturn,
+  }
+}
+
+
+export function computeOperationalDashboard(
+  workOrders: WorkOrder[],
+  expenses: JobExpense[],
+  financialEntries: FinancialEntry[],
+  scheduleEvents: ScheduleEvent[],
+  today: string,
+) {
+  const activeReceivables = financialEntries.filter((entry) => entry.kind === 'receber' && entry.status !== 'Cancelado')
+  const activePayables = financialEntries.filter((entry) => entry.kind === 'pagar' && entry.status !== 'Cancelado')
+  const receivables = financialEntries.filter((entry) => entry.kind === 'receber')
+  const payables = financialEntries.filter((entry) => entry.kind === 'pagar')
+  const paidCents = (entries: FinancialEntry[]) =>
+    entries.reduce((sum, entry) => sum + entry.payments.reduce((paid, payment) => paid + payment.amountCents, 0), 0)
+  const openCents = (entries: FinancialEntry[]) =>
+    entries.reduce((sum, entry) => sum + openAmountCents(entry), 0)
+  const overdueCents = (entries: FinancialEntry[]) =>
+    entries
+      .filter((entry) => entry.dueDate < today)
+      .reduce((sum, entry) => sum + openAmountCents(entry), 0)
+  const contractedCents = workOrders.reduce((sum, order) => sum + order.contractedCents, 0)
+  const costsCents = expenses.reduce((sum, expense) => sum + expense.amountCents, 0)
+
+  return {
+    workOrderCount: workOrders.length,
+    scheduledCount: scheduleEvents.filter((event) => event.date >= today && !['Cancelada', 'Concluída'].includes(event.status)).length,
+    contractedCents,
+    costsCents,
+    balanceCents: contractedCents - costsCents,
+    receivablePaidCents: paidCents(receivables),
+    receivableOpenCents: openCents(activeReceivables),
+    payablePaidCents: paidCents(payables),
+    payableOpenCents: openCents(activePayables),
+    overdueCents: overdueCents([...activeReceivables, ...activePayables]),
   }
 }

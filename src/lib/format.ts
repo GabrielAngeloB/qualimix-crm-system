@@ -8,6 +8,7 @@ const brlFmt = new Intl.NumberFormat('pt-BR', {
 export function brl(value: number | null | undefined): string {
   if (value === null || value === undefined || !Number.isFinite(value))
     return 'Pendente'
+  // eslint-disable-next-line no-irregular-whitespace -- normaliza o NBSP retornado pelo Intl.NumberFormat.
   return brlFmt.format(value).replace(/ /g, ' ')
 }
 

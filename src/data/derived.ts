@@ -1,7 +1,7 @@
 /**
- * Cálculos derivados dos dados de demonstração. Os indicadores do painel são
- * sempre calculados a partir dos registros (nunca números soltos), com as
- * mesmas funções do gerador de orçamentos.
+ * Cálculos derivados dos registros do CRM. Os indicadores são sempre
+ * calculados a partir de registros persistidos, com as mesmas funções do
+ * gerador de orçamentos.
  */
 import {
   computeQuote,
@@ -16,11 +16,8 @@ import {
   officialRules,
   paymentMethods,
 } from './settings'
-import {
-  receivableSeeds,
-  today,
-  type QuoteRecord,
-} from './fixtures'
+import { receivableSeeds, type QuoteRecord } from './fixtures'
+import { today } from '../lib/clock'
 
 export function quoteContext(demoMode: boolean): QuoteContext {
   return {
@@ -77,6 +74,7 @@ export interface ReceivableRow {
   dueDate: string
   method: string
   status: ReceivableStatus
+  payments?: { paidAt: string; amountCents: number }[]
 }
 
 export function receivableStatus(

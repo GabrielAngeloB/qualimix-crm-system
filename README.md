@@ -4,21 +4,29 @@ CRM e sistema de gestão da Qualimix (concreto usinado, concretagens e pisos de 
 
 ## O que já funciona
 
-- **Painel gerencial**: leads, orçamentos criados, enviados e aceitos, taxa de conversão, valor orçado × contratado, m³ e m² vendidos, vendas por FCK, desempenho por origem, orçamentos aguardando retorno, próximas concretagens e contas a receber (cobrado × recebido × vencido). Filtros por período e responsável.
 - **Novo orçamento**: calculadoras de volume e área com vários elementos, margem de segurança e volume informado; itens do catálogo ou itens livres; frete (fixo, por km, por região), bombeamento (fixo, por m³, por hora, mínimo, parceiro), estadia, volume mínimo e descontos; validações em tempo real; bloqueio de proposta definitiva com preço pendente; proposta A4 imprimível/salvável em PDF; WhatsApp com mensagem editável; rascunho salvo automaticamente no navegador.
 - **Orçamentos**: pesquisa, filtros, ordenação, paginação, visualização da proposta e duplicação com preços atuais.
 - **Clientes e obras**: pesquisa por nome, CPF/CNPJ ou telefone; cadastro rápido com validação de documento e alerta de duplicidade; visão consolidada com obras, orçamentos, contratado, em aberto e histórico.
-- **Funil comercial**: colunas e tabela, mudança de etapa, motivo de perda obrigatório, fechamento explícito, follow-ups e histórico.
+- **Funil comercial**: colunas e tabela, cadastro de oportunidades reais associadas a clientes/obras, mudança de etapa, motivo de perda obrigatório, follow-ups, histórico e vínculo com orçamento.
+- **Tarefas e retornos**: tarefas vinculadas a oportunidades, prazo e horário, prioridade, conclusão/cancelamento e alertas visuais de atrasos e tarefas do dia no painel. Agendamento externo, e-mail e notificações push ainda não estão configurados.
+- **Pedidos**: conversão de orçamento real aceito em pedido, com vínculo à oportunidade, cliente e obra e geração da primeira conta a receber.
+- **Agenda operacional**: criação, reagendamento e mudança de status de serviços, com vínculos operacionais e verificação de conflito do mesmo caminhão no mesmo horário.
+- **Profissionais**: cadastro, custo de referência por serviço/unidade, forma de pagamento preferida e histórico de baixas associadas.
+- **Financeiro**: despesas por obra gerando contas a pagar, contas a receber originadas pelos pedidos, vencimentos, baixas parciais, cancelamentos e histórico.
+- **Resultado por obra**: valor contratado menos despesas efetivamente lançadas.
+- **Painel gerencial**: leads e funil, orçamentos, conversão, contratado, agenda futura, contas a pagar, despesas de obras e saldo após custos. Os filtros comerciais continuam aplicados aos indicadores de venda; os totais operacionais são agregados dos registros visíveis.
 - **Configurações**: pendências que dependem da Qualimix (preços, regras, dados institucionais, formas de pagamento) e perfis de acesso previstos.
 
-Nenhum preço, dado institucional ou capacidade operacional da Qualimix foi inventado. Os valores exibidos vêm de **dados de demonstração fictícios**, identificados na interface e que podem ser ocultados no menu lateral.
+> **Limite importante desta etapa:** os novos registros operacionais ainda são persistidos no armazenamento local do navegador (`localStorage`). Eles não são sincronizados entre usuários ou dispositivos, não têm autorização no servidor e não devem ser tratados como dados de produção. O menu exibe esse estado. A conexão ao Supabase, políticas de acesso e persistência multiusuário continuam pendentes.
+
+A base inicial não carrega clientes, obras, oportunidades, orçamentos ou atividades fictícias. Preços e regras comerciais ainda não confirmados permanecem como **Pendente**; não são substituídos por valores de demonstração.
 
 ## Tecnologias
 
 - TanStack Start (React 19 + TypeScript), Vite, Tailwind CSS 4
 - Chart.js (gráficos), lucide-react (ícones)
-- Vitest (testes de regras) e Playwright (teste de navegador)
-- Hospedagem: qualquer runtime Node.js compatível com TanStack Start e SSR. Próximas etapas: PostgreSQL + Drizzle, autenticação independente de provedor e armazenamento de objetos compatível com S3
+- Vitest (testes de regras e indicadores)
+- Hospedagem: runtime compatível com TanStack Start e SSR. A persistência final deve usar o projeto Supabase já indicado para o CRM, com políticas de acesso no banco e autenticação configurada no fluxo do projeto.
 
 ## Executar localmente
 
@@ -29,8 +37,8 @@ npm test             # testes de cálculo, regras e indicadores
 ```
 
 
-Ainda não há variáveis de ambiente obrigatórias. Banco, autenticação e armazenamento ainda não foram implementados; serão escolhidos e configurados de forma independente da hospedagem nos próximos marcos.
+Ainda não há conexão Supabase implementada no código desta branch. Não há cliente de banco, carregamento remoto, políticas RLS verificadas ou autenticação integrada. As credenciais devem existir somente como variáveis de ambiente/segredos do ambiente e nunca ser adicionadas ao repositório. O armazenamento local é provisório e serve apenas para validar os fluxos da interface.
 
 ## Roteiro
 
-Veja [PLAN.md](./PLAN.md). Próximos marcos: banco de dados e persistência, autenticação e permissões, configurações editáveis, ciclo completo do orçamento (versões, aprovação, PDF no servidor com link seguro), pedidos e agenda, financeiro, notificações agendadas.
+Veja [PLAN.md](./PLAN.md). Próximos marcos: integrar o armazenamento atual ao Supabase existente, validar políticas de acesso, adicionar autenticação e auditoria no servidor, implementar versões/aprovações de orçamento, gestão de caminhões/viagens e notificações agendadas.

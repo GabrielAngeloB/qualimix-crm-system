@@ -29,6 +29,54 @@ describe('painel', () => {
     expect(d.conversion).toBeNull()
   })
 
+  it('integra oportunidades a orçamentos e calcula o pipeline aberto', () => {
+    const d = computeDashboard(evaluated, opportunities, [], { today, days: 365, ownerId: '' })
+    const quoteIds = new Set(evaluated.map((q) => q.id))
+    const period = opportunities.filter((o) => o.enteredAt <= today)
+    const open = period.filter((o) => o.stage !== 'fechado' && o.stage !== 'perdido')
+    expect(d.opportunitiesWithQuote).toBe(period.filter((o) => !!o.quoteId && quoteIds.has(o.quoteId)).length)
+    expect(d.opportunitiesWithoutQuote).toBe(open.filter((o) => !o.quoteId || !quoteIds.has(o.quoteId)).length)
+    expect(d.pipelineCents).toBe(open.reduce((sum, o) => sum + Math.round((o.estimatedValue ?? 0) * 100), 0))
+  })
+
+  it('usa a data real da baixa e respeita o responsável nas contas a receber', () => {
+    const carlaQuote = evaluated.find((quote) => quote.ownerId === 'u-carla')!
+    const rafaelQuote = evaluated.find((quote) => quote.ownerId === 'u-rafael')!
+    const rows = [
+      {
+        id: 'cr-real-1',
+        quoteId: carlaQuote.id,
+        clientId: carlaQuote.clientId,
+        description: 'Recebimento recente',
+        originalCents: 10000,
+        paidCents: 4000,
+        openCents: 6000,
+        issuedAt: today,
+        dueDate: today,
+        method: 'Pix',
+        status: 'Parcialmente pago' as const,
+        payments: [{ paidAt: today, amountCents: 4000 }],
+      },
+      {
+        id: 'cr-real-2',
+        quoteId: rafaelQuote.id,
+        clientId: rafaelQuote.clientId,
+        description: 'Recebimento antigo',
+        originalCents: 10000,
+        paidCents: 5000,
+        openCents: 5000,
+        issuedAt: '2020-01-01',
+        dueDate: today,
+        method: 'Boleto',
+        status: 'Parcialmente pago' as const,
+        payments: [{ paidAt: '2020-01-01', amountCents: 5000 }],
+      },
+    ]
+    const d = computeDashboard(evaluated, opportunities, rows, { today, days: 90, ownerId: 'u-carla' })
+    expect(d.receivedCents).toBe(4000)
+    expect(d.receivedInPeriod).toBe(4000)
+  })
+
   it('todos os orçamentos de demonstração têm total calculável', () => {
     for (const q of evaluated) expect(q.result.totalCents, q.number).not.toBeNull()
   })

@@ -15,13 +15,16 @@ O CRM é construído em marcos independentes. Cada marco deixa o sistema utiliz�
 - Dados de demonstração isolados em `src/data/fixtures.ts`, com botão para ocultá-los.
 - Testes de cálculos, regras comerciais, formatação, documentos e indicadores.
 
-## Marco 2 — Banco de dados e persistência
+## Marco 2 — Supabase e persistência multiusuário (pendente)
 
-- PostgreSQL com Drizzle, usando provedor gerenciado ou instância própria: `db/schema.ts` e migrações versionadas.
-- Tabelas: `users`, `clients`, `sites`, `lead_sources`, `regions`, `funnel_stages`, `opportunities`, `opportunity_events`, `tasks`, `catalog_items`, `catalog_price_history`, `commercial_rules`, `payment_methods`, `company_settings`, `quotes`, `quote_versions` (snapshot imutável de itens, preços e regras), `quote_events`, `audit_log`.
-- Coluna `is_demo` em todos os registros de negócio; ação de administrador para carregar ou limpar dados de demonstração sem tocar em registros reais.
-- Server functions com validação de entrada; o servidor recalcula cada orçamento com `computeQuote` antes de salvar.
-- Substituir as fixtures pelo carregamento a partir do banco (mesmos tipos).
+- Conectar ao projeto Supabase já indicado para o CRM; não criar um banco paralelo nem substituir o projeto por Drizzle.
+- Confirmar o schema real no Supabase/Lovable antes de escrever consultas ou políticas. Mudanças estruturais devem seguir o fluxo Lovable definido pelo repositório; não criar migrations manualmente nesta etapa.
+- Implementar cliente e camada de dados com variáveis de ambiente/segredos, sem credenciais no Git.
+- Persistir clientes, obras, oportunidades, histórico, orçamentos, pedidos, agenda, profissionais, despesas, contas e baixas financeiras.
+- Aplicar políticas RLS e validar que cada usuário só acessa os registros autorizados.
+- Adicionar transações/constraints para garantir conversões idempotentes, vínculo referencial e baixa financeira sem duplicidade.
+- Substituir o `localStorage` como fonte de verdade; manter somente rascunho offline opcional, com indicador explícito de sincronização.
+- Recalcular orçamentos no servidor com `computeQuote` antes de salvar.
 
 ## Marco 3 — Autenticação, permissões e auditoria
 
@@ -49,22 +52,24 @@ O CRM é construído em marcos independentes. Cada marco deixa o sistema utiliz�
 
 ## Marco 6 — Pedidos, agenda e caminhões
 
-- Conversão idempotente de orçamento aceito em pedido (chave única por versão aceita).
-- Agenda de concretagens mensal, semanal e diária, com status operacionais.
+- **Interface local implementada parcialmente:** conversão de orçamento aceito em pedido, agenda ligada a pedido/cliente/obra/orçamento, reagendamento, status e detecção de conflito do mesmo caminhão no mesmo horário.
+- **Persistência final pendente:** migrar o fluxo para Supabase com transação e chave única por versão aceita.
 - Cadastro de caminhões próprios e de parceiros, com capacidade obrigatória antes do uso.
-- Divisão do volume em viagens, detecção de conflito de horários e de recursos.
+- Divisão do volume em viagens, detecção de conflitos por intervalo e recursos.
 - Registro de conclusão e ocorrências pela equipe.
 
 ## Marco 7 — Financeiro
 
-- Contas a receber geradas a partir do pedido, sem duplicar cobranças ao reprocessar.
-- Pagamentos parciais, quitação, baixa manual e cancelamento auditados.
+- **Interface local implementada parcialmente:** contas a receber geradas a partir do pedido; despesas por obra gerando contas a pagar; pagamentos parciais, baixa, cancelamento e histórico; saldo da obra = contratado − despesas.
+- **Persistência/auditoria final pendente:** implementar as operações no Supabase com transações, controle de concorrência e trilha de auditoria.
 - Relatórios de a receber, recebido no período, vencido e previsto; contratado × cobrado × recebido.
-- Estrutura pronta para integração bancária futura (boleto/Pix), sem marcar pago sem confirmação.
+- Integração bancária futura (boleto/Pix), sem marcar pago sem confirmação.
 
 ## Marco 8 — Tarefas, notificações e qualidade final
 
-- Tarefas comerciais e lembretes de retorno.
-- Agendador externo (cron diário): orçamentos perto da validade, vencimentos, follow-ups atrasados e concretagens próximas (com e-mail quando configurado).
-- Painel lendo do banco com acesso aos registros de origem de cada indicador.
-- Testes de permissões e de conversões entre módulos; testes end-to-end dos 18 cenários de aceite.
+- **Interface local implementada:** tarefas gerais ou ligadas a oportunidades, prazo, horário opcional, prioridade, conclusão, cancelamento e reabertura; a tarefa pendente atualiza o próximo contato no funil.
+- **Painel local implementado:** lista os próximos retornos e destaca tarefas atrasadas e previstas para hoje.
+- **Notificações externas pendentes:** agendador/cron, e-mail e push ainda precisam de serviço e configuração; os avisos atuais aparecem dentro do CRM e dependem de abrir o sistema.
+- **Persistência e segurança pendentes:** tarefas e indicadores ainda usam armazenamento local; depois da integração Supabase, validar RLS e as permissões por perfil.
+- Testes unitários das regras de tarefa adicionados; testes de permissões e end-to-end dos cenários de aceite continuam pendentes.
+- Executar ESLint, testes, TypeScript e build antes de liberar produção.

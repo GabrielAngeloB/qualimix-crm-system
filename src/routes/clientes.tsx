@@ -3,7 +3,9 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Building2, FileText, MapPin, MessageCircle, Phone, Plus, Search, Users } from 'lucide-react'
 import { useStore } from '../data/store'
 import { clientTypes, leadSources, regions } from '../data/settings'
-import { team, today, userName, type Client, type Site } from '../data/fixtures'
+import type { Client, Site } from '../data/fixtures'
+import { today } from '../lib/clock'
+import { displayUserName, localUserId } from '../data/session'
 import { formatDocument, formatPhone, onlyDigits, validateDocument, whatsappUrl } from '../lib/documents'
 import { brlCents, dateBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
@@ -16,7 +18,14 @@ export const Route = createFileRoute('/clientes')({
     id: typeof s.id === 'string' ? s.id : undefined,
     novo: typeof s.novo === 'string' ? s.novo : undefined,
   }),
-  head: () => ({ meta: [{ title: 'Clientes e obras — Qualimix CRM' }] }),
+  head: () => ({
+    meta: [
+      { title: 'Clientes e obras — Qualimix CRM' },
+      { name: 'description', content: 'Pesquise clientes por nome, CPF/CNPJ ou telefone e veja obras, orçamentos e histórico.' },
+      { property: 'og:title', content: 'Clientes e obras — Qualimix CRM' },
+      { property: 'og:description', content: 'Cadastro e visão consolidada de clientes e obras da Qualimix.' },
+    ],
+  }),
   component: Clientes,
 })
 
@@ -122,7 +131,7 @@ function Clientes() {
                       {sites.filter((s) => s.clientId === c.id).length}
                       <span className="block text-xs text-muted">{quotes.filter((x) => x.clientId === c.id).length} orçamentos</span>
                     </td>
-                    <td className="px-4 py-3">{userName(c.ownerId)}</td>
+                    <td className="px-4 py-3">{displayUserName(c.ownerId)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -155,7 +164,7 @@ function Sel({ label, value, onChange, options }: { label: string; value: string
 }
 
 const emptyForm = {
-  name: '', tradeName: '', type: '', document: '', phone: '', whatsapp: '', sameWa: true, email: '', address: '', city: '', region: '', source: '', ownerId: 'u-carla', notes: '',
+  name: '', tradeName: '', type: '', document: '', phone: '', whatsapp: '', sameWa: true, email: '', address: '', city: '', region: '', source: '', ownerId: localUserId, notes: '',
   siteName: '', siteAddress: '', siteContact: '', sitePhone: '', siteRestrictions: '',
 }
 
@@ -273,7 +282,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
           <Field label="Responsável comercial">
             {(id) => (
               <select id={id} className={inputCls()} value={f.ownerId} onChange={(e) => up('ownerId', e.target.value)}>
-                {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
+                <option value={localUserId}>Sessão local</option>
               </select>
             )}
           </Field>
@@ -376,7 +385,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
               {history.map((h, i) => (
                 <li key={i}>
                   <p><span className="font-semibold">{h.text}</span> <span className="text-muted">— {h.title}</span></p>
-                  <p className="text-xs text-muted">{dateBR(h.at)} · {userName(h.by)}</p>
+                  <p className="text-xs text-muted">{dateBR(h.at)} · {displayUserName(h.by)}</p>
                 </li>
               ))}
             </ol>
