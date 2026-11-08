@@ -34,14 +34,14 @@ function Pedidos() {
     setAmountDraft((amountCents / 100).toFixed(2).replace('.', ','))
   }
 
-  const saveOrderAmount = (orderId: string) => {
+  const saveOrderAmount = async (orderId: string) => {
     const parsed = parseDecimal(amountDraft)
     if (!parsed.ok || parsed.value === null || parsed.value <= 0) {
       toast({ tone: 'erro', title: 'Valor contratado inválido', body: 'Informe um valor maior que zero.' })
       return
     }
     try {
-      updateWorkOrderAmount(orderId, Math.round(parsed.value * 100))
+      await updateWorkOrderAmount(orderId, Math.round(parsed.value * 100))
       toast({ tone: 'ok', title: 'Valor da obra atualizado', body: 'O contrato, a conta a receber vinculada e o saldo da obra foram atualizados.' })
       setEditingOrderId(null)
       setAmountDraft('')
@@ -50,10 +50,10 @@ function Pedidos() {
     }
   }
 
-  const createOrder = (quoteId: string) => {
+  const createOrder = async (quoteId: string) => {
     setBusy(quoteId)
     try {
-      const order = createWorkOrderFromQuote(quoteId, dueDates[quoteId] ?? '', methods[quoteId] ?? '')
+      const order = await createWorkOrderFromQuote(quoteId, dueDates[quoteId] ?? '', methods[quoteId] ?? '')
       toast({ tone: 'ok', title: 'Pedido criado', body: `${order.number} vinculado ao orçamento e à conta a receber.` })
     } catch (error) {
       toast({ tone: 'erro', title: 'Não foi possível converter', body: error instanceof Error ? error.message : 'Revise os dados.' })
@@ -104,7 +104,7 @@ function Pedidos() {
                 <Field label="Forma de pagamento" required>
                   {(id) => <input id={id} className={inputCls()} placeholder="Ex.: Pix, boleto, faturado" value={methods[quote.id] ?? ''} onChange={(event) => setMethods((current) => ({ ...current, [quote.id]: event.target.value }))} />}
                 </Field>
-                <Button variant="primary" disabled={busy === quote.id || !dueDates[quote.id] || !methods[quote.id]?.trim()} onClick={() => createOrder(quote.id)}>
+                <Button variant="primary" disabled={busy === quote.id || !dueDates[quote.id] || !methods[quote.id]?.trim()} onClick={() => void createOrder(quote.id)}>
                   <Plus className="h-4 w-4" /> Converter em pedido
                 </Button>
               </div>
@@ -162,11 +162,11 @@ function Pedidos() {
                               value={amountDraft}
                               onChange={(event) => setAmountDraft(event.target.value)}
                               onKeyDown={(event) => {
-                                if (event.key === 'Enter') saveOrderAmount(order.id)
+                                if (event.key === 'Enter') void saveOrderAmount(order.id)
                                 if (event.key === 'Escape') setEditingOrderId(null)
                               }}
                             />
-                            <Button size="sm" variant="primary" className="h-8 w-8 px-0" aria-label="Salvar valor" onClick={() => saveOrderAmount(order.id)}><Save className="h-4 w-4" /></Button>
+                            <Button size="sm" variant="primary" className="h-8 w-8 px-0" aria-label="Salvar valor" onClick={() => void saveOrderAmount(order.id)}><Save className="h-4 w-4" /></Button>
                             <Button size="sm" className="h-8 w-8 px-0" aria-label="Cancelar edição" onClick={() => setEditingOrderId(null)}><X className="h-4 w-4" /></Button>
                           </div>
                         ) : (
