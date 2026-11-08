@@ -45,9 +45,10 @@ export const Route = createRootRoute({
 function RootLayout() {
   const path = useRouterState({ select: (s) => s.location.pathname })
   const publicPage = path === '/login' || path === '/bootstrap'
+  if (publicPage) return <Outlet />
   return (
     <StoreProvider>
-      {publicPage ? <Outlet /> : <AppShell><Outlet /></AppShell>}
+      <AppShell><Outlet /></AppShell>
     </StoreProvider>
   )
 }
