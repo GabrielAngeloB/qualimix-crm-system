@@ -123,7 +123,7 @@ function fromRecord(q: QuoteRecord, validityDays: number | null, copy = true): D
     paymentTerms: q.paymentTerms,
     validityDays: copy
       ? validityDays?.toString() ?? ''
-      : q.validUntil ? String(Math.max(1, daysBetween(today, q.validUntil))) : '',
+      : q.validUntil ? String(Math.max(1, daysBetween(todayInSaoPaulo(), q.validUntil))) : '',
     executionDeadline: q.executionDeadline,
     notes: q.notes,
     origin: copy ? q.number : null,
