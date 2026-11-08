@@ -115,7 +115,7 @@ function Funil() {
         eyebrow="Comercial"
         title="Funil comercial"
         description="Acompanhe cada oportunidade do primeiro contato ao fechamento. O fechamento é sempre uma ação explícita."
-        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadClientId(clients.find((client) => client.active)?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
+        actions={<div className="flex flex-wrap items-center gap-2"><Button variant="primary" onClick={() => { setLeadTried(false); setLeadClientId(clients.find((client) => client.active)?.id ?? ''); setNewLeadOpen(true) }}><Plus className="h-4 w-4" /> Novo lead</Button><SegTabs label="Visualização" value={view} onChange={setView} options={[{ value: 'kanban', label: <span className="inline-flex items-center gap-1"><SquareKanban className="h-4 w-4" /> Colunas</span> }, { value: 'tabela', label: <span className="inline-flex items-center gap-1"><List className="h-4 w-4" /> Tabela</span> }]} /></div>}
       />
 
       <div className="mb-5 grid gap-3 md:grid-cols-3">
@@ -302,11 +302,11 @@ function Funil() {
 
       <Modal
         open={newLeadOpen}
-        onClose={() => setNewLeadOpen(false)}
+        onClose={() => { setNewLeadOpen(false); setLeadTried(false) }}
         title="Cadastrar novo lead"
         footer={<><Button variant="ghost" onClick={() => { setNewLeadOpen(false); setLeadTried(false) }}>Cancelar</Button><Button variant="primary" disabled={leadSaving} onClick={() => void submitLead()}>{leadSaving ? 'Salvando…' : 'Salvar oportunidade'}</Button></>}
       >
-        {clients.length === 0 ? <EmptyState icon={<KanbanSquare className="h-6 w-6" />} title="Cadastre um cliente primeiro">Uma oportunidade precisa estar vinculada a um cliente real.</EmptyState> : <div className="grid gap-3 sm:grid-cols-2">
+        {clients.filter((client) => client.active).length === 0 ? <EmptyState icon={<KanbanSquare className="h-6 w-6" />} title="Cadastre um cliente ativo primeiro">Uma oportunidade precisa estar vinculada a um cliente ativo. Cadastre o cliente em Clientes e obras antes de criar o lead.</EmptyState> : <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Título da oportunidade" required error={leadErrors.title} hint="Descreva o serviço ou a necessidade que está sendo negociada. Ex.: Concretagem da laje — obra nova." className="sm:col-span-2">{(id) => <input id={id} autoFocus required minLength={3} maxLength={180} className={inputCls(!!leadErrors.title)} value={leadTitle} onChange={(e) => setLeadTitle(e.target.value)} placeholder="Ex.: Concretagem da laje — obra nova" />}</Field>
           <Field label="Cliente" required error={leadErrors.clientId} hint="Oportunidade sempre pertence a um cliente já cadastrado.">{(id) => <select id={id} required className={inputCls(!!leadErrors.clientId)} value={leadClientId} onChange={(e) => { setLeadClientId(e.target.value); setLeadSiteId('') }}><option value="">Selecione…</option>{clients.filter((client) => client.active).map((client) => <option key={client.id} value={client.id}>{client.name}</option>)}</select>}</Field>
           <Field label="Obra (opcional)" error={leadErrors.siteId} hint="Escolha uma obra do cliente selecionado. Deixe em branco quando ainda não souber.">{(id) => <select id={id} className={inputCls(!!leadErrors.siteId)} value={leadSiteId} onChange={(e) => setLeadSiteId(e.target.value)}><option value="">Sem obra definida</option>{leadSites.map((site) => <option key={site.id} value={site.id}>{site.name}</option>)}</select>}</Field>
