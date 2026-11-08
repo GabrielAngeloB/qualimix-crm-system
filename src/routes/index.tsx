@@ -12,7 +12,8 @@ import { BarChart, ChartCard } from '../components/Charts'
 export const Route = createFileRoute('/')({ component: Painel })
 
 function Painel() {
-  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, workOrders } = useStore()
+  const { quotes, opportunities, receivables, clients, sites, demoMode, team, views, ctx, scheduleEvents, workOrders, currentRole } = useStore()
+  const canCreateQuote = currentRole === 'administrador' || currentRole === 'comercial'
   const [days, setDays] = useState(90)
   const [ownerId, setOwnerId] = useState('')
   const userName = (id: string) => team.find((member) => member.id === id)?.name ?? '—'
@@ -54,9 +55,9 @@ function Painel() {
               <option value="">Todos os responsáveis</option>
               {team.filter((u) => u.role === 'Comercial' || u.role === 'Administrador').map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
-            <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
+            {canCreateQuote && <Link to="/orcamentos/novo" className="inline-flex h-10 items-center gap-2 rounded-md bg-brand px-4 font-semibold text-white shadow-sm shadow-brand/20 hover:bg-brand-strong">
               <Plus className="h-4 w-4" /> Novo orçamento
-            </Link>
+            </Link>}
           </>
         }
       />
