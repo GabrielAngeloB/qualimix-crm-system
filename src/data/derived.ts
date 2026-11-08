@@ -9,7 +9,6 @@ import {
   type QuoteContext,
   type QuoteResult,
   type CatalogItem,
-  type CatalogItem,
 } from '../lib/quote'
 import { daysBetween } from '../lib/format'
 import {
