@@ -49,7 +49,7 @@ function getSql(): ReturnType<typeof postgres> {
       ssl: { ca, rejectUnauthorized: true },
       prepare: false,
       fetch_types: false,
-      connection: { application_name: 'qualimix-crm' },
+      connection: { application_name: 'qualimix-crm', TimeZone: 'America/Sao_Paulo' },
       onnotice: () => undefined,
     })
   }

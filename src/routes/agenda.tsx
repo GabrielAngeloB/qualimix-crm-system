@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
 import { CalendarDays, Plus, ClipboardList } from 'lucide-react'
 import { useStore } from '../data/store'
-import { today } from '../lib/clock'
+import { todayInSaoPaulo } from '../lib/clock'
 import type { ScheduleEvent, ScheduleStatus } from '../data/operations'
 import { dateBR } from '../lib/format'
 import { Button, Card, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
@@ -21,6 +21,7 @@ const statuses: ScheduleStatus[] = ['Planejada', 'Confirmada', 'Em preparação'
 
 function Agenda() {
   const { workOrders, scheduleEvents, quotes, clients, sites, addScheduleEvent, toast, currentRole, views } = useStore()
+  const today = todayInSaoPaulo()
   const canEditSchedule = currentRole === 'administrador' || currentRole === 'operacao'
   const [orderId, setOrderId] = useState('')
   const [date, setDate] = useState('')

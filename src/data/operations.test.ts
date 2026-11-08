@@ -221,4 +221,10 @@ describe('tarefas comerciais', () => {
     expect(commercialTaskTiming({ ...task, status: 'Concluída', completedAt: '2026-11-08T13:00:00.000Z' }, '2026-11-08')).toBe('Concluída')
     expect(commercialTaskTiming({ ...task, status: 'Cancelada' }, '2026-11-08')).toBe('Cancelada')
   })
+  it('uses Brasília calendar date when revising a receivable near UTC midnight', () => {
+    const receivable = { ...entry, dueDate: '2026-11-08', status: 'Em aberto' as const, payments: [] }
+    const revised = reviseWorkOrderAmount(order, 55000, receivable, '2026-11-09T02:30:00.000Z')
+    expect(revised.receivable?.status).toBe('Em aberto')
+  })
+
 })

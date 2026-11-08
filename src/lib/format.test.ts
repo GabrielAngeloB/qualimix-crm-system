@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { addDays, brl, dateBR, num, parseDecimal, roundHalfUp, toCents } from './format'
+import { addDays, brl, dateBR, dateTimeBR, daysBetween, isoDate, num, parseDecimal, roundHalfUp, timeBR, toCents } from './format'
 
 // Espaços não separáveis são intencionais: este helper testa a normalização do Intl.NumberFormat.
 // eslint-disable-next-line no-irregular-whitespace
@@ -16,6 +16,13 @@ describe('formatação brasileira', () => {
   it('datas DD/MM/AAAA', () => {
     expect(dateBR('2026-03-09')).toBe('09/03/2026')
     expect(addDays('2026-02-27', 3)).toBe('2026-03-02')
+    expect(daysBetween('2026-11-08', '2026-11-09')).toBe(1)
+  })
+  it('exibe data e horário de instantes no fuso de Brasília, inclusive na virada UTC', () => {
+    const instant = new Date('2026-11-09T02:30:00.000Z')
+    expect(dateTimeBR(instant.toISOString())).toBe('08/11/2026 23:30')
+    expect(timeBR(instant)).toBe('23:30')
+    expect(isoDate(instant)).toBe('2026-11-08')
   })
   it('lê decimais com vírgula ou ponto; vazio é null', () => {
     expect(parseDecimal('1.234,56')).toEqual({ ok: true, value: 1234.56 })

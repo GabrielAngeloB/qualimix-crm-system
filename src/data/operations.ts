@@ -1,4 +1,5 @@
 import type { QuoteRecord } from './fixtures'
+import { isoDateInTimeZone } from '../lib/clock'
 
 export type WorkOrderStatus =
   | 'Aguardando programação'
@@ -215,7 +216,7 @@ export function reviseWorkOrderAmount(
     ? {
         ...receivable,
         amountCents,
-        status: financialStatus(amountCents, paidCents, receivable.dueDate, at.slice(0, 10)),
+        status: financialStatus(amountCents, paidCents, receivable.dueDate, isoDateInTimeZone(new Date(at))),
       }
     : null
 
