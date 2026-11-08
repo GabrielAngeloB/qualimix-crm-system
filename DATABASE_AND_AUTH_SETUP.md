@@ -9,14 +9,19 @@
 - public.usuarios guarda username, hash da senha e versão da sessão. public.perfis mantém nome, papel e estado e continua sendo referenciada pelas tabelas comerciais.
 - VITE_SUPABASE_PUBLISHABLE_KEY não autentica este login. A persistência e autenticação atuais usam DATABASE_URL apenas no servidor.
 
-## Aplicação no banco
+## Aplicação no banco — ordem obrigatória
 
-1. Faça backup do banco.
-2. Confirme que o esquema de 9 tabelas já existe. Não execute o SQL inicial em cima de uma base com dados.
-3. Execute supabase/migrations/20261108000200_custom_server_auth.sql no SQL Editor do Supabase.
-4. Confirme no resultado que fks_restantes_para_auth_users é zero e que usuarios e login_tentativas existem.
+Faça backup antes de qualquer alteração.
 
-A migration não apaga clientes, obras, oportunidades nem orçamentos. Ela remove somente o vínculo de perfis com auth.users e o trigger que criava perfis pelo Auth. Contas antigas não migram senha: será necessário criar novo usuário pelo bootstrap ou pela tela de administração.
+1. **Confira o esquema:** o SQL base está versionado em `supabase/schema/000_initial_9_tables.sql`. Execute-o somente em um projeto Supabase vazio. Se as nove tabelas e quatro views já existem no banco de produção, pule esta etapa. Não rode o SQL base novamente em produção.
+2. **Autenticação:** execute `supabase/migrations/20261108000200_custom_server_auth.sql` no SQL Editor. O resultado deve mostrar `fks_restantes_para_auth_users = 0` e as tabelas `usuarios` e `login_tentativas`.
+3. **Credencial restrita:** gere uma senha aleatória forte, substitua o placeholder em `supabase/security/001_create_app_role.sql` e execute esse script como `postgres`. Ele cria `qualimix_app` sem privilégios de superusuário, concede somente os acessos usados pelo CRM e cria as políticas RLS para essa conexão técnica.
+4. **Atualize DATABASE_URL:** use a conexão PostgreSQL do usuário `qualimix_app`, não a conta `postgres`. Mantenha o mesmo nome da variável. Codifique caracteres especiais da senha em formato URL. Para hospedagens sem acesso IPv6 à conexão direta, use o Session Pooler do Supabase.
+5. **Verifique:** o script da credencial deve retornar `rolsuper=false`, `rolcreatedb=false`, `rolcreaterole=false`, `rolbypassrls=false` e `rolcanlogin=true`.
+
+A migration de autenticação preserva os registros de clientes, obras, oportunidades, orçamentos e os UUIDs de `perfis`. Ela remove somente o vínculo de `perfis` com `auth.users` e o trigger que criava perfis pelo Auth. Senhas do Supabase Auth não podem ser extraídas nem convertidas; as contas antigas precisam receber novas credenciais pelo bootstrap ou pela tela de administração.
+
+**Importante sobre RLS:** como o login é próprio e as consultas usam uma conexão PostgreSQL do servidor, as políticas RLS não recebem o JWT do usuário final. A política `qualimix_app` autoriza a conexão técnica restrita; a autorização de cada pessoa é verificada pelas Server Functions antes de cada operação. Nunca exponha `DATABASE_URL` ao browser.
 
 ## Variáveis
 
@@ -24,7 +29,7 @@ Configure no servidor local e na Vercel:
 - DATABASE_URL: URL PostgreSQL do projeto Supabase. Use o host/porta recomendados pelo Supabase para a hospedagem; se a conexão direta não for acessível, use a URL do Session Pooler.
 - VITE_SUPABASE_URL e VITE_SUPABASE_PUBLISHABLE_KEY podem continuar no .env se outras partes do frontend precisarem delas; a autenticação e persistência descritas aqui não dependem delas.
 
-Não coloque a senha do banco no Git, em variável VITE_ ou no navegador. A senha de conexão foi exposta durante a configuração: redefina-a no Supabase e atualize .env e a variável de produção antes de habilitar o acesso externo.
+Não coloque a senha do banco no Git, em variável VITE_ ou no navegador. A senha PostgreSQL antiga foi exposta durante a configuração: redefina a senha do usuário postgres, use uma senha nova para qualimix_app e atualize .env e a variável de produção antes de habilitar o acesso externo.
 
 ## Primeiro administrador
 
