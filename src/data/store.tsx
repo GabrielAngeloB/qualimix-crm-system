@@ -24,7 +24,6 @@ import {
   type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
 import { createDefaultSettings, type AppSettings } from './settings'
-import type { CatalogItem } from '../lib/quote'
 import {
   loadSettings,
   saveSettings as saveSettingsOnServer,
