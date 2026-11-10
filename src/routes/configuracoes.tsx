@@ -431,6 +431,7 @@ type RuleNumericFieldProps = {
   min?: number
   max?: number
   integer?: boolean
+  required?: boolean
   suffix?: string
 }
 
@@ -443,8 +444,9 @@ function RuleNumericField({ id, label, value, onChange, onValidityChange, min = 
   const change = (next: string) => {
     setRaw(next)
     if (!next.trim()) {
-      setError('')
-      onValidityChange(id, true)
+      const message = required ? 'Este campo é obrigatório.' : ''
+      setError(message)
+      onValidityChange(id, !message)
       onChange(null)
       return
     }
@@ -525,10 +527,10 @@ function RemainingSettingsEditor({
       case 'quantityDecimals': if (value !== null) r.quantityDecimals = value; break
     }
   })
-  const numeric = (id: string, label: string, value: number | null, path: string, options: { min?: number; max?: number; integer?: boolean; suffix?: string } = {}) => (
+  const numeric = (id: string, label: string, value: number | null, path: string, options: { min?: number; max?: number; integer?: boolean; required?: boolean; suffix?: string } = {}) => (
     <RuleNumericField key={id} id={id} label={label} value={value} onChange={(next) => setRule(path, next)}
       onValidityChange={(field, valid) => setInvalidFields((current) => ({ ...current, [field]: !valid }))}
-      min={options.min ?? 0} max={options.max} integer={options.integer} suffix={options.suffix} />
+      min={options.min ?? 0} max={options.max} integer={options.integer} required={options.required} suffix={options.suffix} />
   )
   const regionRule = (id: string, name: string, value: number | null) => (
     <RuleNumericField key={id} id={'freight-region-' + id} label={'Frete — ' + name} value={value}
@@ -602,7 +604,6 @@ function RemainingSettingsEditor({
     try {
       await onSave(draft)
       setSaved(draft)
-      onToast('Configurações salvas', 'Regras comerciais, pagamentos e cadastros de apoio foram atualizados.')
     } catch (error) {
       onToast('Não foi possível salvar as configurações', error instanceof Error ? error.message : 'Erro ao salvar.')
     } finally { setSaving(false) }
@@ -821,7 +822,7 @@ function Configuracoes() {
             {numeric('floor-area', 'Área mínima de piso', draft.officialRules.floor.minArea, 'floor.minArea', { suffix: 'm²' })}
             {numeric('discount-limit', 'Desconto sem aprovação', draft.officialRules.maxDiscountPctWithoutApproval, 'maxDiscountPctWithoutApproval', { max: 100, suffix: '%' })}
             {numeric('validity-days', 'Validade padrão', draft.officialRules.validityDays, 'validityDays', { min: 1, max: 365, integer: true, suffix: 'dias' })}
-            {numeric('quantity-decimals', 'Casas decimais da quantidade', draft.officialRules.quantityDecimals, 'quantityDecimals', { min: 0, max: 4, integer: true })}
+            {numeric('quantity-decimals', 'Casas decimais da quantidade', draft.officialRules.quantityDecimals, 'quantityDecimals', { min: 0, max: 4, integer: true, required: true })}
             <label className="flex items-center gap-2 self-end pb-2 text-sm">
               <input type="checkbox" checked={draft.officialRules.minVolume.chargeDifference} onChange={(event) => update((next) => { next.officialRules.minVolume.chargeDifference = event.target.checked })} />
               Cobrar diferença até o volume mínimo
