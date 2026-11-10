@@ -9,6 +9,7 @@ import {
   getCurrentProfile,
   hashPassword,
   requireCurrentProfile,
+  requireAdmin,
   setAuthenticatedSession,
   verifyPassword,
 } from './auth.server'
@@ -47,11 +48,6 @@ function requirePassword(value: unknown, minimum = 12) {
     throw new Error('A senha deve ter entre ' + minimum + ' e 128 caracteres.')
   }
   return value
-}
-
-function requireAdmin(profile: Awaited<ReturnType<typeof requireCurrentProfile>>) {
-  if (profile.perfil !== 'admin') throw new Error('Acesso restrito ao administrador.')
-  return profile
 }
 
 function clientIpHash(): string {

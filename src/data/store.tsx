@@ -24,6 +24,13 @@ import {
   type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
 import { createDefaultSettings, type AppSettings } from './settings'
+import {
+  loadSettings,
+  saveSettings as saveSettingsOnServer,
+  saveProduct as saveProductOnServer,
+  type LoadedSettings,
+  type SaveProductInput,
+} from '../lib/settings.functions'
 
 export interface Toast { id: number; tone: 'ok' | 'erro' | 'info'; title: string; body?: string }
 interface Store {
@@ -49,6 +56,8 @@ interface Store {
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
   settings: AppSettings
   settingsReady: boolean
+  saveSettings: (settings: AppSettings) => Promise<void>
+  saveProduct: (product: SaveProductInput) => Promise<void>
   workspaceReady: boolean
   addQuote: (quote: QuoteRecord) => void
   updateQuote: (quote: QuoteRecord) => void
@@ -57,6 +66,7 @@ interface Store {
 }
 type StoreData = Omit<CrmData, 'views'> & Omit<OperationalRecords, 'views'> & {
   views: CrmViews & OperationalRecords['views']
+  settings: LoadedSettings | null
 }
 const emptyViews: CrmViews & OperationalRecords['views'] = {
   clients: [], funnel: [], quotes: [],
@@ -66,6 +76,7 @@ const emptyData: StoreData = {
   clients: [], sites: [], opportunities: [], quotes: [], products: [], team: [],
   currentUserId: '', currentRole: '', views: emptyViews,
   workOrders: [], scheduleEvents: [], professionals: [], expenses: [], financialEntries: [], tasks: [],
+  settings: null,
 }
 const StoreCtx = createContext<Store | null>(null)
 
@@ -80,8 +91,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setLoading(true)
     try {
-      const [crm, operational] = await Promise.all([loadCrmData(), loadOperationalRecords()])
-      setDbData({ ...crm, ...operational, views: { ...crm.views, ...operational.views } })
+      const [crm, operational, settings] = await Promise.all([
+        loadCrmData(),
+        loadOperationalRecords(),
+        loadSettings(),
+      ])
+      setDbData({ ...crm, ...operational, settings, views: { ...crm.views, ...operational.views } })
     } finally { setLoading(false) }
   }, [])
 
@@ -176,6 +191,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await refresh()
   }, [refresh])
 
+  const saveSettings = useCallback(async (settings: AppSettings) => {
+    const current = dbData.settings
+    if (!current?.settingsReady || !current.settingsUpdatedAt) {
+      throw new Error('As configurações persistidas ainda não foram carregadas. Verifique a migration e o seed.')
+    }
+    await saveSettingsOnServer({
+      data: { settings, expectedUpdatedAt: current.settingsUpdatedAt },
+    })
+    await refresh()
+    toast({ tone: 'ok', title: 'Configurações salvas', body: 'As alterações foram persistidas no banco de dados.' })
+  }, [dbData.settings, refresh, toast])
+
+  const saveProduct = useCallback(async (product: SaveProductInput) => {
+    await saveProductOnServer({ data: product })
+    await refresh()
+    toast({ tone: 'ok', title: 'Produto atualizado', body: 'O catálogo foi atualizado no banco de dados.' })
+  }, [refresh, toast])
+
   const saveProfessional = useCallback(async (professional: Professional) => {
     await saveProfessionalOnServer({ data: professional })
     await refresh()
@@ -192,10 +225,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   }, [refresh])
 
   const value = useMemo<Store>(() => {
-    const settings = {
-      ...createDefaultSettings(),
-      catalog: dbData.products.length ? dbData.products : createDefaultSettings().catalog,
-    }
+    // Os defaults só são usados enquanto a linha persistida ainda não estiver pronta.
+    const settings = dbData.settings?.settingsReady
+      ? dbData.settings
+      : createDefaultSettings()
     const ctx = quoteContext(demoMode, settings)
     const clients = demoMode ? [...dbData.clients, ...seedClients] : dbData.clients
     const sites = demoMode ? [...dbData.sites, ...seedSites] : dbData.sites
@@ -208,8 +241,9 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       quotes: evaluateAll(quoteRecords, ctx), opportunities,
       team: demoMode ? [...dbData.team, ...seedTeam] : dbData.team,
       currentUserId: dbData.currentUserId, currentRole: dbData.currentRole, views: dbData.views,
-      products: dbData.products,
-      settings, settingsReady: !loading, workspaceReady: !loading,
+      products: settings.catalog,
+      settings, settingsReady: dbData.settings?.settingsReady === true, workspaceReady: !loading,
+      saveSettings, saveProduct,
       addQuote, updateQuote,
       receivables: demoMode ? buildReceivables(evaluateAll(quoteRecords, ctx)) : [],
       workOrders: dbData.workOrders, scheduleEvents: dbData.scheduleEvents,
@@ -226,7 +260,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     }
   }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
     createWorkOrderFromQuote, updateWorkOrderAmount, addExpense, registerPayment, cancelFinancialEntry,
-    saveProfessional, addScheduleEvent, saveTask, refresh, toasts, toast, dismissToast])
+    saveProfessional, addScheduleEvent, saveTask, saveSettings, saveProduct, refresh, toasts, toast, dismissToast])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>
 }

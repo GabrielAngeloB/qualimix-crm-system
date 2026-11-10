@@ -103,6 +103,12 @@ export async function requireCurrentProfile(): Promise<AuthProfile> {
   if (!profile) throw new Error('Sua sessão expirou. Entre novamente.')
   return profile
 }
+
+/** Restringe operações administrativas no servidor; nunca confiar apenas na interface. */
+export function requireAdmin(profile: AuthProfile): AuthProfile {
+  if (profile.perfil !== 'admin') throw new Error('Acesso restrito ao administrador.')
+  return profile
+}
 export function assertSameOrigin() {
   const origin = getRequestHeader('origin')
   const forwardedHost = getRequestHeader('x-forwarded-host')
