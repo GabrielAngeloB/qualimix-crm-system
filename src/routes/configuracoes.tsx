@@ -421,6 +421,332 @@ function ProductRow({
   )
 }
 
+
+type RuleNumericFieldProps = {
+  id: string
+  label: string
+  value: number | null
+  onChange: (value: number | null) => void
+  onValidityChange: (id: string, valid: boolean) => void
+  min?: number
+  max?: number
+  integer?: boolean
+  required?: boolean
+  suffix?: string
+}
+
+function RuleNumericField({ id, label, value, onChange, onValidityChange, min = 0, max, integer = false, required = false, suffix }: RuleNumericFieldProps) {
+  const [raw, setRaw] = useState(value === null ? '' : String(value).replace('.', ','))
+  const [error, setError] = useState('')
+  useEffect(() => {
+    setRaw(value === null ? '' : String(value).replace('.', ','))
+  }, [value])
+  const change = (next: string) => {
+    setRaw(next)
+    if (!next.trim()) {
+      const message = required ? 'Este campo é obrigatório.' : ''
+      setError(message)
+      onValidityChange(id, !message)
+      onChange(null)
+      return
+    }
+    const parsed = parseDecimal(next)
+    let message = ''
+    if (!parsed.ok) message = 'Informe um número válido.'
+    else if (parsed.value !== null && parsed.value < min) message = 'O valor mínimo é ' + min + '.'
+    else if (max !== undefined && parsed.value !== null && parsed.value > max) message = 'O valor máximo é ' + max + '.'
+    else if (integer && parsed.value !== null && !Number.isInteger(parsed.value)) message = 'Informe um número inteiro.'
+    setError(message)
+    onValidityChange(id, !message)
+    if (!message && parsed.ok) onChange(parsed.value)
+  }
+  return (
+    <label className="block min-w-0 text-sm">
+      <span className="mb-1 block text-xs font-semibold text-ink-2">{label}{suffix ? ' (' + suffix + ')' : ''}</span>
+      <input inputMode="decimal" value={raw} onChange={(event) => change(event.target.value)} placeholder="Pendente" aria-invalid={Boolean(error)} className={inputCls(Boolean(error))} />
+      {error ? <span role="alert" className="mt-1 block text-xs text-brand">{error}</span> : value === null ? <span className="mt-1 block"><Badge tone="warn">Pendente</Badge></span> : null}
+    </label>
+  )
+}
+
+type SupportListKey = 'leadSources' | 'regions' | 'lossReasons' | 'clientTypes' | 'elementTypes'
+
+function RemainingSettingsEditor({
+  settings,
+  isAdmin,
+  settingsReady,
+  onSave,
+  onDirtyChange,
+  onToast,
+}: {
+  settings: AppSettings
+  isAdmin: boolean
+  settingsReady: boolean
+  onSave: (settings: AppSettings) => Promise<void>
+  onDirtyChange: (dirty: boolean) => void
+  onToast: (title: string, body: string) => void
+}) {
+  const [draft, setDraft] = useState<AppSettings>(settings)
+  const [saved, setSaved] = useState<AppSettings>(settings)
+  const [saving, setSaving] = useState(false)
+  const [invalidFields, setInvalidFields] = useState<Record<string, boolean>>({})
+  const [newItems, setNewItems] = useState<Record<string, string>>({})
+  const [listErrors, setListErrors] = useState<Record<string, string>>({})
+  const dirty = JSON.stringify(draft) !== JSON.stringify(saved)
+  useEffect(() => {
+    if (!dirty) {
+      setDraft(settings)
+      setSaved(settings)
+    }
+  }, [settings, dirty])
+  useEffect(() => { onDirtyChange(dirty) }, [dirty, onDirtyChange])
+
+  const update = (mutate: (next: AppSettings) => void) => {
+    setDraft((current) => {
+      const next = JSON.parse(JSON.stringify(current)) as AppSettings
+      mutate(next)
+      return next
+    })
+  }
+  const setRule = (path: string, value: number | null) => update((next) => {
+    const r = next.officialRules
+    switch (path) {
+      case 'freight.fixed': r.freight.fixed = value; break
+      case 'freight.perKm': r.freight.perKm = value; break
+      case 'pumping.fixed': r.pumping.fixed = value; break
+      case 'pumping.perM3': r.pumping.perM3 = value; break
+      case 'pumping.perHour': r.pumping.perHour = value; break
+      case 'pumping.minimum': r.pumping.minimum = value; break
+      case 'minVolume.m3': r.minVolume.m3 = value; break
+      case 'minVolume.minOrderValue': r.minVolume.minOrderValue = value; break
+      case 'stay.toleranceMin': r.stay.toleranceMin = value; break
+      case 'stay.perHour': r.stay.perHour = value; break
+      case 'floor.minArea': r.floor.minArea = value; break
+      case 'maxDiscountPctWithoutApproval': r.maxDiscountPctWithoutApproval = value; break
+      case 'validityDays': r.validityDays = value; break
+      case 'quantityDecimals': if (value !== null) r.quantityDecimals = value; break
+    }
+  })
+  const numeric = (id: string, label: string, value: number | null, path: string, options: { min?: number; max?: number; integer?: boolean; required?: boolean; suffix?: string } = {}) => (
+    <RuleNumericField key={id} id={id} label={label} value={value} onChange={(next) => setRule(path, next)}
+      onValidityChange={(field, valid) => setInvalidFields((current) => ({ ...current, [field]: !valid }))}
+      min={options.min ?? 0} max={options.max} integer={options.integer} required={options.required} suffix={options.suffix} />
+  )
+  const regionRule = (id: string, name: string, value: number | null) => (
+    <RuleNumericField key={id} id={'freight-region-' + id} label={'Frete — ' + name} value={value}
+      onChange={(next) => update((settings) => { const region = settings.officialRules.freight.regions.find((item) => item.id === id); if (region) region.price = next })}
+      onValidityChange={(field, valid) => setInvalidFields((current) => ({ ...current, [field]: !valid }))}
+    />
+  )
+  const setPayment = (id: string, value: string) => update((next) => {
+    const method = next.paymentMethods.find((item) => item.id === id)
+    if (method) method.enabledOfficial = value === 'pending' ? null : value === 'accepted'
+  })
+  const updateList = (key: SupportListKey, values: string[]) => update((next) => {
+    next[key] = values
+  })
+  const addItem = (key: SupportListKey) => {
+    const value = (newItems[key] ?? '').trim()
+    if (!value) { setListErrors((current) => ({ ...current, [key]: 'Digite um nome antes de adicionar.' })); return }
+    if (draft[key].some((item) => item.toLocaleLowerCase('pt-BR') === value.toLocaleLowerCase('pt-BR'))) {
+      setListErrors((current) => ({ ...current, [key]: 'Esse nome já existe na lista.' })); return
+    }
+    if (key === 'regions') {
+      const id = 'reg-' + value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + Date.now().toString(36)
+      update((next) => {
+        next.regions = [...next.regions, value]
+        next.officialRules.freight.regions = [...next.officialRules.freight.regions, { id, name: value, price: null }]
+      })
+    } else updateList(key, [...draft[key], value])
+    setNewItems((current) => ({ ...current, [key]: '' }))
+    setListErrors((current) => ({ ...current, [key]: '' }))
+  }
+  const renameItem = (key: SupportListKey, index: number, value: string) => {
+    const clean = value.trim()
+    if (!clean) { setListErrors((current) => ({ ...current, [key]: 'O nome não pode ficar vazio.' })); return }
+    if (draft[key].some((item, i) => i !== index && item.toLocaleLowerCase('pt-BR') === clean.toLocaleLowerCase('pt-BR'))) {
+      setListErrors((current) => ({ ...current, [key]: 'Esse nome já existe na lista.' })); return
+    }
+    const old = draft[key][index]
+    const values = [...draft[key]]
+    values[index] = clean
+    if (key === 'regions') update((next) => {
+      next.regions = values
+      next.officialRules.freight.regions = next.officialRules.freight.regions.map((region) => region.name === old ? { ...region, name: clean } : region)
+    })
+    else updateList(key, values)
+    setListErrors((current) => ({ ...current, [key]: '' }))
+  }
+  const removeItem = (key: SupportListKey, index: number) => {
+    if (key === 'leadSources' && index === 0) return
+    const item = draft[key][index]
+    if (!window.confirm('Remover "' + item + '"? Verifique antes se esse valor já foi usado em registros existentes. A remoção não altera o histórico já salvo.')) return
+    const values = draft[key].filter((_, i) => i !== index)
+    if (key === 'regions') update((next) => {
+      next.regions = values
+      next.officialRules.freight.regions = next.officialRules.freight.regions.filter((region) => region.name !== item)
+    })
+    else updateList(key, values)
+  }
+  const moveItem = (key: SupportListKey, index: number, delta: number) => {
+    if (key === 'leadSources' && index === 0) return
+    const target = index + delta
+    if (target < (key === 'leadSources' ? 1 : 0) || target >= draft[key].length) return
+    const values = [...draft[key]]
+    ;[values[index], values[target]] = [values[target], values[index]]
+    if (key === 'regions') update((next) => {
+      next.regions = values
+      const byName = new Map(next.officialRules.freight.regions.map((region) => [region.name, region]))
+      next.officialRules.freight.regions = values.flatMap((name) => {
+        const region = byName.get(name)
+        return region ? [region] : []
+      })
+    })
+    else updateList(key, values)
+  }
+  const save = async () => {
+    if (!dirty || Object.values(invalidFields).some(Boolean) || Object.values(listErrors).some(Boolean)) return
+    setSaving(true)
+    try {
+      await onSave(draft)
+      setSaved(draft)
+    } catch (error) {
+      onToast('Não foi possível salvar as configurações', error instanceof Error ? error.message : 'Erro ao salvar.')
+    } finally { setSaving(false) }
+  }
+  const discard = () => { setDraft(saved); setInvalidFields({}); setListErrors({}); setNewItems({}) }
+  const lists: { key: SupportListKey; label: string }[] = [
+    { key: 'leadSources', label: 'Origens de lead' },
+    { key: 'regions', label: 'Regiões' },
+    { key: 'lossReasons', label: 'Motivos de perda' },
+    { key: 'clientTypes', label: 'Tipos de cliente' },
+    { key: 'elementTypes', label: 'Tipos de elemento' },
+  ]
+  if (!settingsReady) return <Card><SettingsSkeleton rows={10} /></Card>
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader title="Regras comerciais oficiais" subtitle="Campos vazios permanecem pendentes. Valores precisam ser iguais ou maiores que zero." action={isAdmin && <Badge tone={dirty ? 'warn' : 'ok'}>{dirty ? 'Alterações pendentes' : 'Sincronizado'}</Badge>} />
+        <div className="grid gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">
+          {isAdmin ? <>
+            {numeric('freight-fixed', 'Frete — valor fixo', draft.officialRules.freight.fixed, 'freight.fixed')}
+            {numeric('freight-km', 'Frete — por km', draft.officialRules.freight.perKm, 'freight.perKm')}
+            {draft.officialRules.freight.regions.map((region) => regionRule(region.id, region.name, region.price))}
+            {numeric('pump-fixed', 'Bombeamento — fixo', draft.officialRules.pumping.fixed, 'pumping.fixed')}
+            {numeric('pump-m3', 'Bombeamento — por m³', draft.officialRules.pumping.perM3, 'pumping.perM3')}
+            {numeric('pump-hour', 'Bombeamento — por hora', draft.officialRules.pumping.perHour, 'pumping.perHour')}
+            {numeric('pump-min', 'Bombeamento — mínimo', draft.officialRules.pumping.minimum, 'pumping.minimum')}
+            {numeric('min-volume', 'Volume mínimo', draft.officialRules.minVolume.m3, 'minVolume.m3', { suffix: 'm³' })}
+            {numeric('min-order', 'Valor mínimo do pedido', draft.officialRules.minVolume.minOrderValue, 'minVolume.minOrderValue', { suffix: 'reais' })}
+            {numeric('stay-tolerance', 'Tolerância de estadia', draft.officialRules.stay.toleranceMin, 'stay.toleranceMin', { suffix: 'min' })}
+            {numeric('stay-hour', 'Estadia — por hora', draft.officialRules.stay.perHour, 'stay.perHour')}
+            {numeric('floor-area', 'Área mínima de piso', draft.officialRules.floor.minArea, 'floor.minArea', { suffix: 'm²' })}
+            {numeric('discount-limit', 'Desconto sem aprovação', draft.officialRules.maxDiscountPctWithoutApproval, 'maxDiscountPctWithoutApproval', { max: 100, suffix: '%' })}
+            {numeric('validity-days', 'Validade padrão', draft.officialRules.validityDays, 'validityDays', { min: 1, max: 365, integer: true, suffix: 'dias' })}
+            {numeric('quantity-decimals', 'Casas decimais da quantidade', draft.officialRules.quantityDecimals, 'quantityDecimals', { min: 0, max: 4, integer: true, required: true })}
+            <label className="flex items-center gap-2 self-end pb-2 text-sm">
+              <input type="checkbox" checked={draft.officialRules.minVolume.chargeDifference} onChange={(event) => update((next) => { next.officialRules.minVolume.chargeDifference = event.target.checked })} />
+              Cobrar diferença até o volume mínimo
+            </label>
+          </> : <>
+            {[
+              ['Frete — valor fixo', draft.officialRules.freight.fixed, 'R$'],
+              ['Frete — por km', draft.officialRules.freight.perKm, 'R$/km'],
+              ...draft.officialRules.freight.regions.map((r) => ['Frete — ' + r.name, r.price, 'R$'] as [string, number | null, string]),
+              ['Bombeamento — fixo', draft.officialRules.pumping.fixed, 'R$'],
+              ['Bombeamento — por m³', draft.officialRules.pumping.perM3, 'R$/m³'],
+              ['Bombeamento — por hora', draft.officialRules.pumping.perHour, 'R$/h'],
+              ['Bombeamento — mínimo', draft.officialRules.pumping.minimum, 'R$'],
+              ['Volume mínimo', draft.officialRules.minVolume.m3, 'm³'],
+              ['Valor mínimo do pedido', draft.officialRules.minVolume.minOrderValue, 'R$'],
+              ['Estadia — tolerância', draft.officialRules.stay.toleranceMin, 'min'],
+              ['Estadia — por hora', draft.officialRules.stay.perHour, 'R$/h'],
+              ['Área mínima de piso', draft.officialRules.floor.minArea, 'm²'],
+              ['Desconto sem aprovação', draft.officialRules.maxDiscountPctWithoutApproval, '%'],
+              ['Validade padrão', draft.officialRules.validityDays, 'dias'],
+              ['Casas decimais', draft.officialRules.quantityDecimals, ''],
+            ].map(([label, value, unit]) => <div key={String(label)} className="text-sm"><p className="text-xs text-muted">{String(label)}</p>{value === null ? <Badge tone="warn">Pendente</Badge> : <strong>{String(value)} {String(unit)}</strong>}</div>)}
+            <p className="text-sm">Cobrar diferença até o volume mínimo: <strong>{draft.officialRules.minVolume.chargeDifference ? 'Sim' : 'Não'}</strong></p>
+          </>}
+        </div>
+      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader title="Formas de pagamento" subtitle="Defina cada modalidade como aceita, não aceita ou ainda a confirmar." />
+          <div className="space-y-3 p-5">
+            {draft.paymentMethods.map((method) => (
+              <label key={method.id} className="flex items-center justify-between gap-3 text-sm">
+                <span className="font-medium">{method.label}</span>
+                {isAdmin ? <select className={cx(inputCls(), 'max-w-48')} value={method.enabledOfficial === null ? 'pending' : method.enabledOfficial ? 'accepted' : 'rejected'} onChange={(event) => setPayment(method.id, event.target.value)}>
+                  <option value="pending">A confirmar</option><option value="accepted">Aceita</option><option value="rejected">Não aceita</option>
+                </select> : <Badge tone={method.enabledOfficial === true ? 'ok' : 'warn'}>{method.enabledOfficial === null ? 'A confirmar' : method.enabledOfficial ? 'Aceita' : 'Não aceita'}</Badge>}
+              </label>
+            ))}
+          </div>
+        </Card>
+        <Card>
+          <CardHeader title="Etapas do funil" subtitle="Os identificadores internos são fixos; somente os rótulos podem mudar." />
+          <div className="space-y-3 p-5">
+            {draft.funnelStages.map((stage, index) => (
+              <label key={stage.id} className="block text-sm"><span className="mb-1 block text-xs text-muted">{stage.id} (ID fixo)</span>
+                {isAdmin ? <input className={inputCls()} value={stage.label} onChange={(event) => update((next) => { next.funnelStages[index].label = event.target.value })} /> : <strong>{stage.label}</strong>}
+              </label>
+            ))}
+          </div>
+        </Card>
+      </div>
+      <Card>
+        <CardHeader title="Cadastros de apoio" subtitle="Adicione, renomeie, remova e reordene opções. A remoção pede confirmação porque pode haver registros históricos associados." />
+        <div className="grid gap-6 p-5 lg:grid-cols-2">
+          {lists.map(({ key, label }) => (
+            <section key={key} className="min-w-0">
+              <h3 className="mb-2 font-semibold">{label}</h3>
+              <ol className="space-y-2">
+                {draft[key].map((item, index) => (
+                  <li key={key + '-' + index} className="flex items-center gap-2">
+                    <input aria-label={label + ' ' + (index + 1)} className={inputCls()} value={item}
+                      disabled={!isAdmin || (key === 'leadSources' && index === 0)}
+                      onChange={(event) => {
+                        const values = [...draft[key]]
+                        values[index] = event.target.value
+                        if (key === 'regions') {
+                          const old = draft.regions[index]
+                          update((next) => {
+                            next.regions = values
+                            next.officialRules.freight.regions = next.officialRules.freight.regions.map((region) => region.name === old ? { ...region, name: event.target.value } : region)
+                          })
+                        } else updateList(key, values)
+                      }}
+                      onBlur={(event) => renameItem(key, index, event.target.value)}
+                    />
+                    {isAdmin && <>
+                      <Button size="sm" variant="secondary" disabled={index === (key === 'leadSources' ? 1 : 0)} onClick={() => moveItem(key, index, -1)}>↑</Button>
+                      <Button size="sm" variant="secondary" disabled={index === draft[key].length - 1 || (key === 'leadSources' && index === 0)} onClick={() => moveItem(key, index, 1)}>↓</Button>
+                      <Button size="sm" variant="danger" disabled={key === 'leadSources' && index === 0} onClick={() => removeItem(key, index)}>Remover</Button>
+                    </>}
+                  </li>
+                ))}
+              </ol>
+              {listErrors[key] && <p className="mt-1 text-xs text-brand" role="alert">{listErrors[key]}</p>}
+              {isAdmin && <div className="mt-3 flex gap-2">
+                <input className={inputCls()} placeholder={'Nova opção de ' + label.toLowerCase()} value={newItems[key] ?? ''} onChange={(event) => setNewItems((current) => ({ ...current, [key]: event.target.value }))} />
+                <Button size="sm" onClick={() => addItem(key)}>Adicionar</Button>
+              </div>}
+            </section>
+          ))}
+        </div>
+      </Card>
+      {isAdmin && <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-line bg-surface p-4">
+        <div className="text-sm">{dirty ? <Badge tone="warn">Alterações não salvas</Badge> : 'Configurações sincronizadas.'}</div>
+        <div className="flex gap-2">
+          <Button variant="secondary" disabled={!dirty || saving} onClick={discard}>Descartar</Button>
+          <Button variant="primary" disabled={!dirty || saving || Object.values(invalidFields).some(Boolean) || Object.values(listErrors).some(Boolean)} onClick={() => void save()}>{saving ? 'Salvando…' : 'Salvar regras e cadastros'}</Button>
+        </div>
+      </div>}
+    </div>
+  )
+}
+
 function SettingsSkeleton({ rows = 4 }: { rows?: number }) {
   return (
     <div className="animate-pulse space-y-3 p-5" aria-label="Carregando configurações">
@@ -447,8 +773,9 @@ function Configuracoes() {
   const isAdmin = currentRole === 'admin' || currentRole === 'administrador'
   const pend = pendingSettings(settings)
   const [companyDirty, setCompanyDirty] = useState(false)
+  const [settingsDirty, setSettingsDirty] = useState(false)
   const [dirtyProducts, setDirtyProducts] = useState<Set<string>>(() => new Set())
-  const hasUnsavedChanges = companyDirty || dirtyProducts.size > 0
+  const hasUnsavedChanges = companyDirty || settingsDirty || dirtyProducts.size > 0
 
   const onProductDirtyChange = useCallback((id: string, dirty: boolean) => {
     setDirtyProducts((current) => {
@@ -473,26 +800,6 @@ function Configuracoes() {
     withResolver: true,
   })
 
-  const ruleRows: [string, number | null, number | null, ((n: number) => string)?][] = [
-    ['Frete — valor fixo', settings.officialRules.freight.fixed, settings.demoRules.freight.fixed],
-    ['Frete — por km', settings.officialRules.freight.perKm, settings.demoRules.freight.perKm],
-    ...settings.officialRules.freight.regions.map((region): [string, number | null, number | null] => [
-      'Frete — ' + region.name,
-      region.price,
-      settings.demoRules.freight.regions.find((demo) => demo.id === region.id)?.price ?? null,
-    ]),
-    ['Bombeamento — fixo', settings.officialRules.pumping.fixed, settings.demoRules.pumping.fixed],
-    ['Bombeamento — por m³', settings.officialRules.pumping.perM3, settings.demoRules.pumping.perM3],
-    ['Bombeamento — por hora', settings.officialRules.pumping.perHour, settings.demoRules.pumping.perHour],
-    ['Bombeamento — mínimo', settings.officialRules.pumping.minimum, settings.demoRules.pumping.minimum],
-    ['Volume mínimo (m³)', settings.officialRules.minVolume.m3, settings.demoRules.minVolume.m3, (n) => num(n, 1) + ' m³'],
-    ['Estadia — tolerância', settings.officialRules.stay.toleranceMin, settings.demoRules.stay.toleranceMin, (n) => n + ' min'],
-    ['Estadia — por hora', settings.officialRules.stay.perHour, settings.demoRules.stay.perHour],
-    ['Piso — área mínima', settings.officialRules.floor.minArea, settings.demoRules.floor.minArea, (n) => num(n, 0) + ' m²'],
-    ['Desconto sem aprovação', settings.officialRules.maxDiscountPctWithoutApproval, settings.demoRules.maxDiscountPctWithoutApproval, (n) => n + '%'],
-    ['Validade padrão', settings.officialRules.validityDays, settings.demoRules.validityDays, (n) => n + ' dias'],
-  ]
-
   const products = settings.catalog
 
   return (
@@ -503,7 +810,7 @@ function Configuracoes() {
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm">
           <TriangleAlert className="h-4 w-4 shrink-0 text-warn" />
           <p className="flex-1"><strong>Há alterações não salvas.</strong> Salve ou descarte antes de sair desta página.</p>
-          <Badge tone="warn">{(companyDirty ? 1 : 0) + dirtyProducts.size} item(ns) alterado(s)</Badge>
+          <Badge tone="warn">{(companyDirty ? 1 : 0) + (settingsDirty ? 1 : 0) + dirtyProducts.size} item(ns) alterado(s)</Badge>
         </div>
       )}
 
@@ -589,51 +896,7 @@ function Configuracoes() {
         )}
       </Card>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Regras comerciais" subtitle="Cada regra é independente. Regras oficiais não confirmadas permanecem pendentes." />
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-muted">
-                <tr><th className="px-4 py-2">Regra</th><th className="px-4 py-2 text-right">Oficial</th><th className="px-4 py-2 text-right">Demo</th></tr>
-              </thead>
-              <tbody>
-                {ruleRows.map(([label, official, demo, formatter]) => (
-                  <tr key={label} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2">{label}</td>
-                    <td className="px-4 py-2 text-right">{v(official, formatter)}</td>
-                    <td className="px-4 py-2 text-right text-muted">{v(demo, formatter)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader title="Formas de pagamento" subtitle="Modalidades oficiais configuradas para a Qualimix." />
-            <ul className="flex flex-wrap gap-2 p-5">
-              {settings.paymentMethods.map((method) => (
-                <li key={method.id}>
-                  <Badge tone={method.enabledOfficial ? 'ok' : 'warn'}>
-                    {method.label}: {method.enabledOfficial === null ? 'a confirmar' : method.enabledOfficial ? 'aceita' : 'não aceita'}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <Card>
-            <CardHeader title="Cadastros de apoio" />
-            <div className="space-y-3 p-5 text-sm">
-              <p><strong>Origens de lead:</strong> {settings.leadSources.join(', ')}</p>
-              <p><strong>Regiões atendidas:</strong> {settings.regions.join(', ')}</p>
-              <p><strong>Etapas do funil:</strong> {settings.funnelStages.map((stage) => stage.label).join(' → ')}</p>
-              <p><strong>Numeração de orçamentos:</strong> ORC-AAAA-NNNN, sequencial e única</p>
-            </div>
-          </Card>
-        </div>
-      </div>
+      <RemainingSettingsEditor settings={settings} isAdmin={isAdmin} settingsReady={settingsReady} onSave={saveSettings} onDirtyChange={setSettingsDirty} onToast={onToast} />
 
       <Card>
         <CardHeader title="Usuários e permissões" subtitle="Perfis previstos. As permissões são aplicadas no servidor e no banco de dados, não apenas na interface." action={<Lock className="h-5 w-5 text-brand" />} />
