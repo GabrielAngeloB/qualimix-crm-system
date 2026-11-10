@@ -1,18 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Qualimix">
   <defs>
-    <linearGradient id="surface" x1="8" y1="6" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#202020" />
-      <stop offset="1" stop-color="#101010" />
-    </linearGradient>
+    <radialGradient id="background" cx="35%" cy="28%" r="85%">
+      <stop offset="0" stop-color="#1c1c1c" />
+      <stop offset="1" stop-color="#090909" />
+    </radialGradient>
   </defs>
-  <rect width="64" height="64" rx="15" fill="url(#surface)" />
-  <circle cx="28.5" cy="28.5" r="19.2" fill="none" stroke="#F11B18" stroke-width="10" />
-  <path
-    d="M42.2 42.1 C45.8 44.7 49.7 47.5 53.8 50.1 C55.5 51.2 57.0 50.2 57.5 48.6"
-    fill="none"
-    stroke="#F11B18"
-    stroke-width="10"
-    stroke-linecap="round"
-    stroke-linejoin="round"
-  />
+
+  <rect width="64" height="64" rx="15" fill="url(#background)" />
+
+  <!-- Organic Q mark: a bold circular form with a curved, integrated tail. -->
+  <g fill="#E10F1F">
+    <circle cx="27.5" cy="27.5" r="23" />
+    <path d="M42.8 38.4
+      C46 42.6 50 46 55.5 47.9
+      C58.7 49 60.3 51.1 59.6 53.6
+      C58.9 56.2 56.3 57.4 53.7 56.2
+      C47.9 53.6 43.3 49.8 39.4 45
+      Z" />
+  </g>
+
+  <circle cx="27.5" cy="27.5" r="13.6" fill="url(#background)" />
 </svg>
