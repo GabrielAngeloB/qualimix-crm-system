@@ -323,6 +323,7 @@ function ClientForm({ open, onClose, onCreated, initialClient, onUpdated }: { op
           </div>
         </div>
       </div>}
+      </div>
     </Drawer>
   )
 }

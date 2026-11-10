@@ -19,7 +19,7 @@ import {
   type OperationalRecords,
 } from '../lib/operations.functions'
 import {
-  loadCrmData, persistClient, archiveClient as archiveClientOnServer, restoreClient as restoreClientOnServer, persistOpportunity, persistQuote,
+  loadCrmData, persistClient, persistOpportunity, persistQuote,
   createOpportunity as createOpportunityOnServer,
   type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
@@ -51,9 +51,6 @@ interface Store {
   addScheduleEvent: (event: ScheduleEvent) => Promise<void>
   saveTask: (task: CommercialTask) => Promise<void>
   addClient: (c: Client, site?: Site) => Promise<void>
-  updateClient: (c: Client) => Promise<void>
-  archiveClient: (id: string) => Promise<void>
-  restoreClient: (id: string) => Promise<void>
   updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
   createOpportunity: (input: OpportunityCreateInput) => Promise<void>
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
@@ -134,24 +131,6 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     await persistClient({ data: { client, site } })
     await refresh()
     toast({ tone: 'ok', title: 'Cliente cadastrado', body: 'Dados salvos no banco de dados.' })
-  }, [refresh, toast])
-
-  const updateClient = useCallback(async (client: Client) => {
-    await persistClient({ data: { client, mode: 'update' } })
-    await refresh()
-    toast({ tone: 'ok', title: 'Cliente atualizado', body: 'As alterações foram salvas no banco de dados.' })
-  }, [refresh, toast])
-
-  const archiveClient = useCallback(async (id: string) => {
-    await archiveClientOnServer({ data: { id } })
-    await refresh()
-    toast({ tone: 'ok', title: 'Cliente arquivado', body: 'O histórico foi preservado e o cliente saiu da lista de ativos.' })
-  }, [refresh, toast])
-
-  const restoreClient = useCallback(async (id: string) => {
-    await restoreClientOnServer({ data: { id } })
-    await refresh()
-    toast({ tone: 'ok', title: 'Cliente reativado', body: 'O cliente voltou para a lista de ativos.' })
   }, [refresh, toast])
 
   const updateOpportunity = useCallback((id: string, patch: Partial<Opportunity>, historyText?: string) => {
@@ -276,10 +255,10 @@ export function StoreProvider({ children }: { children: ReactNode }) {
         return order ? jobBalanceCents(order, dbData.expenses) : null
       },
       addExpense, registerPayment, cancelFinancialEntry, saveProfessional, addScheduleEvent, saveTask,
-      loading, addClient, updateClient, archiveClient, restoreClient, updateOpportunity, createOpportunity, saveQuote, refresh,
+      loading, addClient, updateOpportunity, createOpportunity, saveQuote, refresh,
       toasts, toast, dismissToast,
     }
-  }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateClient, archiveClient, restoreClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
+  }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
     createWorkOrderFromQuote, updateWorkOrderAmount, addExpense, registerPayment, cancelFinancialEntry,
     saveProfessional, addScheduleEvent, saveTask, saveSettings, saveProduct, refresh, toasts, toast, dismissToast])
 

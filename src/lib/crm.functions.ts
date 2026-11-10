@@ -161,7 +161,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
 export const persistClient = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('Dados do cliente inválidos.')
-    const data = input as { client?: unknown; site?: unknown; mode?: unknown }
+    const data = input as { client?: unknown; site?: unknown }
     if (!data.client || typeof data.client !== 'object' || Array.isArray(data.client)) {
       throw new Error('Dados do cliente inválidos.')
     }
@@ -234,40 +234,25 @@ export const persistClient = createServerFn({ method: 'POST' })
     if (rawSite && typeof rawSite.clientId === 'string' && rawSite.clientId !== client.id) {
       throw new Error('A obra precisa estar vinculada ao cliente informado.')
     }
-    const mode = data.mode === 'update' ? 'update' : 'create'
-    return { client, site, mode }
+    return { client, site }
   })
   .handler(async ({ data }) => {
     assertSameOrigin()
     const profile = await requireCurrentProfile()
     if (profile.perfil !== 'admin') {
-      throw new Error('Somente administradores podem cadastrar ou editar clientes.')
+      throw new Error('Somente administradores podem cadastrar novos clientes.')
     }
     const c = data.client
     try {
       await withTransaction(async (tx) => {
-        if (data.mode === 'update') {
-          if (data.site) throw new Error('Edite as obras pela área de obras; esta edição altera somente os dados do cliente.')
-          const updated = await tx.query(
-            `UPDATE public.clientes
-             SET nome=$2, nome_fantasia=$3, documento=$4, telefone=$5, whatsapp=$6,
-                 email=$7, endereco=$8, cidade=$9, regiao=$10, tipo=$11, origem=$12,
-                 observacoes=$13
-             WHERE id=$1 AND is_demo=false`,
-            [c.id,c.name,c.tradeName,c.document || null,c.phone,c.whatsapp,
-             c.email,c.address,c.city,c.region,c.type,c.source,c.notes],
-          )
-          if (!updated.rowCount) throw new Error('Cliente não encontrado ou não pode ser editado.')
-        } else {
-          await tx.query(
-            `INSERT INTO public.clientes
-              (id,nome,nome_fantasia,documento,telefone,whatsapp,email,endereco,cidade,regiao,tipo,origem,
-               responsavel_id,observacoes,ativo,is_demo,created_by)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,false,$13)`,
-            [c.id,c.name,c.tradeName,c.document || null,c.phone,c.whatsapp,
-             c.email,c.address,c.city,c.region,c.type,c.source,profile.id,c.notes],
-          )
-        }
+        await tx.query(
+          `INSERT INTO public.clientes
+            (id,nome,nome_fantasia,documento,telefone,whatsapp,email,endereco,cidade,regiao,tipo,origem,
+             responsavel_id,observacoes,ativo,is_demo,created_by)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,true,false,$13)`,
+          [c.id,c.name,c.tradeName,c.document || null,c.phone,c.whatsapp,
+           c.email,c.address,c.city,c.region,c.type,c.source,profile.id,c.notes],
+        )
         if (data.site) {
           const s = data.site
           await tx.query(
@@ -288,45 +273,6 @@ export const persistClient = createServerFn({ method: 'POST' })
       }
       throw error
     }
-    return { success: true }
-  })
-
-
-export const archiveClient = createServerFn({ method: 'POST' })
-  .validator((input: unknown) => {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Cliente inválido.')
-    const id = (input as Record<string, unknown>).id
-    if (typeof id !== 'string' || !id.trim() || id.length > 80) throw new Error('Identificador do cliente inválido.')
-    return { id: id.trim() }
-  })
-  .handler(async ({ data }) => {
-    assertSameOrigin()
-    const profile = await requireCurrentProfile()
-    if (profile.perfil !== 'admin') throw new Error('Somente administradores podem arquivar clientes.')
-    const result = await getPool().query(
-      `UPDATE public.clientes SET ativo = false WHERE id = $1 AND is_demo = false AND ativo = true`,
-      [data.id],
-    )
-    if (!result.rowCount) throw new Error('Cliente não encontrado, já arquivado ou protegido.')
-    return { success: true }
-  })
-
-export const restoreClient = createServerFn({ method: 'POST' })
-  .validator((input: unknown) => {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Cliente inválido.')
-    const id = (input as Record<string, unknown>).id
-    if (typeof id !== 'string' || !id.trim() || id.length > 80) throw new Error('Identificador do cliente inválido.')
-    return { id: id.trim() }
-  })
-  .handler(async ({ data }) => {
-    assertSameOrigin()
-    const profile = await requireCurrentProfile()
-    if (profile.perfil !== 'admin') throw new Error('Somente administradores podem reativar clientes.')
-    const result = await getPool().query(
-      `UPDATE public.clientes SET ativo = true WHERE id = $1 AND is_demo = false AND ativo = false`,
-      [data.id],
-    )
-    if (!result.rowCount) throw new Error('Cliente não encontrado ou já ativo.')
     return { success: true }
   })
 
