@@ -1,11 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Qualimix">
   <defs>
-    <linearGradient id="background" x1="8" y1="4" x2="56" y2="60" gradientUnits="userSpaceOnUse">
-      <stop offset="0" stop-color="#292929" />
+    <linearGradient id="surface" x1="8" y1="6" x2="56" y2="60" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#202020" />
       <stop offset="1" stop-color="#101010" />
     </linearGradient>
   </defs>
-  <rect width="64" height="64" rx="15" fill="url(#background)" />
-  <circle cx="29" cy="29" r="17.5" fill="none" stroke="#FFFFFF" stroke-width="7" />
-  <path d="M41.2 41.2 53.8 53.8" fill="none" stroke="#E10F1F" stroke-width="7" stroke-linecap="round" />
+  <rect width="64" height="64" rx="15" fill="url(#surface)" />
+  <circle cx="28.5" cy="28.5" r="19.2" fill="none" stroke="#F11B18" stroke-width="10" />
+  <path
+    d="M42.2 42.1 C45.8 44.7 49.7 47.5 53.8 50.1 C55.5 51.2 57.0 50.2 57.5 48.6"
+    fill="none"
+    stroke="#F11B18"
+    stroke-width="10"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
 </svg>

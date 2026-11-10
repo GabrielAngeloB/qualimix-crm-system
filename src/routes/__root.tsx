@@ -112,7 +112,7 @@ export const Route = createRootRouteWithContext<{
     ],
     links: [
       { rel: "stylesheet", href: appCss },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+      { rel: "icon", href: "/favicon.svg?v=2", type: "image/svg+xml" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
