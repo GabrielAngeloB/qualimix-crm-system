@@ -39,7 +39,23 @@ grant select, insert, update on public.login_tentativas to qualimix_app;
 -- CRM comercial.
 grant select, insert, update on public.clientes, public.obras, public.oportunidades to qualimix_app;
 grant select on public.produtos to qualimix_app;
+
+-- O papel pode editar apenas campos comerciais não demonstrativos.
+-- Remova UPDATE amplo antes de conceder privilégios por coluna.
+revoke update on public.produtos from qualimix_app;
+revoke update (preco_demo) on public.produtos from qualimix_app;
+grant update (
+  nome,
+  descricao,
+  preco_base,
+  ativo,
+  valido_desde,
+  observacoes_internas
+) on public.produtos to qualimix_app;
 grant select, insert on public.orcamentos to qualimix_app;
+
+-- Configuração institucional/comercial: linha única id='default'.
+grant select, insert, update on public.configuracoes to qualimix_app;
 
 
 -- Operação: os endpoints server-side validam o papel antes de gravar.
@@ -78,7 +94,7 @@ declare tab text;
 begin
   foreach tab in array array[
     'perfis','usuarios','login_tentativas',
-    'clientes','obras','oportunidades','produtos','orcamentos',
+    'clientes','obras','oportunidades','produtos','orcamentos','configuracoes',
     'pedidos','profissionais','despesas','lancamentos_financeiros',
     'pagamentos_financeiros','agenda_eventos','tarefas_comerciais'
   ] loop
