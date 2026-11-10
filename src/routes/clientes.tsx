@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, createFileRoute, useNavigate } from '@tanstack/react-router'
-import { Building2, FileText, MapPin, MessageCircle, Phone, Plus, Search, Users } from 'lucide-react'
+import { Archive, Building2, FileText, MapPin, MessageCircle, Pencil, Phone, Plus, RotateCcw, Search, Users } from 'lucide-react'
 import { useStore } from '../data/store'
 import { clientTypes, leadSources, regions } from '../data/settings'
 import { today, userName, type Client, type Site } from '../data/fixtures'
@@ -24,7 +24,7 @@ export const Route = createFileRoute('/clientes')({
 function Clientes() {
   const { id, novo } = Route.useSearch()
   const navigate = useNavigate()
-  const { clients, sites, quotes, currentRole, views } = useStore()
+  const { clients, sites, quotes, currentRole, views, archiveClient, restoreClient, toast } = useStore()
   const canCreate = currentRole === 'admin' || currentRole === 'administrador'
   const clientSummaryById = useMemo(() => new Map(views.clients.map((row) => [String(row.id), row])), [views.clients])
   const totalSitesForClient = (clientId: string) => {
@@ -41,6 +41,7 @@ function Clientes() {
   const [source, setSource] = useState('')
   const [status, setStatus] = useState('ativos')
   const [creating, setCreating] = useState(false)
+  const [editingClient, setEditingClient] = useState<Client | null>(null)
   useEffect(() => {
     if (novo && canCreate) setCreating(true)
   }, [novo, canCreate])
@@ -151,7 +152,29 @@ function Clientes() {
         }}
         onCreated={(cid) => navigate({ to: '/clientes', search: { id: cid } })}
       />}
-      {selected && <ClientDetail client={selected} onClose={closeDetail} />}
+      {editingClient && <ClientForm
+        open
+        initialClient={editingClient}
+        onClose={() => setEditingClient(null)}
+        onUpdated={() => { const editedId = editingClient.id; setEditingClient(null); navigate({ to: '/clientes', search: { id: editedId } }) }}
+      />}
+      {selected && <ClientDetail
+        client={selected}
+        canManage={canCreate}
+        onEdit={() => { setEditingClient(selected); closeDetail() }}
+        onArchive={async () => {
+          const confirmed = window.confirm(`Tem certeza que deseja arquivar ${selected.name}? Ele sairá da lista de ativos, mas obras, orçamentos, pedidos e histórico serão preservados. Você poderá reativá-lo em Inativos.`)
+          if (!confirmed) return
+          await archiveClient(selected.id)
+          closeDetail()
+        }}
+        onRestore={async () => {
+          await restoreClient(selected.id)
+          closeDetail()
+          setStatus('ativos')
+        }}
+        onClose={closeDetail}
+      />}
     </>
   )
 }
@@ -170,28 +193,34 @@ const emptyForm = {
   siteName: '', siteAddress: '', siteContact: '', sitePhone: '', siteRestrictions: '',
 }
 
-function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: (id: string) => void }) {
-  const { clients, addClient, toast, team, currentUserId } = useStore()
-  const [f, setF] = useState(emptyForm)
+function ClientForm({ open, onClose, onCreated, initialClient, onUpdated }: { open: boolean; onClose: () => void; onCreated?: (id: string) => void; initialClient?: Client; onUpdated?: () => void }) {
+  const { clients, addClient, updateClient, toast, team, currentUserId } = useStore()
+  const initialForm = initialClient ? {
+    ...emptyForm, name: initialClient.name, tradeName: initialClient.tradeName, type: initialClient.type,
+    document: initialClient.document, phone: initialClient.phone, whatsapp: initialClient.whatsapp,
+    sameWa: initialClient.whatsapp === initialClient.phone, email: initialClient.email, address: initialClient.address,
+    city: initialClient.city, region: initialClient.region, source: initialClient.source, notes: initialClient.notes,
+  } : emptyForm
+  const [f, setF] = useState(initialForm)
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [tried, setTried] = useState(false)
-  const dirty = JSON.stringify(f) !== JSON.stringify(emptyForm)
+  const dirty = JSON.stringify(f) !== JSON.stringify(initialForm)
   const up = (k: keyof typeof emptyForm, v: string | boolean) => setF((x) => ({ ...x, [k]: v }))
 
   const docDigits = onlyDigits(f.document)
   const phoneDigits = normalizeBrazilPhone(f.phone)
-  const dupDoc = docDigits ? clients.find((c) => c.document === docDigits) : undefined
-  const dupPhone = phoneDigits.length >= 10 ? clients.find((c) => c.phone === phoneDigits || c.whatsapp === phoneDigits) : undefined
+  const dupDoc = docDigits ? clients.find((c) => c.id !== initialClient?.id && c.document === docDigits) : undefined
+  const dupPhone = phoneDigits.length >= 10 ? clients.find((c) => c.id !== initialClient?.id && (c.phone === phoneDigits || c.whatsapp === phoneDigits)) : undefined
 
   const validate = () => validateClientFields({
     ...f,
     whatsapp: f.sameWa ? f.phone : f.whatsapp,
-  }, clients)
+  }, clients.filter((client) => client.id !== initialClient?.id))
   const liveErrors = tried ? validate() : errors
 
   const close = () => {
     if (dirty && !confirm('Descartar o cadastro em andamento?')) return
-    setF(emptyForm)
+    setF(initialForm)
     setErrors({})
     setTried(false)
     onClose()
@@ -205,27 +234,29 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
       toast({ tone: 'erro', title: 'Revise os campos destacados', body: `${Object.keys(e).length} campo(s) com pendência.` })
       return
     }
-    const id = newId()
+    const id = initialClient?.id ?? newId()
     const client: Client = {
-      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : normalizeBrazilPhone(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: currentUserId, notes: f.notes.trim(), createdAt: today, active: true, demo: false,
+      id, name: f.name.trim(), tradeName: f.tradeName.trim(), document: docDigits, phone: phoneDigits, whatsapp: f.sameWa ? phoneDigits : normalizeBrazilPhone(f.whatsapp), email: f.email.trim(), address: f.address.trim(), city: f.city.trim(), region: f.region, type: f.type, source: f.source, ownerId: initialClient?.ownerId ?? currentUserId, notes: f.notes.trim(), createdAt: initialClient?.createdAt ?? today, active: initialClient?.active ?? true, demo: initialClient?.demo ?? false,
     }
-    const site: Site | undefined = f.siteName.trim()
+    const site: Site | undefined = !initialClient && f.siteName.trim()
       ? { id: newId(), clientId: id, name: f.siteName.trim(), address: f.siteAddress.trim(), city: f.city.trim(), region: f.region, contactName: f.siteContact.trim(), contactPhone: normalizeBrazilPhone(f.sitePhone), serviceType: '', accessNotes: '', restrictions: f.siteRestrictions.trim(), demo: false }
       : undefined
     try {
-      await addClient(client, site)
+      if (initialClient) await updateClient(client)
+      else await addClient(client, site)
     } catch (error) {
-      toast({ tone: 'erro', title: 'Falha ao cadastrar cliente', body: error instanceof Error ? error.message : 'Erro ao salvar no banco.' })
+      toast({ tone: 'erro', title: initialClient ? 'Falha ao atualizar cliente' : 'Falha ao cadastrar cliente', body: error instanceof Error ? error.message : 'Erro ao salvar no banco.' })
       return
     }
-    setF(emptyForm)
+    setF(initialForm)
     setTried(false)
     onClose()
-    onCreated(id)
+    if (initialClient) onUpdated?.()
+    else onCreated?.(id)
   }
 
   return (
-    <Drawer open={open} onClose={close} title="Novo cliente" wide footer={<><Button onClick={close}>Cancelar</Button><Button variant="primary" onClick={submit}>Salvar cliente</Button></>}>
+    <Drawer open={open} onClose={close} title={initialClient ? "Editar cliente" : "Novo cliente"} wide footer={<><Button onClick={close}>Cancelar</Button><Button variant="primary" onClick={submit}>{initialClient ? "Salvar alterações" : "Salvar cliente"}</Button></>}>
       <div className="space-y-6">
         <p className="text-sm text-muted">Campos com <span className="text-brand">*</span> são obrigatórios. O restante pode ser completado depois.</p>
         <div className="grid gap-4 sm:grid-cols-2">
@@ -280,7 +311,7 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
           <Field label="Observações" error={liveErrors.notes} hint="Ex.: prefere contato pela manhã; falar com o setor de compras." className="sm:col-span-2">{(id) => <textarea id={id} rows={2} maxLength={2000} className={cx(inputCls(!!liveErrors.notes), 'h-auto py-2')} value={f.notes} placeholder="Ex.: Prefere contato pela manhã; falar com compras." onChange={(e) => up('notes', e.target.value)} />}</Field>
         </div>
 
-        <div className="rounded-lg border border-dashed border-line p-4">
+        {!initialClient && <div className="rounded-lg border border-dashed border-line p-4">
           <h3 className="mb-1 flex items-center gap-2 text-lg font-bold uppercase"><Building2 className="h-5 w-5 text-brand" /> Primeira obra (opcional)</h3>
           <p className="mb-4 text-sm text-muted">Já cadastre a obra para orçar em seguida.</p>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -291,13 +322,13 @@ function ClientForm({ open, onClose, onCreated }: { open: boolean; onClose: () =
             <Field label="Restrições de acesso e descarga" error={liveErrors.siteRestrictions} hint="Anote regras que afetam a entrada do caminhão ou o horário de serviço." className="sm:col-span-2">{(id) => <input id={id} maxLength={500} className={inputCls(!!liveErrors.siteRestrictions)} value={f.siteRestrictions} placeholder="Ex.: descarga até 16h; entrada pela Rua B; altura máxima 3,5 m." onChange={(e) => up('siteRestrictions', e.target.value)} />}</Field>
           </div>
         </div>
-      </div>
+      </div>}
     </Drawer>
   )
 }
 
-function ClientDetail({ client, onClose }: { client: Client; onClose: () => void }) {
-  const { sites, quotes, receivables, opportunities } = useStore()
+function ClientDetail({ client, canManage, onEdit, onArchive, onRestore, onClose }: { client: Client; canManage: boolean; onEdit: () => void; onArchive: () => Promise<void>; onRestore: () => Promise<void>; onClose: () => void }) {
+  const { sites, quotes, receivables, opportunities, toast } = useStore()
   const own = sites.filter((s) => s.clientId === client.id)
   const cq = quotes.filter((q) => q.clientId === client.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt))
   const accepted = cq.filter((q) => q.status === 'Aceito')
@@ -309,7 +340,7 @@ function ClientDetail({ client, onClose }: { client: Client; onClose: () => void
   const wa = whatsappUrl(client.whatsapp || client.phone, `Olá, ${client.name.split(' ')[0]}! Tudo bem?`)
 
   return (
-    <Drawer open onClose={onClose} title="Cliente" wide>
+    <Drawer open onClose={onClose} title="Cliente" wide footer={canManage ? <div className="flex flex-wrap justify-between gap-2">{client.active ? <Button variant="danger" onClick={() => { void onArchive().catch((error) => toast({ tone: 'erro', title: 'Não foi possível arquivar o cliente', body: error instanceof Error ? error.message : 'Erro ao atualizar o banco.' })) }}><Archive className="h-4 w-4" /> Arquivar cliente</Button> : <Button onClick={() => { void onRestore().catch((error) => toast({ tone: 'erro', title: 'Não foi possível reativar o cliente', body: error instanceof Error ? error.message : 'Erro ao atualizar o banco.' })) }}><RotateCcw className="h-4 w-4" /> Reativar cliente</Button>}<div className="flex gap-2"><Button onClick={onClose}>Fechar</Button><Button variant="primary" onClick={onEdit}><Pencil className="h-4 w-4" /> Editar cliente</Button></div></div> : <Button onClick={onClose}>Fechar</Button>}>
       <div className="space-y-6">
         <div>
           <div className="flex flex-wrap items-center gap-2">
