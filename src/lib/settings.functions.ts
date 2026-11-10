@@ -252,9 +252,16 @@ export const saveSettings = createServerFn({ method: 'POST' })
     if (cnpj && !isValidCNPJ(cnpj)) {
       throw new Error('Informe um CNPJ válido com 14 dígitos.')
     }
+    const logoUrl = settings.company.logoUrl?.trim() ?? ''
+    if (logoUrl) {
+      let parsedLogoUrl: URL
+      try { parsedLogoUrl = new URL(logoUrl) } catch { throw new Error('A logo precisa ser uma URL HTTPS válida.') }
+      if (parsedLogoUrl.protocol !== 'https:') throw new Error('A logo precisa usar HTTPS.')
+    }
     settings.company = {
       ...settings.company,
       cnpj: cnpj ? onlyDigits(cnpj) : null,
+      logoUrl: logoUrl || null,
     }
     return {
       settings,
