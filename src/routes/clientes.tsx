@@ -321,8 +321,7 @@ function ClientForm({ open, onClose, onCreated, initialClient, onUpdated }: { op
             <Field label="Telefone do contato" error={liveErrors.sitePhone} hint="Opcional. Ex.: (61) 98888-7777.">{(id) => <input id={id} inputMode="tel" maxLength={20} className={inputCls(!!liveErrors.sitePhone)} value={f.sitePhone} placeholder="(61) 98888-7777" onChange={(e) => up('sitePhone', e.target.value)} onBlur={() => up('sitePhone', formatPhone(f.sitePhone))} />}</Field>
             <Field label="Restrições de acesso e descarga" error={liveErrors.siteRestrictions} hint="Anote regras que afetam a entrada do caminhão ou o horário de serviço." className="sm:col-span-2">{(id) => <input id={id} maxLength={500} className={inputCls(!!liveErrors.siteRestrictions)} value={f.siteRestrictions} placeholder="Ex.: descarga até 16h; entrada pela Rua B; altura máxima 3,5 m." onChange={(e) => up('siteRestrictions', e.target.value)} />}</Field>
           </div>
-        </div>
-      </div>}
+        </div>}
       </div>
     </Drawer>
   )
