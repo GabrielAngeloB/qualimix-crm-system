@@ -584,9 +584,7 @@ function RemainingSettingsEditor({
     const values = draft[key].filter((_, i) => i !== index)
     if (key === 'regions') update((next) => {
       next.regions = values
-      const removed = next.officialRules.freight.regions.find((region) => region.name === item)
       next.officialRules.freight.regions = next.officialRules.freight.regions.filter((region) => region.name !== item)
-      if (removed) next.officialRules.freight.regions = next.officialRules.freight.regions
     })
     else updateList(key, values)
   }
@@ -596,7 +594,15 @@ function RemainingSettingsEditor({
     if (target < (key === 'leadSources' ? 1 : 0) || target >= draft[key].length) return
     const values = [...draft[key]]
     ;[values[index], values[target]] = [values[target], values[index]]
-    updateList(key, values)
+    if (key === 'regions') update((next) => {
+      next.regions = values
+      const byName = new Map(next.officialRules.freight.regions.map((region) => [region.name, region]))
+      next.officialRules.freight.regions = values.flatMap((name) => {
+        const region = byName.get(name)
+        return region ? [region] : []
+      })
+    })
+    else updateList(key, values)
   }
   const save = async () => {
     if (!dirty || Object.values(invalidFields).some(Boolean) || Object.values(listErrors).some(Boolean)) return
