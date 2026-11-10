@@ -194,10 +194,13 @@ function buildLoadedSettings(
   })
 }
 
-async function loadProductRows(): Promise<ProductRow[]> {
+async function loadProductRows(canViewSales: boolean): Promise<ProductRow[]> {
   const result = await getPool().query<ProductRow>(
-    'SELECT id, codigo, nome, categoria, unidade, descricao, preco_base, fck, acabamento, ativo, valido_desde, observacoes_internas ' +
+    'SELECT id, codigo, nome, categoria, unidade, descricao, ' +
+    'CASE WHEN $1 THEN preco_base ELSE NULL::numeric END AS preco_base, ' +
+    'fck, acabamento, ativo, valido_desde, observacoes_internas ' +
     'FROM public.produtos ORDER BY categoria, nome',
+    [canViewSales],
   )
   return result.rows
 }
@@ -210,12 +213,14 @@ export const loadSettings = createServerFn({ method: 'GET' }).handler(async (): 
   const profile = await requireCurrentProfile()
   const isAdmin = profile.perfil === 'admin' || profile.role === 'administrador'
   const canViewSales = isAdmin || profile.role === 'comercial' || profile.role === 'consulta'
-  const products = await loadProductRows()
+  const products = await loadProductRows(canViewSales)
 
   try {
     const result = await getPool().query<{ config: Record<string, unknown>; updated_at: string }>(
-      'SELECT to_jsonb(c) AS config, c.updated_at::text AS updated_at ' +
+      'SELECT CASE WHEN $1 THEN to_jsonb(c) ELSE to_jsonb(c) - \'regras_oficiais\' END AS config, ' +
+      'c.updated_at::text AS updated_at ' +
       "FROM public.configuracoes c WHERE c.id = 'default' LIMIT 1",
+      [canViewSales],
     )
     const row = result.rows[0]
     return buildLoadedSettings(
