@@ -43,4 +43,43 @@ describe('app settings', () => {
     configured.company.tradeName = ' '
     expect(() => validateSettings(configured)).toThrow(/nome comercial/i)
   })
+
+  it('validates the editable official commercial rules', () => {
+    const configured = createDefaultSettings()
+    configured.officialRules.maxDiscountPctWithoutApproval = 100
+    configured.officialRules.validityDays = 365
+    configured.officialRules.quantityDecimals = 4
+    configured.officialRules.minVolume.chargeDifference = true
+    expect(() => validateSettings(configured)).not.toThrow()
+
+    configured.officialRules.maxDiscountPctWithoutApproval = 100.01
+    expect(() => validateSettings(configured)).toThrow(/desconto sem aprovação/i)
+    configured.officialRules.maxDiscountPctWithoutApproval = 10
+    configured.officialRules.validityDays = 366
+    expect(() => validateSettings(configured)).toThrow(/validade padrão/i)
+    configured.officialRules.validityDays = 30
+    configured.officialRules.quantityDecimals = 5
+    expect(() => validateSettings(configured)).toThrow(/casas decimais/i)
+  })
+
+  it('keeps support lists valid and protects the default lead source', () => {
+    const configured = createDefaultSettings()
+    configured.leadSources[0] = 'Origem alterada'
+    expect(() => validateSettings(configured)).toThrow(/Não informado/i)
+
+    configured.leadSources[0] = 'Não informado'
+    configured.regions.push(configured.regions[0])
+    expect(() => validateSettings(configured)).toThrow(/nomes repetidos/i)
+
+    configured.regions.pop()
+    configured.lossReasons[0] = ' '
+    expect(() => validateSettings(configured)).toThrow(/nomes vazios/i)
+  })
+
+  it('requires freight region rules to match the support region list', () => {
+    const configured = createDefaultSettings()
+    configured.officialRules.freight.regions[0].name = 'Região inexistente'
+    expect(() => validateSettings(configured)).toThrow(/regiões de frete/i)
+  })
+
 })
