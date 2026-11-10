@@ -291,6 +291,13 @@ function hasDuplicates(values: string[]): boolean {
 }
 
 export function validateSettings(value: AppSettings): AppSettings {
+  const listInputs = [value.leadSources, value.regions, value.lossReasons, value.clientTypes, value.elementTypes]
+  if (listInputs.some((list) => !Array.isArray(list) || list.some((item) => typeof item !== 'string' || !item.trim()))) {
+    throw new Error('Os cadastros de apoio não podem conter nomes vazios.')
+  }
+  if (listInputs.some((list) => hasDuplicates(list))) {
+    throw new Error('Remova os nomes repetidos das listas de apoio antes de confirmar.')
+  }
   const next = normalizeSettings(value)
   if (!next.company.tradeName.trim()) throw new Error('Informe o nome comercial da empresa.')
   if (next.catalog.some((item) => !item.id.trim() || !item.code.trim() || !item.name.trim())) throw new Error('Cada produto precisa ter código e nome.')
