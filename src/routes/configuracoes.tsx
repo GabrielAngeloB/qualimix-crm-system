@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { createFileRoute, useBlocker } from '@tanstack/react-router'
 import { CircleCheck, Lock, TriangleAlert } from 'lucide-react'
 import type { AppSettings, CompanySettings } from '../data/settings'
@@ -66,7 +67,7 @@ function isHttpsUrl(raw: string): boolean {
   }
 }
 
-function PendingValue({ value, children }: { value: string | null | undefined; children?: React.ReactNode }) {
+function PendingValue({ value, children }: { value: string | null | undefined; children?: ReactNode }) {
   return value?.trim()
     ? <>{children ?? value}</>
     : <Badge tone="warn">A preencher</Badge>
@@ -124,7 +125,7 @@ function CompanySettingsEditor({
     setLogoPreviewFailed(false)
   }
 
-  const save = async (event: React.FormEvent<HTMLFormElement>) => {
+  const save = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (hasErrors || !dirty) return
     setSaving(true)
