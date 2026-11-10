@@ -17,6 +17,7 @@ import {
 const usernamePattern = /^[a-z0-9][a-z0-9._-]{2,29}$/
 
 const assignableRoles = ['comercial', 'operacao', 'financeiro', 'consulta'] as const
+const PROTECTED_ADMIN_USERNAME = 'admin'
 type AssignableRole = typeof assignableRoles[number]
 function normalizeAssignedRole(value: unknown): AssignableRole {
   if (typeof value !== 'string' || !assignableRoles.includes(value as AssignableRole)) {
@@ -240,13 +241,21 @@ export const updateUserProfile = createServerFn({ method: 'POST' })
     await withTransaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
       const result = await client.query<any>(
-        'SELECT id, nome, perfil, ativo FROM public.perfis WHERE id=$1 FOR UPDATE',
+        'SELECT p.id, p.nome, p.perfil, p.ativo, u.username FROM public.perfis p ' +
+        'JOIN public.usuarios u ON u.id = p.id WHERE p.id=$1 FOR UPDATE OF p',
         [data.id],
       )
       const target = result.rows[0]
       if (!target) throw new Error('Usuário não encontrado.')
       const wasAdmin = target.perfil === 'admin' || target.perfil === 'administrador'
       const nextRole = data.role ?? target.perfil
+      if (
+        target.username === PROTECTED_ADMIN_USERNAME &&
+        nextRole !== 'admin' &&
+        nextRole !== 'administrador'
+      ) {
+        throw new Error('O usuário padrão "admin" não pode perder o perfil de administrador.')
+      }
       if (current.id === data.id && target.perfil !== nextRole) {
         throw new Error('Por segurança, não altere o próprio perfil de acesso. Outro administrador deve fazer isso.')
       }
@@ -289,11 +298,15 @@ export const setUserActive = createServerFn({ method: 'POST' })
     await withTransaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
       const targetResult = await client.query(
-        'SELECT p.perfil, p.ativo FROM public.perfis p WHERE p.id = $1 FOR UPDATE',
+        'SELECT p.perfil, p.ativo, u.username FROM public.perfis p ' +
+        'JOIN public.usuarios u ON u.id = p.id WHERE p.id = $1 FOR UPDATE OF p',
         [data.id],
       )
       const target = targetResult.rows[0]
       if (!target) throw new Error('Usuário não encontrado.')
+      if (target.username === PROTECTED_ADMIN_USERNAME && !data.active) {
+        throw new Error('O usuário padrão "admin" é protegido e não pode ser desativado.')
+      }
 
       const isAdmin = target.perfil === 'admin' || target.perfil === 'administrador'
       if (!data.active && isAdmin && target.ativo) {
@@ -330,11 +343,15 @@ export const deleteUser = createServerFn({ method: 'POST' })
     await withTransaction(async (client) => {
       await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
       const targetResult = await client.query(
-        'SELECT p.perfil, p.ativo FROM public.perfis p WHERE p.id = $1 FOR UPDATE',
+        'SELECT p.perfil, p.ativo, u.username FROM public.perfis p ' +
+        'JOIN public.usuarios u ON u.id = p.id WHERE p.id = $1 FOR UPDATE OF p',
         [data.id],
       )
       const target = targetResult.rows[0]
       if (!target) throw new Error('Usuário não encontrado.')
+      if (target.username === PROTECTED_ADMIN_USERNAME) {
+        throw new Error('O usuário padrão "admin" é protegido e não pode ser excluído ou desativado.')
+      }
       if (target.perfil === 'admin' || target.perfil === 'administrador') {
         const countResult = await client.query(
           "SELECT count(*)::int AS count FROM public.perfis WHERE ativo = true AND perfil IN ('admin', 'administrador')",

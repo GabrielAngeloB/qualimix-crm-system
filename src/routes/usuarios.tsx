@@ -119,10 +119,14 @@ function UsersPage() {
           <tbody>{users.map((user) => <tr key={user.id} className="border-b border-line last:border-0">
             <td className="px-4 py-3"><strong>{user.nome}</strong><span className="block text-xs text-muted">@{user.username}</span></td>
             <td className="px-4 py-3">{user.perfil === 'admin' ? 'Administrador' : user.role === 'operacao' ? 'Operação' : user.role === 'financeiro' ? 'Financeiro' : user.role === 'consulta' ? 'Consulta' : 'Comercial'}</td>
-            <td className="px-4 py-3">{user.ativo ? 'Ativo' : 'Desativado'}</td>
+            <td className="px-4 py-3">{user.ativo ? 'Ativo' : 'Desativado'}{user.username === 'admin' && <span className="ml-2 inline-flex rounded-full bg-brand-soft px-2 py-0.5 text-[10px] font-bold uppercase text-brand">Conta protegida</span>}</td>
             <td className="px-4 py-3 text-right"><div className="inline-flex flex-wrap justify-end gap-3">
               <button onClick={() => startEdit(user)} className="inline-flex items-center gap-1 font-semibold text-brand hover:underline"><Pencil className="h-3.5 w-3.5" /> Editar</button>
-              <button onClick={() => void toggle(user)} className="font-semibold text-brand hover:underline">{user.ativo ? 'Desativar e revogar sessões' : 'Ativar'}</button>
+              {user.username === 'admin' ? (
+                <span className="text-xs font-semibold text-muted" title="A conta principal não pode ser desativada nem excluída.">Conta principal protegida</span>
+              ) : (
+                <button onClick={() => void toggle(user)} className="font-semibold text-brand hover:underline">{user.ativo ? 'Desativar e revogar sessões' : 'Ativar'}</button>
+              )}
             </div></td>
           </tr>)}</tbody>
         </table>
