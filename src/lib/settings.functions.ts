@@ -160,7 +160,7 @@ function buildLoadedSettings(
   const settings = normalizeSettings({
     catalog: products.map((product) => mapProduct(product, canViewSales, defaults.catalog)),
     officialRules: canViewSales && row ? rulesFromDatabase(row.regras_oficiais) : defaults.officialRules,
-    paymentMethods: paymentMethods.length ? paymentMethods : defaults.paymentMethods,
+    paymentMethods: row ? paymentMethods : defaults.paymentMethods,
     company: {
       tradeName: row?.nome_comercial ?? defaults.company.tradeName,
       legalName: row?.razao_social ?? null,
