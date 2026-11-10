@@ -26,7 +26,6 @@ type ProductRow = {
   unidade: CatalogItem['unit']
   descricao: string | null
   preco_base: string | number | null
-  preco_demo: string | number | null
   fck: string | number | null
   acabamento: CatalogItem['finish'] | null
   ativo: boolean
@@ -104,7 +103,7 @@ function rulesFromDatabase(value: unknown): CommercialRules {
   }
 }
 
-function mapProduct(row: ProductRow, canViewSales: boolean): CatalogItem {
+function mapProduct(row: ProductRow, canViewSales: boolean, defaultCatalog: CatalogItem[]): CatalogItem {
   return {
     id: String(row.id),
     code: row.codigo,
@@ -113,8 +112,8 @@ function mapProduct(row: ProductRow, canViewSales: boolean): CatalogItem {
     unit: row.unidade,
     description: row.descricao ?? '',
     basePrice: canViewSales ? nullableNumber(row.preco_base) : null,
-    // Valores de demonstração continuam definidos no código; não são lidos do banco.
-    demoPrice: canViewSales ? nullableNumber(row.preco_demo) : null,
+    // Preços de demonstração permanecem exclusivamente no catálogo do código.
+    demoPrice: canViewSales ? defaultCatalog.find((item) => item.id === row.id)?.demoPrice ?? null : null,
     ...(row.fck == null ? {} : { fck: Number(row.fck) }),
     ...(row.acabamento == null ? {} : { finish: row.acabamento }),
     active: Boolean(row.ativo),
@@ -159,7 +158,7 @@ function buildLoadedSettings(
   }))
 
   const settings = normalizeSettings({
-    catalog: products.map((product) => mapProduct(product, canViewSales)),
+    catalog: products.map((product) => mapProduct(product, canViewSales, defaults.catalog)),
     officialRules: canViewSales && row ? rulesFromDatabase(row.regras_oficiais) : defaults.officialRules,
     paymentMethods: paymentMethods.length ? paymentMethods : defaults.paymentMethods,
     company: {
@@ -197,7 +196,7 @@ function buildLoadedSettings(
 
 async function loadProductRows(): Promise<ProductRow[]> {
   const result = await getPool().query<ProductRow>(
-    'SELECT id, codigo, nome, categoria, unidade, descricao, preco_base, preco_demo, fck, acabamento, ativo, valido_desde, observacoes_internas ' +
+    'SELECT id, codigo, nome, categoria, unidade, descricao, preco_base, fck, acabamento, ativo, valido_desde, observacoes_internas ' +
     'FROM public.produtos ORDER BY categoria, nome',
   )
   return result.rows
