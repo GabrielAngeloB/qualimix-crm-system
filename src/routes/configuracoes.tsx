@@ -435,7 +435,7 @@ type RuleNumericFieldProps = {
   suffix?: string
 }
 
-function RuleNumericField({ id, label, value, onChange, onValidityChange, min = 0, max, integer = false, suffix }: RuleNumericFieldProps) {
+function RuleNumericField({ id, label, value, onChange, onValidityChange, min = 0, max, integer = false, required = false, suffix }: RuleNumericFieldProps) {
   const [raw, setRaw] = useState(value === null ? '' : String(value).replace('.', ','))
   const [error, setError] = useState('')
   useEffect(() => {
