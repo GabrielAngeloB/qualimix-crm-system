@@ -767,8 +767,9 @@ function Configuracoes() {
   const isAdmin = currentRole === 'admin' || currentRole === 'administrador'
   const pend = pendingSettings(settings)
   const [companyDirty, setCompanyDirty] = useState(false)
+  const [settingsDirty, setSettingsDirty] = useState(false)
   const [dirtyProducts, setDirtyProducts] = useState<Set<string>>(() => new Set())
-  const hasUnsavedChanges = companyDirty || dirtyProducts.size > 0
+  const hasUnsavedChanges = companyDirty || settingsDirty || dirtyProducts.size > 0
 
   const onProductDirtyChange = useCallback((id: string, dirty: boolean) => {
     setDirtyProducts((current) => {
@@ -793,26 +794,6 @@ function Configuracoes() {
     withResolver: true,
   })
 
-  const ruleRows: [string, number | null, number | null, ((n: number) => string)?][] = [
-    ['Frete — valor fixo', settings.officialRules.freight.fixed, settings.demoRules.freight.fixed],
-    ['Frete — por km', settings.officialRules.freight.perKm, settings.demoRules.freight.perKm],
-    ...settings.officialRules.freight.regions.map((region): [string, number | null, number | null] => [
-      'Frete — ' + region.name,
-      region.price,
-      settings.demoRules.freight.regions.find((demo) => demo.id === region.id)?.price ?? null,
-    ]),
-    ['Bombeamento — fixo', settings.officialRules.pumping.fixed, settings.demoRules.pumping.fixed],
-    ['Bombeamento — por m³', settings.officialRules.pumping.perM3, settings.demoRules.pumping.perM3],
-    ['Bombeamento — por hora', settings.officialRules.pumping.perHour, settings.demoRules.pumping.perHour],
-    ['Bombeamento — mínimo', settings.officialRules.pumping.minimum, settings.demoRules.pumping.minimum],
-    ['Volume mínimo (m³)', settings.officialRules.minVolume.m3, settings.demoRules.minVolume.m3, (n) => num(n, 1) + ' m³'],
-    ['Estadia — tolerância', settings.officialRules.stay.toleranceMin, settings.demoRules.stay.toleranceMin, (n) => n + ' min'],
-    ['Estadia — por hora', settings.officialRules.stay.perHour, settings.demoRules.stay.perHour],
-    ['Piso — área mínima', settings.officialRules.floor.minArea, settings.demoRules.floor.minArea, (n) => num(n, 0) + ' m²'],
-    ['Desconto sem aprovação', settings.officialRules.maxDiscountPctWithoutApproval, settings.demoRules.maxDiscountPctWithoutApproval, (n) => n + '%'],
-    ['Validade padrão', settings.officialRules.validityDays, settings.demoRules.validityDays, (n) => n + ' dias'],
-  ]
-
   const products = settings.catalog
 
   return (
@@ -823,7 +804,7 @@ function Configuracoes() {
         <div className="mb-5 flex flex-wrap items-center gap-3 rounded-md border border-warn/40 bg-warn-soft p-3 text-sm">
           <TriangleAlert className="h-4 w-4 shrink-0 text-warn" />
           <p className="flex-1"><strong>Há alterações não salvas.</strong> Salve ou descarte antes de sair desta página.</p>
-          <Badge tone="warn">{(companyDirty ? 1 : 0) + dirtyProducts.size} item(ns) alterado(s)</Badge>
+          <Badge tone="warn">{(companyDirty ? 1 : 0) + (settingsDirty ? 1 : 0) + dirtyProducts.size} item(ns) alterado(s)</Badge>
         </div>
       )}
 
@@ -909,51 +890,7 @@ function Configuracoes() {
         )}
       </Card>
 
-      <div className="mb-6 grid gap-6 lg:grid-cols-2">
-        <Card>
-          <CardHeader title="Regras comerciais" subtitle="Cada regra é independente. Regras oficiais não confirmadas permanecem pendentes." />
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-line bg-surface-2 text-xs uppercase tracking-wide text-muted">
-                <tr><th className="px-4 py-2">Regra</th><th className="px-4 py-2 text-right">Oficial</th><th className="px-4 py-2 text-right">Demo</th></tr>
-              </thead>
-              <tbody>
-                {ruleRows.map(([label, official, demo, formatter]) => (
-                  <tr key={label} className="border-b border-line last:border-0">
-                    <td className="px-4 py-2">{label}</td>
-                    <td className="px-4 py-2 text-right">{v(official, formatter)}</td>
-                    <td className="px-4 py-2 text-right text-muted">{v(demo, formatter)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        <div className="space-y-6">
-          <Card>
-            <CardHeader title="Formas de pagamento" subtitle="Modalidades oficiais configuradas para a Qualimix." />
-            <ul className="flex flex-wrap gap-2 p-5">
-              {settings.paymentMethods.map((method) => (
-                <li key={method.id}>
-                  <Badge tone={method.enabledOfficial ? 'ok' : 'warn'}>
-                    {method.label}: {method.enabledOfficial === null ? 'a confirmar' : method.enabledOfficial ? 'aceita' : 'não aceita'}
-                  </Badge>
-                </li>
-              ))}
-            </ul>
-          </Card>
-          <Card>
-            <CardHeader title="Cadastros de apoio" />
-            <div className="space-y-3 p-5 text-sm">
-              <p><strong>Origens de lead:</strong> {settings.leadSources.join(', ')}</p>
-              <p><strong>Regiões atendidas:</strong> {settings.regions.join(', ')}</p>
-              <p><strong>Etapas do funil:</strong> {settings.funnelStages.map((stage) => stage.label).join(' → ')}</p>
-              <p><strong>Numeração de orçamentos:</strong> ORC-AAAA-NNNN, sequencial e única</p>
-            </div>
-          </Card>
-        </div>
-      </div>
+      <RemainingSettingsEditor settings={settings} isAdmin={isAdmin} settingsReady={settingsReady} onSave={saveSettings} onDirtyChange={setSettingsDirty} onToast={onToast} />
 
       <Card>
         <CardHeader title="Usuários e permissões" subtitle="Perfis previstos. As permissões são aplicadas no servidor e no banco de dados, não apenas na interface." action={<Lock className="h-5 w-5 text-brand" />} />
