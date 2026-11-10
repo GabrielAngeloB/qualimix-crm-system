@@ -41,7 +41,7 @@ function Tarefas() {
   const { tasks, opportunities, clients, saveTask, toast, currentRole, views } = useStore()
   const today = todayInSaoPaulo()
   const canEdit = currentRole === 'administrador' || currentRole === 'comercial'
-  const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade)
+  const initialOpportunity = opportunities.find((item) => item.id === search.oportunidade && !item.archived)
   const [form, setForm] = useState(() => ({
     ...blankForm(),
     title: initialOpportunity
@@ -192,7 +192,7 @@ function Tarefas() {
               {(id) => (
                 <select id={id} className={inputCls()} value={form.opportunityId} onChange={(event) => setForm((current) => ({ ...current, opportunityId: event.target.value }))}>
                   <option value="">Tarefa geral, sem oportunidade</option>
-                  {opportunities.map((opportunity) => {
+                  {opportunities.filter((opportunity) => !opportunity.archived).map((opportunity) => {
                     const client = clients.find((item) => item.id === opportunity.clientId)
                     return <option key={opportunity.id} value={opportunity.id}>{opportunity.title}{client ? ' · ' + client.name : ''}</option>
                   })}

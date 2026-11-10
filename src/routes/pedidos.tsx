@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { Link, createFileRoute } from '@tanstack/react-router'
-import { ClipboardList, CalendarDays, Wallet, Plus, Pencil, Save, X } from 'lucide-react'
+import { ClipboardList, CalendarDays, Wallet, Plus, Pencil, Save, X, XCircle } from 'lucide-react'
 import { useStore } from '../data/store'
 import { today } from '../lib/clock'
 import { brlCents, dateBR, parseDecimal } from '../lib/format'
@@ -17,7 +17,7 @@ export const Route = createFileRoute('/pedidos')({
 })
 
 function Pedidos() {
-  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, jobBalance, toast, currentRole, views } = useStore()
+  const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, cancelWorkOrder, jobBalance, toast, currentRole, views } = useStore()
   const canCreateOrder = currentRole === 'administrador' || currentRole === 'comercial'
   const canEditOrderAmount = currentRole === 'administrador' || currentRole === 'comercial'
   const [dueDates, setDueDates] = useState<Record<string, string>>({})
@@ -50,6 +50,22 @@ function Pedidos() {
       setAmountDraft('')
     } catch (error) {
       toast({ tone: 'erro', title: 'Não foi possível atualizar o valor', body: error instanceof Error ? error.message : 'Revise o financeiro do pedido.' })
+    }
+  }
+
+  const cancelOrder = async (orderId: string, orderNumber: string) => {
+    const reason = window.prompt(`Informe o motivo do cancelamento do pedido ${orderNumber}:`)
+    if (reason === null) return
+    if (reason.trim().length < 5) {
+      toast({ tone: 'erro', title: 'Motivo obrigatório', body: 'Descreva o motivo com pelo menos 5 caracteres.' })
+      return
+    }
+    if (!window.confirm('Confirmar cancelamento? O recebível sem pagamentos será cancelado e as programações pendentes serão marcadas como canceladas.')) return
+    try {
+      await cancelWorkOrder(orderId, reason.trim())
+      toast({ tone: 'info', title: 'Pedido cancelado', body: orderNumber + ' · histórico preservado.' })
+    } catch (error) {
+      toast({ tone: 'erro', title: 'Não foi possível cancelar o pedido', body: error instanceof Error ? error.message : 'Revise o financeiro e a situação operacional.' })
     }
   }
 
@@ -127,7 +143,7 @@ function Pedidos() {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[850px] text-left text-sm">
+            <table className="w-full min-w-[980px] text-left text-sm">
               <thead className="border-b border-line bg-surface-2 text-xs text-muted">
                 <tr>
                   <th className="px-4 py-3">Pedido</th>
@@ -137,6 +153,7 @@ function Pedidos() {
                   <th className="px-4 py-3 text-right">Saldo da obra</th>
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Origem</th>
+                  {canEditOrderAmount && <th className="px-4 py-3 text-right">Ações</th>}
                 </tr>
               </thead>
               <tbody>
@@ -192,8 +209,9 @@ function Pedidos() {
                       </td>
                       <td className="px-4 py-3 text-right tabular">{brlCents(costCents)}</td>
                       <td className={cx('px-4 py-3 text-right font-semibold tabular', balance < 0 && 'text-brand')}>{brlCents(balance)}</td>
-                      <td className="px-4 py-3"><Badge>{order.status}</Badge></td>
+                      <td className="px-4 py-3"><Badge>{order.status}</Badge>{order.cancellationReason && <span className="mt-1 block max-w-[220px] text-xs text-muted" title={order.cancellationReason}>Motivo: {order.cancellationReason}</span>}</td>
                       <td className="px-4 py-3"><Link to="/orcamentos" className="text-brand hover:underline">{order.quoteId}</Link></td>
+                      {canEditOrderAmount && <td className="px-4 py-3 text-right">{order.status !== 'Cancelada' && <Button size="sm" variant="danger" onClick={() => void cancelOrder(order.id, order.number)}><XCircle className="h-4 w-4" /> Cancelar pedido</Button>}</td>}
                     </tr>
                   )
                 })}

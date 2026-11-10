@@ -32,6 +32,7 @@ const nav: { group: string; items: NavItem[] }[] = [
     group: 'Comercial',
     items: [
       { label: 'Clientes e obras', icon: Users, to: '/clientes' },
+      { label: 'Obras', icon: Building2, to: '/obras' },
       { label: 'Funil comercial', icon: SquareKanban, to: '/funil' },
       { label: 'Tarefas e retornos', icon: Bell, to: '/tarefas' },
       { label: 'Orçamentos', icon: FileText, to: '/orcamentos' },

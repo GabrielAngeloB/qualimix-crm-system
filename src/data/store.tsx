@@ -15,12 +15,12 @@ import {
 import {
   loadOperationalRecords, createWorkOrderFromQuoteOnServer, updateWorkOrderAmountOnServer,
   addExpenseOnServer, registerPaymentOnServer, cancelFinancialEntryOnServer,
-  saveProfessionalOnServer, saveScheduleEventOnServer, saveTaskOnServer,
+  saveProfessionalOnServer, saveScheduleEventOnServer, saveTaskOnServer, cancelWorkOrderOnServer,
   type OperationalRecords,
 } from '../lib/operations.functions'
 import {
-  loadCrmData, persistClient, persistOpportunity, persistQuote,
-  createOpportunity as createOpportunityOnServer,
+  loadCrmData, persistClient, updateClientOnServer, setClientActiveOnServer, persistOpportunity, persistQuote,
+  createOpportunity as createOpportunityOnServer, setOpportunityArchived as setOpportunityArchivedOnServer,
   type OpportunityCreateInput, type QuoteSaveInput, type CrmData, type CrmViews,
 } from '../lib/crm.functions'
 import { createDefaultSettings, type AppSettings } from './settings'
@@ -43,6 +43,7 @@ interface Store {
   expenses: JobExpense[]; financialEntries: FinancialEntry[]; tasks: CommercialTask[]
   createWorkOrderFromQuote: (quoteId: string, dueDate: string, method: string) => Promise<WorkOrder>
   updateWorkOrderAmount: (id: string, amountCents: number) => Promise<void>
+  cancelWorkOrder: (id: string, reason: string) => Promise<void>
   jobBalance: (id: string) => number | null
   addExpense: (expense: JobExpense, dueDate: string, method: string) => Promise<void>
   registerPayment: (entryId: string, payment: FinancialPayment) => Promise<void>
@@ -51,7 +52,11 @@ interface Store {
   addScheduleEvent: (event: ScheduleEvent) => Promise<void>
   saveTask: (task: CommercialTask) => Promise<void>
   addClient: (c: Client, site?: Site) => Promise<void>
+  updateClient: (client: Client) => Promise<void>
+  archiveClient: (id: string) => Promise<void>
+  restoreClient: (id: string) => Promise<void>
   updateOpportunity: (id: string, patch: Partial<Opportunity>, historyText?: string) => void
+  setOpportunityArchived: (id: string, archived: boolean) => Promise<void>
   createOpportunity: (input: OpportunityCreateInput) => Promise<void>
   saveQuote: (input: QuoteSaveInput) => Promise<{ id: string; number: string; version: number }>
   settings: AppSettings
@@ -133,6 +138,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     toast({ tone: 'ok', title: 'Cliente cadastrado', body: 'Dados salvos no banco de dados.' })
   }, [refresh, toast])
 
+  const updateClient = useCallback(async (client: Client) => {
+    await updateClientOnServer({ data: client })
+    await refresh()
+    toast({ tone: 'ok', title: 'Cliente atualizado', body: 'Dados cadastrais salvos sem alterar os vínculos históricos.' })
+  }, [refresh, toast])
+
+  const archiveClient = useCallback(async (id: string) => {
+    await setClientActiveOnServer({ data: { id, active: false } })
+    await refresh()
+    toast({ tone: 'ok', title: 'Cliente arquivado', body: 'Obras, orçamentos, pedidos e histórico foram preservados.' })
+  }, [refresh, toast])
+
+  const restoreClient = useCallback(async (id: string) => {
+    await setClientActiveOnServer({ data: { id, active: true } })
+    await refresh()
+    toast({ tone: 'ok', title: 'Cliente reativado', body: 'O cliente voltou à lista de ativos.' })
+  }, [refresh, toast])
+
   const updateOpportunity = useCallback((id: string, patch: Partial<Opportunity>, historyText?: string) => {
     const update = (items: Opportunity[]) => items.map((item) => item.id === id
       ? { ...item, ...patch, history: historyText ? [{ at: new Date().toISOString(), by: dbData.currentUserId, text: historyText }, ...item.history] : item.history }
@@ -173,6 +196,16 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const updateWorkOrderAmount = useCallback(async (id: string, amountCents: number) => {
     await updateWorkOrderAmountOnServer({ data: { id, amountCents } })
+    await refresh()
+  }, [refresh])
+
+  const cancelWorkOrder = useCallback(async (id: string, reason: string) => {
+    await cancelWorkOrderOnServer({ data: { id, reason } })
+    await refresh()
+  }, [refresh])
+
+  const setOpportunityArchived = useCallback(async (id: string, archived: boolean) => {
+    await setOpportunityArchivedOnServer({ data: { id, archived } })
     await refresh()
   }, [refresh])
 
@@ -249,17 +282,17 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       workOrders: dbData.workOrders, scheduleEvents: dbData.scheduleEvents,
       professionals: dbData.professionals, expenses: dbData.expenses,
       financialEntries: dbData.financialEntries, tasks: dbData.tasks,
-      createWorkOrderFromQuote, updateWorkOrderAmount,
+      createWorkOrderFromQuote, updateWorkOrderAmount, cancelWorkOrder,
       jobBalance: (id: string) => {
         const order = dbData.workOrders.find((item) => item.id === id)
         return order ? jobBalanceCents(order, dbData.expenses) : null
       },
       addExpense, registerPayment, cancelFinancialEntry, saveProfessional, addScheduleEvent, saveTask,
-      loading, addClient, updateOpportunity, createOpportunity, saveQuote, refresh,
+      loading, addClient, updateClient, archiveClient, restoreClient, updateOpportunity, setOpportunityArchived, createOpportunity, saveQuote, refresh,
       toasts, toast, dismissToast,
     }
-  }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
-    createWorkOrderFromQuote, updateWorkOrderAmount, addExpense, registerPayment, cancelFinancialEntry,
+  }, [demoMode, setDemoMode, dbData, opps, localQuotes, loading, addClient, updateClient, archiveClient, restoreClient, updateOpportunity, createOpportunity, saveQuote, addQuote, updateQuote,
+    createWorkOrderFromQuote, updateWorkOrderAmount, cancelWorkOrder, setOpportunityArchived, addExpense, registerPayment, cancelFinancialEntry,
     saveProfessional, addScheduleEvent, saveTask, saveSettings, saveProduct, refresh, toasts, toast, dismissToast])
 
   return <StoreCtx.Provider value={value}>{children}</StoreCtx.Provider>

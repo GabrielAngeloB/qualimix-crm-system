@@ -223,6 +223,56 @@ export const createUser = createServerFn({ method: 'POST' })
     return { id, nome: data.name, username: data.username, perfil: 'user' as const, role: data.role, ativo: true, senha_pendente: false }
   })
 
+export const updateUserProfile = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Dados inválidos.')
+    const x = input as Record<string, unknown>
+    if (typeof x.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(x.id)) throw new Error('Usuário inválido.')
+    return {
+      id: x.id,
+      name: requireText(x.name, 'o nome', 2, 100),
+      role: x.role == null ? null : normalizeAssignedRole(x.role),
+    }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const current = requireAdmin(await requireCurrentProfile())
+    await withTransaction(async (client) => {
+      await client.query('SELECT pg_advisory_xact_lock($1, $2)', [741911, 2])
+      const result = await client.query<any>(
+        'SELECT id, nome, perfil, ativo FROM public.perfis WHERE id=$1 FOR UPDATE',
+        [data.id],
+      )
+      const target = result.rows[0]
+      if (!target) throw new Error('Usuário não encontrado.')
+      const wasAdmin = target.perfil === 'admin' || target.perfil === 'administrador'
+      const nextRole = data.role ?? target.perfil
+      if (current.id === data.id && target.perfil !== nextRole) {
+        throw new Error('Por segurança, não altere o próprio perfil de acesso. Outro administrador deve fazer isso.')
+      }
+      if (wasAdmin && target.ativo && nextRole !== 'admin' && nextRole !== 'administrador') {
+        const count = await client.query<{ count: number }>(
+          "SELECT count(*)::int AS count FROM public.perfis WHERE ativo=true AND perfil IN ('admin','administrador')",
+        )
+        if (Number(count.rows[0]?.count ?? 0) <= 1) {
+          throw new Error('Não é possível rebaixar o último administrador ativo.')
+        }
+      }
+      const roleChanged = target.perfil !== nextRole
+      await client.query(
+        'UPDATE public.perfis SET nome=$2, perfil=$3 WHERE id=$1',
+        [data.id,data.name,nextRole],
+      )
+      if (roleChanged) {
+        await client.query(
+          'UPDATE public.usuarios SET session_version=session_version+1 WHERE id=$1',
+          [data.id],
+        )
+      }
+    })
+    return { success: true }
+  })
+
 export const setUserActive = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('Dados inválidos.')

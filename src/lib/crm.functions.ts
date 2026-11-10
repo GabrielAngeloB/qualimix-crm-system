@@ -39,7 +39,7 @@ const mapSite = (r: any): Site => ({
   id: String(r.id), clientId: String(r.cliente_id), name: r.nome, address: r.endereco ?? '',
   city: r.cidade ?? '', region: r.regiao ?? '', contactName: r.contato_nome ?? '',
   contactPhone: r.contato_telefone ?? '', serviceType: r.tipo_servico ?? '',
-  accessNotes: r.observacoes_acesso ?? '', restrictions: r.restricoes ?? '', demo: Boolean(r.is_demo),
+  accessNotes: r.observacoes_acesso ?? '', restrictions: r.restricoes ?? '', active: Boolean(r.ativa), demo: Boolean(r.is_demo),
 })
 const mapOpportunity = (r: any): Opportunity => ({
   id: String(r.id), title: r.titulo, clientId: String(r.cliente_id), siteId: r.obra_id ?? null,
@@ -47,7 +47,7 @@ const mapOpportunity = (r: any): Opportunity => ({
   ownerId: r.responsavel_id ?? '', source: r.origem, enteredAt: isoDate(r.entrou_em),
   lastContact: nullableDate(r.ultimo_contato), nextContact: nullableDate(r.proximo_contato),
   nextAction: r.proxima_acao ?? '', lossReason: r.motivo_perda ?? null,
-  quoteId: null, history: Array.isArray(r.historico) ? r.historico : [], demo: Boolean(r.is_demo),
+  quoteId: null, history: Array.isArray(r.historico) ? r.historico : [], archived: Boolean(r.arquivada), demo: Boolean(r.is_demo),
 })
 const mapQuote = (r: any): QuoteRecord => {
   const d = r.dados_orcamento ?? {}
@@ -115,7 +115,7 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
   }>(`
     SELECT
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.clientes WHERE is_demo = false) x), '[]'::json) AS clients,
-      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.obras WHERE is_demo = false AND ativa = true) x), '[]'::json) AS sites,
+      COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.obras WHERE is_demo = false) x), '[]'::json) AS sites,
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.oportunidades WHERE is_demo = false) x), '[]'::json) AS opportunities,
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.created_at DESC, x.id DESC) FROM (SELECT * FROM public.orcamentos WHERE is_demo = false) x), '[]'::json) AS quotes,
       COALESCE((SELECT json_agg(to_jsonb(x) ORDER BY x.categoria, x.nome) FROM (SELECT * FROM public.produtos WHERE ativo = true) x), '[]'::json) AS products,
@@ -157,6 +157,125 @@ export const loadCrmData = createServerFn({ method: 'GET' }).handler(async (): P
     currentRole: currentProfile.role,
   }
 })
+
+type ManagedSiteRecord = {
+  id: string; cliente_id: string; cliente_nome: string; nome: string; endereco: string;
+  cidade: string; regiao: string; contato_nome: string; contato_telefone: string;
+  tipo_servico: string; observacoes_acesso: string; restricoes: string; ativa: boolean;
+}
+
+export const loadManagedSites = createServerFn({ method: 'GET' }).handler(async (): Promise<ManagedSiteRecord[]> => {
+  await requireCurrentProfile()
+  const result = await getPool().query<ManagedSiteRecord>(
+    `select o.id, o.cliente_id, c.nome as cliente_nome, o.nome, o.endereco,
+            coalesce(o.cidade,'') as cidade, coalesce(o.regiao,'') as regiao,
+            coalesce(o.contato_nome,'') as contato_nome, coalesce(o.contato_telefone,'') as contato_telefone,
+            coalesce(o.tipo_servico,'') as tipo_servico, coalesce(o.observacoes_acesso,'') as observacoes_acesso,
+            coalesce(o.restricoes,'') as restricoes, o.ativa
+       from public.obras o
+       join public.clientes c on c.id = o.cliente_id
+      where o.is_demo = false and c.is_demo = false
+      order by o.ativa desc, o.nome asc`,
+  )
+  return result.rows
+})
+
+export const saveManagedSite = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Dados da obra inválidos.')
+    const x = input as Record<string, unknown>
+    const read = (key: string, label: string, max: number, required = false) => {
+      if (typeof x[key] !== 'string') {
+        if (required) throw new Error('Informe ' + label + '.')
+        return ''
+      }
+      const value = (x[key] as string).trim()
+      if ((required && !value) || value.length > max) throw new Error(label + ' inválido.')
+      return value
+    }
+    const id = read('id', 'identificador', 80)
+    const clientId = read('clientId', 'cliente', 80, true)
+    const name = read('name', 'nome da obra', 160, true)
+    const address = read('address', 'endereço', 200, true)
+    if (name.length < 3) throw new Error('O nome da obra precisa ter ao menos 3 caracteres.')
+    return {
+      id, clientId, name, address,
+      city: read('city', 'cidade', 100), region: read('region', 'região', 80),
+      contactName: read('contactName', 'contato', 120),
+      contactPhone: read('contactPhone', 'telefone', 30),
+      serviceType: read('serviceType', 'tipo de serviço', 120),
+      accessNotes: read('accessNotes', 'observações de acesso', 1000),
+      restrictions: read('restrictions', 'restrições', 1000),
+    }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    if (profile.perfil !== 'admin' && !['comercial', 'operacao'].includes(profile.role)) {
+      throw new Error('Seu perfil não pode gerenciar obras.')
+    }
+    await withTransaction(async (tx) => {
+      if (data.id) {
+        const existing = await tx.query<any>(
+          'select cliente_id from public.obras where id=$1 and is_demo=false for update',
+          [data.id],
+        )
+        if (!existing.rowCount) throw new Error('Obra não encontrada.')
+        if (existing.rows[0].cliente_id !== data.clientId) {
+          throw new Error('Não é permitido transferir uma obra para outro cliente. Preserve os vínculos históricos.')
+        }
+        await tx.query(
+          `update public.obras set nome=$2,endereco=$3,cidade=$4,regiao=$5,contato_nome=$6,
+             contato_telefone=$7,tipo_servico=$8,observacoes_acesso=$9,restricoes=$10
+           where id=$1 and is_demo=false`,
+          [data.id,data.name,data.address,data.city,data.region,data.contactName,
+           data.contactPhone,data.serviceType,data.accessNotes,data.restrictions],
+        )
+      } else {
+        const client = await tx.query(
+          'select id from public.clientes where id=$1 and ativo=true and is_demo=false for share',
+          [data.clientId],
+        )
+        if (!client.rowCount) throw new Error('Selecione um cliente ativo.')
+        await tx.query(
+          `insert into public.obras
+            (cliente_id,nome,endereco,cidade,regiao,contato_nome,contato_telefone,tipo_servico,
+             observacoes_acesso,restricoes,ativa,is_demo)
+           values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,true,false)`,
+          [data.clientId,data.name,data.address,data.city,data.region,data.contactName,
+           data.contactPhone,data.serviceType,data.accessNotes,data.restrictions],
+        )
+      }
+    })
+    return { success: true }
+  })
+
+export const setManagedSiteActive = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Dados da obra inválidos.')
+    const x = input as Record<string, unknown>
+    if (typeof x.id !== 'string' || !x.id.trim() || x.id.length > 80 || typeof x.active !== 'boolean') {
+      throw new Error('Identificador ou situação da obra inválidos.')
+    }
+    return { id: x.id.trim(), active: x.active }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    if (profile.perfil !== 'admin' && !['comercial', 'operacao'].includes(profile.role)) {
+      throw new Error('Seu perfil não pode alterar a situação de obras.')
+    }
+    const result = await getPool().query(
+      `update public.obras o set ativa=$2
+        where o.id=$1 and o.is_demo=false
+          and ($2=false or exists (
+            select 1 from public.clientes c where c.id=o.cliente_id and c.ativo=true and c.is_demo=false
+          ))`,
+      [data.id,data.active],
+    )
+    if (!result.rowCount) throw new Error('Obra não encontrada ou cliente inativo. Reative o cliente antes da obra.')
+    return { success: true }
+  })
 
 export const persistClient = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
@@ -276,6 +395,83 @@ export const persistClient = createServerFn({ method: 'POST' })
     return { success: true }
   })
 
+export const updateClientOnServer = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) throw new Error('Dados do cliente inválidos.')
+    const x = input as Record<string, unknown>
+    const read = (key: string, label: string, max: number, required = false) => {
+      if (typeof x[key] !== 'string') {
+        if (required) throw new Error('Informe ' + label + '.')
+        return ''
+      }
+      const value = (x[key] as string).trim()
+      if ((required && !value) || value.length > max) throw new Error(label + ' inválido.')
+      return value
+    }
+    const id = read('id', 'identificador do cliente', 80, true)
+    const client = {
+      id,
+      name: read('name', 'nome do cliente', 160, true),
+      tradeName: read('tradeName', 'nome fantasia', 120),
+      document: onlyDigits(read('document', 'documento', 20)),
+      phone: normalizeBrazilPhone(read('phone', 'telefone', 20)),
+      whatsapp: normalizeBrazilPhone(read('whatsapp', 'WhatsApp', 20)),
+      email: read('email', 'e-mail', 254),
+      address: read('address', 'endereço', 200),
+      city: read('city', 'cidade', 100),
+      region: read('region', 'região', 80, true),
+      type: read('type', 'tipo de cliente', 40, true),
+      source: read('source', 'origem', 40, true),
+      notes: read('notes', 'observações', 2000),
+    }
+    const errors = validateClientFields(client)
+    if (Object.keys(errors).length) throw new Error(Object.values(errors).join(' '))
+    return client
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    if (profile.perfil !== 'admin') throw new Error('Somente administradores podem editar clientes.')
+    try {
+      const result = await getPool().query(
+        `update public.clientes
+            set nome=$2,nome_fantasia=$3,documento=$4,telefone=$5,whatsapp=$6,email=$7,
+                endereco=$8,cidade=$9,regiao=$10,tipo=$11,origem=$12,observacoes=$13
+          where id=$1 and is_demo=false`,
+        [data.id,data.name,data.tradeName,data.document || null,data.phone,data.whatsapp,
+         data.email,data.address,data.city,data.region,data.type,data.source,data.notes],
+      )
+      if (!result.rowCount) throw new Error('Cliente não encontrado.')
+    } catch (error) {
+      if ((error as { code?: string; constraint?: string })?.code === '23505') {
+        throw new Error('Esse CPF/CNPJ já está cadastrado para outro cliente.')
+      }
+      throw error
+    }
+    return { success: true }
+  })
+
+export const setClientActiveOnServer = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Dados do cliente inválidos.')
+    const x = input as Record<string, unknown>
+    if (typeof x.id !== 'string' || !x.id.trim() || x.id.length > 80 || typeof x.active !== 'boolean') {
+      throw new Error('Identificador ou situação do cliente inválidos.')
+    }
+    return { id: x.id.trim(), active: x.active }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    if (profile.perfil !== 'admin') throw new Error('Somente administradores podem arquivar ou reativar clientes.')
+    const result = await getPool().query(
+      'update public.clientes set ativo=$2 where id=$1 and is_demo=false',
+      [data.id,data.active],
+    )
+    if (!result.rowCount) throw new Error('Cliente não encontrado.')
+    return { success: true }
+  })
+
 export const persistOpportunity = createServerFn({ method: 'POST' })
   .validator((input: unknown) => {
     if (!input || typeof input !== 'object') throw new Error('Dados da oportunidade inválidos.')
@@ -355,10 +551,46 @@ export const persistOpportunity = createServerFn({ method: 'POST' })
     if (!sets.length) return { success: true }
     values.push(data.id)
     const result = await getPool().query(
-      'UPDATE public.oportunidades SET ' + sets.join(', ') + ', updated_at = now() WHERE id = $' + values.length,
+      'UPDATE public.oportunidades SET ' + sets.join(', ') + ', updated_at = now() WHERE id = $' + values.length + ' AND arquivada = false',
       values,
     )
     if (result.rowCount === 0) throw new Error('Oportunidade não encontrada.')
+    return { success: true }
+  })
+
+export const setOpportunityArchived = createServerFn({ method: 'POST' })
+  .validator((input: unknown) => {
+    if (!input || typeof input !== 'object') throw new Error('Oportunidade inválida.')
+    const x = input as Record<string, unknown>
+    if (typeof x.id !== 'string' || !x.id.trim() || x.id.length > 80 || typeof x.archived !== 'boolean') {
+      throw new Error('Dados de arquivamento inválidos.')
+    }
+    return { id: x.id.trim(), archived: x.archived }
+  })
+  .handler(async ({ data }) => {
+    assertSameOrigin()
+    const profile = await requireCurrentProfile()
+    assertCommercial(profile)
+    const message = data.archived ? 'Oportunidade arquivada.' : 'Oportunidade restaurada do arquivo.'
+    const result = await getPool().query(
+      `update public.oportunidades
+          set arquivada=$2,
+              arquivada_em=case when $2 then now() else null end,
+              arquivada_por=case when $2 then $3::uuid else null end,
+              historico=jsonb_build_array(jsonb_build_object(
+                'at',$4::text,'by',$3::text,'text',$5::text
+              )) || historico,
+              updated_at=now()
+        where id=$1 and is_demo=false and arquivada is distinct from $2`,
+      [data.id,data.archived,profile.id,new Date().toISOString(),message],
+    )
+    if (!result.rowCount) {
+      const existing = await getPool().query(
+        'select id from public.oportunidades where id=$1 and is_demo=false',
+        [data.id],
+      )
+      if (!existing.rowCount) throw new Error('Oportunidade não encontrada.')
+    }
     return { success: true }
   })
 
@@ -621,6 +853,7 @@ export const persistQuote = createServerFn({ method: 'POST' })
              WHERE id = $1 AND cliente_id = $2
                AND (obra_id IS NULL OR obra_id = $3)
                AND is_demo = false
+               AND arquivada = false
              LIMIT 1`,
             [data.opportunityId, data.clientId, data.siteId],
           )

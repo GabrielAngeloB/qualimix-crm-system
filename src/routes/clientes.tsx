@@ -29,7 +29,7 @@ function Clientes() {
   const clientSummaryById = useMemo(() => new Map(views.clients.map((row) => [String(row.id), row])), [views.clients])
   const totalSitesForClient = (clientId: string) => {
     const summary = clientSummaryById.get(clientId)
-    return summary ? Number(summary.total_obras ?? 0) : sites.filter((site) => site.clientId === clientId).length
+    return summary ? Number(summary.total_obras ?? 0) : sites.filter((site) => site.clientId === clientId && site.active !== false).length
   }
   const totalQuotesForClient = (clientId: string) => {
     const summary = clientSummaryById.get(clientId)
@@ -369,7 +369,7 @@ function ClientDetail({ client, canManage, onEdit, onArchive, onRestore, onClose
             <ul className="space-y-2">
               {own.map((s) => (
                 <li key={s.id} className="rounded-md border border-line p-3 text-sm">
-                  <p className="font-semibold">{s.name}</p>
+                  <div className="flex flex-wrap items-center gap-2"><p className="font-semibold">{s.name}</p>{s.active === false && <Badge tone="neutral">Inativa</Badge>}</div>
                   <p className="text-muted">{s.address} — {s.city} · {s.region}</p>
                   <p className="text-muted">Contato: {s.contactName || '—'} {s.contactPhone && `· ${formatPhone(s.contactPhone)}`} {s.serviceType && `· ${s.serviceType}`}</p>
                   {s.restrictions && <p className="text-warn">Restrição: {s.restrictions}</p>}

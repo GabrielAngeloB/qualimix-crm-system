@@ -28,6 +28,8 @@ export interface WorkOrder {
   contractedCents: number
   status: WorkOrderStatus
   createdAt: string
+  cancellationReason?: string | null
+  cancelledAt?: string | null
   valueHistory?: { at: string; fromCents: number; toCents: number }[]
   demo: false
 }
