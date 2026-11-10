@@ -299,8 +299,28 @@ export function validateSettings(value: AppSettings): AppSettings {
   if (hasDuplicates(next.leadSources) || hasDuplicates(next.regions) || hasDuplicates(next.lossReasons) || hasDuplicates(next.clientTypes) || hasDuplicates(next.elementTypes)) {
     throw new Error('Remova os nomes repetidos das listas de apoio antes de confirmar.')
   }
+  if (next.leadSources[0] !== 'Não informado') {
+    throw new Error('A origem "Não informado" precisa permanecer como a primeira opção do funil.')
+  }
+  if (next.funnelStages.some((stage) => !stage.label.trim())) {
+    throw new Error('Todas as etapas do funil precisam ter um rótulo.')
+  }
+  if (next.paymentMethods.some((method) => method.enabledOfficial !== null && typeof method.enabledOfficial !== 'boolean')) {
+    throw new Error('O status de cada forma de pagamento deve ser aceita, não aceita ou a confirmar.')
+  }
+  if (next.officialRules.maxDiscountPctWithoutApproval !== null &&
+      (next.officialRules.maxDiscountPctWithoutApproval < 0 || next.officialRules.maxDiscountPctWithoutApproval > 100)) {
+    throw new Error('O desconto sem aprovação deve estar entre 0 e 100%.')
+  }
+  if (next.officialRules.validityDays !== null &&
+      (!Number.isInteger(next.officialRules.validityDays) || next.officialRules.validityDays < 1 || next.officialRules.validityDays > 365)) {
+    throw new Error('A validade padrão deve ser um número inteiro entre 1 e 365 dias.')
+  }
   if (!Number.isInteger(next.officialRules.quantityDecimals) || next.officialRules.quantityDecimals < 0 || next.officialRules.quantityDecimals > 4) {
     throw new Error('As casas decimais de quantidade devem estar entre 0 e 4.')
+  }
+  if (next.officialRules.freight.regions.some((region) => !next.regions.includes(region.name))) {
+    throw new Error('Os nomes das regiões de frete precisam corresponder aos cadastros de regiões.')
   }
   if (!Number.isInteger(next.demoRules.quantityDecimals) || next.demoRules.quantityDecimals < 0 || next.demoRules.quantityDecimals > 4) {
     throw new Error('As casas decimais de demonstração devem estar entre 0 e 4.')
