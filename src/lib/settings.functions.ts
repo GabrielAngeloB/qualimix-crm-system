@@ -6,6 +6,7 @@ import { assertSameOrigin, requireAdmin, requireCurrentProfile } from './auth.se
 import { getPool } from './db.server'
 import { isValidIsoDate } from './crm-validation'
 import { parseDecimal } from './format'
+import { isValidCNPJ, onlyDigits } from './documents'
 
 export type LoadedSettings = AppSettings & {
   /** Identifica se a linha persistida foi encontrada e carregada. */
@@ -16,7 +17,7 @@ export type LoadedSettings = AppSettings & {
 
 export type SaveProductInput = Pick<CatalogItem,
   'id' | 'name' | 'description' | 'basePrice' | 'active' | 'validFrom'
-> & { internalNotes?: string }
+>
 
 type ProductRow = {
   id: string
@@ -246,8 +247,24 @@ export const saveSettings = createServerFn({ method: 'POST' })
     if (!data.settings || typeof data.settings !== 'object' || Array.isArray(data.settings)) {
       throw new Error('Informe as configurações que deseja salvar.')
     }
+    const settings = validateSettings(data.settings as AppSettings)
+    const cnpj = settings.company.cnpj?.trim() ?? ''
+    if (cnpj && !isValidCNPJ(cnpj)) {
+      throw new Error('Informe um CNPJ válido com 14 dígitos.')
+    }
+    const logoUrl = settings.company.logoUrl?.trim() ?? ''
+    if (logoUrl) {
+      let parsedLogoUrl: URL
+      try { parsedLogoUrl = new URL(logoUrl) } catch { throw new Error('A logo precisa ser uma URL HTTPS válida.') }
+      if (parsedLogoUrl.protocol !== 'https:') throw new Error('A logo precisa usar HTTPS.')
+    }
+    settings.company = {
+      ...settings.company,
+      cnpj: cnpj ? onlyDigits(cnpj) : null,
+      logoUrl: logoUrl || null,
+    }
     return {
-      settings: validateSettings(data.settings as AppSettings),
+      settings,
       expectedUpdatedAt: data.expectedUpdatedAt,
     }
   })
@@ -325,11 +342,9 @@ export const saveProduct = createServerFn({ method: 'POST' })
     const id = typeof data.id === 'string' ? data.id.trim() : ''
     const name = typeof data.name === 'string' ? data.name.trim() : ''
     const description = typeof data.description === 'string' ? data.description.trim() : ''
-    const internalNotes = typeof data.internalNotes === 'string' ? data.internalNotes.trim() : ''
     if (!id || id.length > 80) throw new Error('Produto inválido.')
     if (name.length < 2 || name.length > 180) throw new Error('O nome do produto deve ter entre 2 e 180 caracteres.')
     if (description.length > 1000) throw new Error('A descrição deve ter até 1.000 caracteres.')
-    if (internalNotes.length > 5000) throw new Error('As observações internas devem ter até 5.000 caracteres.')
     if (typeof data.active !== 'boolean') throw new Error('O status do produto é inválido.')
     const validFrom = data.validFrom == null || data.validFrom === '' ? null : data.validFrom
     if (validFrom !== null && (typeof validFrom !== 'string' || !isValidIsoDate(validFrom))) {
@@ -350,7 +365,6 @@ export const saveProduct = createServerFn({ method: 'POST' })
       basePrice: parsedPrice.value,
       active: data.active,
       validFrom,
-      internalNotes,
     }
   })
   .handler(async ({ data }) => {
@@ -362,10 +376,9 @@ export const saveProduct = createServerFn({ method: 'POST' })
            descricao = $3,
            preco_base = $4,
            ativo = $5,
-           valido_desde = $6,
-           observacoes_internas = $7
+           valido_desde = $6
        WHERE id = $1`,
-      [data.id, data.name, data.description, data.basePrice, data.active, data.validFrom, data.internalNotes ?? ''],
+      [data.id, data.name, data.description, data.basePrice, data.active, data.validFrom],
     )
     if (!result.rowCount) throw new Error('Produto não encontrado.')
     return { success: true }
