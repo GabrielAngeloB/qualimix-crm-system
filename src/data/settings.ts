@@ -316,8 +316,12 @@ export function validateSettings(value: AppSettings): AppSettings {
     throw new Error('O status de cada forma de pagamento deve ser aceita, não aceita ou a confirmar.')
   }
   if (next.officialRules.maxDiscountPctWithoutApproval !== null &&
-      (next.officialRules.maxDiscountPctWithoutApproval < 0 || next.officialRules.maxDiscountPctWithoutApproval > 100)) {
+      (!Number.isFinite(next.officialRules.maxDiscountPctWithoutApproval) ||
+        next.officialRules.maxDiscountPctWithoutApproval < 0 || next.officialRules.maxDiscountPctWithoutApproval > 100)) {
     throw new Error('O desconto sem aprovação deve estar entre 0 e 100%.')
+  }
+  if (typeof next.officialRules.minVolume.chargeDifference !== 'boolean') {
+    throw new Error('Informe se a diferença até o volume mínimo deve ser cobrada.')
   }
   if (next.officialRules.validityDays !== null &&
       (!Number.isInteger(next.officialRules.validityDays) || next.officialRules.validityDays < 1 || next.officialRules.validityDays > 365)) {
