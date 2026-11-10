@@ -82,4 +82,15 @@ describe('app settings', () => {
     expect(() => validateSettings(configured)).toThrow(/regiões de frete/i)
   })
 
+
+  it('rejects non-finite discounts and invalid minimum-volume switches', () => {
+    const configured = createDefaultSettings()
+    configured.officialRules.maxDiscountPctWithoutApproval = Number.NaN
+    expect(() => validateSettings(configured)).toThrow(/desconto sem aprovação/i)
+
+    configured.officialRules.maxDiscountPctWithoutApproval = null
+    ;(configured.officialRules.minVolume as unknown as { chargeDifference: unknown }).chargeDifference = null
+    expect(() => validateSettings(configured)).toThrow(/diferença até o volume mínimo/i)
+  })
+
 })
