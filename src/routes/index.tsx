@@ -52,7 +52,7 @@ function Painel() {
       text: event.text,
       ref: opportunity.title,
       by: event.by,
-      at: event.at.slice(0, 10),
+      at: (typeof event.at === 'string' ? event.at : '').slice(0, 10),
     })))
     .sort((a, b) => b.at.localeCompare(a.at))
     .slice(0, 6)
