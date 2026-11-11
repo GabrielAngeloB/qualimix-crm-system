@@ -182,7 +182,7 @@ export const loadOperationalRecords = createServerFn({ method: 'GET' })
       tasks: canViewSales ? row.tasks.map(mapTask) : [],
       views: {
         finance: canViewFinance ? row.financeView : [],
-        orders: row.ordersView,
+        orders: canViewFinance ? row.ordersView : [],
         professionals: canViewOperations || canViewFinance ? row.professionalsView : [],
         schedule: canViewOperations ? row.scheduleView : [],
         tasks: canViewSales ? row.tasksView : [],
