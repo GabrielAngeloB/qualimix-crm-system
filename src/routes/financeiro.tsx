@@ -57,6 +57,7 @@ function Financeiro() {
     views,
   } = useStore()
   const canEditFinance = currentRole === 'administrador' || currentRole === 'financeiro'
+  const canAddExpense = canEditFinance || currentRole === 'operacao'
   const today = todayInSaoPaulo()
   const [kind, setKind] = useState<'todos' | FinancialKind>('todos')
   const [statusFilter, setStatusFilter] = useState('todos')
@@ -184,7 +185,7 @@ function Financeiro() {
         eyebrow="Financeiro"
         title="Contas a pagar e receber"
         description="Vencimentos, baixas totais ou parciais, vínculo com obras e profissionais. Pix/boleto informado não representa pagamento sem uma baixa registrada."
-        actions={canEditFinance ? <Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button> : undefined}
+        actions={canAddExpense ? <Button variant="primary" onClick={() => setShowExpense((value) => !value)}><Plus className="h-4 w-4" /> Lançar despesa</Button> : undefined}
       />
 
       <dl className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-5">
@@ -195,7 +196,7 @@ function Financeiro() {
         <Kpi label="Vencido" value={brlCents(overdueCents)} sub="Pagar + receber" danger={overdueCents > 0} />
       </dl>
 
-      {canEditFinance && showExpense && (
+      {canAddExpense && showExpense && (
         <Card className="mb-6">
           <div className="border-b border-line px-5 py-4">
             <h2 className="text-xl font-bold uppercase">Nova despesa da obra</h2>
