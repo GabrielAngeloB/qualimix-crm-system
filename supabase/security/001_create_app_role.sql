@@ -31,7 +31,7 @@ grant usage on schema public to qualimix_app;
 
 -- Autenticação customizada e administração de contas.
 grant select, insert on public.perfis to qualimix_app;
-grant update (ativo) on public.perfis to qualimix_app;
+grant update (ativo, nome, perfil) on public.perfis to qualimix_app;
 grant select, insert on public.usuarios to qualimix_app;
 grant update (session_version) on public.usuarios to qualimix_app;
 grant select, insert, update on public.login_tentativas to qualimix_app;
