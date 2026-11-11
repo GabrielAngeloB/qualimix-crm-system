@@ -32,7 +32,7 @@ const mapClient = (r: any): Client => ({
   id: String(r.id), name: r.nome, tradeName: r.nome_fantasia ?? '', document: r.documento ?? '',
   phone: r.telefone ?? '', whatsapp: r.whatsapp ?? '', email: r.email ?? '', address: r.endereco ?? '',
   city: r.cidade ?? '', region: r.regiao ?? '', type: r.tipo ?? 'Outro', source: r.origem ?? 'Outros',
-  ownerId: r.responsavel_id ?? '', notes: r.observacoes ?? '', createdAt: isoDate(r.created_at),
+  ownerId: r.responsavel_id ?? '', notes: r.observacoes ?? '', createdAt: isoDateTime(r.created_at),
   active: Boolean(r.ativo), demo: Boolean(r.is_demo),
 })
 const mapSite = (r: any): Site => ({

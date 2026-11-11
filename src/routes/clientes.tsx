@@ -6,7 +6,7 @@ import { clientTypes, leadSources, regions } from '../data/settings'
 import { today, userName, type Client, type Site } from '../data/fixtures'
 import { formatDocument, formatPhone, onlyDigits, whatsappUrl } from '../lib/documents'
 import { normalizeBrazilPhone, validateClientFields } from '../lib/crm-validation'
-import { brlCents, dateBR, daysBetween } from '../lib/format'
+import { brlCents, dateBR, dateTimeBR, daysBetween } from '../lib/format'
 import { Badge, Button, Card, Drawer, EmptyState, Field, PageHeader, cx, inputCls } from '../components/ui'
 import { Pagination, SortTh, useSortPage } from '../components/table'
 import { MiniStat, statusTone } from '../components/bits'
@@ -101,10 +101,11 @@ function Clientes() {
           </EmptyState>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[820px] text-left text-sm">
+            <table className="w-full min-w-[1040px] text-left text-sm">
               <thead className="border-b border-line bg-surface-2 text-xs text-muted">
                 <tr>
                   <SortTh label="Cliente" k="name" sort={t.sort} toggle={t.toggle} />
+                  <SortTh label="Cadastro" k="created" sort={t.sort} toggle={t.toggle} />
                   <th className="px-4 py-3 font-bold uppercase tracking-wide">Contato</th>
                   <SortTh label="Cidade / região" k="city" sort={t.sort} toggle={t.toggle} />
                   <SortTh label="Tipo" k="type" sort={t.sort} toggle={t.toggle} />
@@ -120,6 +121,9 @@ function Clientes() {
                       <span className="block truncate text-xs text-muted">
                         {c.document ? formatDocument(c.document) : 'Sem documento'} {!c.active && '· inativo'} {c.demo && '· demo'}
                       </span>
+                    </td>
+                    <td className="whitespace-nowrap px-4 py-3 text-xs tabular text-muted">
+                      {c.createdAt.includes('T') ? dateTimeBR(c.createdAt) : dateBR(c.createdAt)}
                     </td>
                     <td className="px-4 py-3 tabular">
                       {formatPhone(c.whatsapp || c.phone)}
