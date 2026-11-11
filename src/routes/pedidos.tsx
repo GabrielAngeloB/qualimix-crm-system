@@ -20,6 +20,7 @@ function Pedidos() {
   const { quotes, clients, sites, workOrders, createWorkOrderFromQuote, updateWorkOrderAmount, cancelWorkOrder, jobBalance, toast, currentRole, views } = useStore()
   const canCreateOrder = currentRole === 'administrador' || currentRole === 'comercial'
   const canEditOrderAmount = currentRole === 'administrador' || currentRole === 'comercial'
+  const canViewOrderCosts = ['admin', 'administrador', 'operacao', 'financeiro', 'consulta'].includes(currentRole)
   const [dueDates, setDueDates] = useState<Record<string, string>>({})
   const [methods, setMethods] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
@@ -149,8 +150,8 @@ function Pedidos() {
                   <th className="px-4 py-3">Pedido</th>
                   <th className="px-4 py-3">Cliente / obra</th>
                   <th className="px-4 py-3 text-right">Contratado</th>
-                  <th className="px-4 py-3 text-right">Custos</th>
-                  <th className="px-4 py-3 text-right">Saldo da obra</th>
+                  {canViewOrderCosts && <th className="px-4 py-3 text-right">Custos</th>}
+                  {canViewOrderCosts && <th className="px-4 py-3 text-right">Saldo da obra</th>}
                   <th className="px-4 py-3">Status</th>
                   <th className="px-4 py-3">Origem</th>
                   {canEditOrderAmount && <th className="px-4 py-3 text-right">Ações</th>}
@@ -207,8 +208,8 @@ function Pedidos() {
                         )}
                         {order.valueHistory && order.valueHistory.length > 0 && <span className="block text-xs text-muted">{order.valueHistory.length} alteração(ões) de valor</span>}
                       </td>
-                      <td className="px-4 py-3 text-right tabular">{brlCents(costCents)}</td>
-                      <td className={cx('px-4 py-3 text-right font-semibold tabular', balance < 0 && 'text-brand')}>{brlCents(balance)}</td>
+                      {canViewOrderCosts && <td className="px-4 py-3 text-right tabular">{brlCents(costCents)}</td>}
+                      {canViewOrderCosts && <td className={cx('px-4 py-3 text-right font-semibold tabular', balance < 0 && 'text-brand')}>{brlCents(balance)}</td>}
                       <td className="px-4 py-3"><Badge>{order.status}</Badge>{order.cancellationReason && <span className="mt-1 block max-w-[220px] text-xs text-muted" title={order.cancellationReason}>Motivo: {order.cancellationReason}</span>}</td>
                       <td className="px-4 py-3"><Link to="/orcamentos" className="text-brand hover:underline">{order.quoteId}</Link></td>
                       {canEditOrderAmount && <td className="px-4 py-3 text-right">{order.status !== 'Cancelada' && <Button size="sm" variant="danger" onClick={() => void cancelOrder(order.id, order.number)}><XCircle className="h-4 w-4" /> Cancelar pedido</Button>}</td>}
